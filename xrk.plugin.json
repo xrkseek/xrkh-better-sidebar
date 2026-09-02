@@ -1,6 +1,6 @@
 {
   "id": "xrkh-better-sidebar",
-  "version": "0.17.1",
+  "version": "0.17.2",
   "description": "XRK-Harness standard sidebar: explorer / editor / terminal / git / browser.",
   "engines": {
     "xrk": ">=0.1.29"
