@@ -10,13 +10,18 @@
 前置：已能跑 `xrkh web` / `npx @xrkseek/harness-cli web`，Node ≥ 26。
 
 ```bash
-xrkh plugin add xrk-better-sidebar@latest
-# 或本地路径：
-# xrkh plugin add ./XRK-better-sidebar
+# 本地仓（本机已 clone）
+xrkh plugin add /path/to/XRK-better-sidebar
+
+# 或直接从 GitHub
+xrkh plugin add github:xrkseek/XRK-better-sidebar
+
 xrkh restart
 ```
 
-装完硬刷新浏览器。终端等 lazy chunk 依赖 Host 已能从插件目录提供 `lib/client-*.js`（`xrkh plugin add` 会拷到 `plugins/web/`）。
+npm 名 `xrk-better-sidebar` 发版后再用 `xrkh plugin add xrk-better-sidebar@latest`。
+
+装完硬刷新浏览器。终端等 lazy chunk 由 `xrkh plugin add` 拷到 `plugins/web/`；Host `/sidebar/*` 走 XRK `dsh-compat`。
 
 ## 与上游差异
 
