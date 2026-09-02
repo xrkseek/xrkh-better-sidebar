@@ -7,7 +7,7 @@
  */
 
 /** The user-settings namespace holding the side card preferences. */
-export const SIDEBAR_PREFS_NS = 'dsh-better-sidebar'
+export const SIDEBAR_PREFS_NS = 'xrkh-better-sidebar'
 
 /** User-facing side card preferences (new-conversation defaults). */
 export interface SidebarPrefs {

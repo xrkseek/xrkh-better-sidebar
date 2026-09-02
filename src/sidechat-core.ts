@@ -38,7 +38,7 @@ export const SIDE_BOUNDARY_PREFIX = 'Side conversation boundary'
 /** The plugin identity stamped on the source of context-injection messages
  *  (boundary prompt + parked snapshot), so the transcript recognizes them
  *  structurally — not by text prefix. */
-export const SIDE_INJECTION_PLUGIN = 'dsh-better-sidebar'
+export const SIDE_INJECTION_PLUGIN = 'xrkh-better-sidebar'
 
 /**
  * The boundary prompt delivered as the thread's first user message: the
