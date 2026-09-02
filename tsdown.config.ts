@@ -216,7 +216,7 @@ function chunkBundle(name: string): UserConfig {
     noExternal: (id: string) => (CLIENT_EXTERNALS.includes(id) ? undefined : true),
     plugins: [
       purityGatePlugin(),
-      makeCssPlugin('dsh-better-sidebar'),
+      makeCssPlugin('xrkh-better-sidebar'),
       ...(name === 'mermaid' ? [mermaidChunkAliases()] : []),
     ],
     outputOptions: {
@@ -341,9 +341,9 @@ export default [
     clean: false,
   },
   // Official profile channel: bundle id = package name (package.json `name`).
-  clientBundle('dsh-better-sidebar', 'client.js'),
+  clientBundle('xrkh-better-sidebar', 'client.js'),
   // Plugin-registry channel: bundle id = manifest id (dsh.plugin.json `id`).
-  clientBundle('dsh-external/dsh-better-sidebar', 'client-registry.js'),
+  clientBundle('xrkh-better-sidebar', 'client-registry.js'),
   // Lazy chunks: shared by both channels, fetched on first use through the
   // plugin's /sidebar/bundle route (see src/client/chunk-loader.ts).
   ...CHUNKS.map(chunkBundle),
