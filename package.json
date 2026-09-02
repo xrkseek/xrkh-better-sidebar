@@ -1,11 +1,11 @@
 {
-  "name": "xrk-better-sidebar",
+  "name": "xrkh-better-sidebar",
   "version": "0.17.1",
-  "description": "XRK-Harness web plugin: VSCode-like right sidebar (explorer / editor / terminal / git / browser). Fork of dsh-better-sidebar, Host routes via XRK dsh-compat.",
+  "description": "XRK-Harness (xrkh) web plugin: VSCode-like right sidebar. Fork of dsh-better-sidebar; Host /sidebar/* via dsh-compat.",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "https://github.com/xrkseek/XRK-better-sidebar"
+    "url": "git+ssh://git@github.com/xrkseek/XRKH-better-sidebar.git"
   },
   "publishConfig": {
     "access": "public"
@@ -54,15 +54,17 @@
     "cordis.patch.yml",
     "README.md",
     "README_EN.md",
-    "LICENSE"
+    "LICENSE",
+    "scripts/install-xrkh.ps1",
+    "scripts/install-xrkh.sh",
+    "xrk.plugin.json",
+    "FORK.md"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && tsdown",
-    "prepublishOnly": "pnpm build",
     "typecheck": "tsc --noEmit",
     "bundle": "tsdown",
     "watch": "tsdown --watch",
-    "prepare": "tsdown",
     "test": "vitest run",
     "test:mount": "bash scripts/e2e-mount.sh",
     "check:consumer-types": "bash scripts/check-consumer-types.sh"
@@ -173,5 +175,9 @@
       ],
       "platform": "web"
     }
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/xrkseek/XRKH-better-sidebar/issues"
+  },
+  "homepage": "https://github.com/xrkseek/XRKH-better-sidebar#readme"
 }
