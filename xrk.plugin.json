@@ -1,7 +1,7 @@
 {
   "id": "xrkh-better-sidebar",
   "version": "0.17.1",
-  "description": "VSCode-like right sidebar for XRK-Harness. Client half; Host /sidebar/* via dsh-compat.",
+  "description": "XRK-Harness standard sidebar: explorer / editor / terminal / git / browser.",
   "engines": {
     "xrk": ">=0.1.29"
   },

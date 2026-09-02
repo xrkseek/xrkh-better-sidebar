@@ -1,11 +1,11 @@
 {
   "name": "xrkh-better-sidebar",
   "version": "0.17.1",
-  "description": "XRK-Harness (xrkh) web plugin: VSCode-like right sidebar. Fork of dsh-better-sidebar; Host /sidebar/* via dsh-compat.",
+  "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/xrkseek/XRKH-better-sidebar.git"
+    "url": "git+ssh://git@github.com/xrkseek/xrkh-better-sidebar.git"
   },
   "publishConfig": {
     "access": "public"
@@ -57,8 +57,7 @@
     "LICENSE",
     "scripts/install-xrkh.ps1",
     "scripts/install-xrkh.sh",
-    "xrk.plugin.json",
-    "FORK.md"
+    "xrk.plugin.json"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && tsdown",
@@ -177,7 +176,7 @@
     }
   },
   "bugs": {
-    "url": "https://github.com/xrkseek/XRKH-better-sidebar/issues"
+    "url": "https://github.com/xrkseek/xrkh-better-sidebar/issues"
   },
-  "homepage": "https://github.com/xrkseek/XRKH-better-sidebar#readme"
+  "homepage": "https://github.com/xrkseek/xrkh-better-sidebar#readme"
 }
