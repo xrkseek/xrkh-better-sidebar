@@ -1,0 +1,15 @@
+{
+  "id": "xrk-better-sidebar",
+  "version": "0.17.1",
+  "description": "VSCode-like right sidebar for XRK-Harness (explorer / editor / terminal / git / browser). Client half; Host /sidebar/* via dsh-compat.",
+  "engines": {
+    "xrk": ">=0.1.29"
+  },
+  "contributes": {
+    "tools": [],
+    "skills": []
+  },
+  "client": {
+    "main": "./lib/client.js"
+  }
+}
