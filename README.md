@@ -30,7 +30,7 @@ xrkh restart
 |----|------|
 | npm | `xrkh-better-sidebar` |
 | 仓库 | `xrkseek/xrkh-better-sidebar` |
-| 清单 | `xrk.client`（`package.json`）· `xrk.plugin.json` |
+| 清单 | `package.json` → `xrk.client`（client 半包） |
 | 注入 | `@xrkseek/client-runtime` · `client-locale` · `client-ui-slots` · `client-ui-conversation` · `client-modules` |
 | Host | 产品 `dsh-compat` 提供 `/sidebar/api` · `/sidebar/bundle` · PTY 等 |
 

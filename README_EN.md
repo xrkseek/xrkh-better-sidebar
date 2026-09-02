@@ -30,7 +30,7 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 |------|--------|
 | npm | `xrkh-better-sidebar` |
 | Repo | `xrkseek/xrkh-better-sidebar` |
-| Manifest | `xrk.client` · `xrk.plugin.json` |
+| Manifest | `package.json` → `xrk.client` (client half) |
 | Inject | `@xrkseek/client-*` (runtime, locale, slots, conversation, modules) |
 | Host | Product adapter: `/sidebar/api` · `/sidebar/bundle` · PTY |
 

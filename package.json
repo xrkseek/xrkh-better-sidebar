@@ -1,6 +1,6 @@
 {
   "name": "xrkh-better-sidebar",
-  "version": "0.17.2",
+  "version": "0.17.3",
   "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {
@@ -56,8 +56,7 @@
     "README_EN.md",
     "LICENSE",
     "scripts/install-xrkh.ps1",
-    "scripts/install-xrkh.sh",
-    "xrk.plugin.json"
+    "scripts/install-xrkh.sh"
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && tsdown",
