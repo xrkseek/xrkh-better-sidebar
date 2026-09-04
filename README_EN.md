@@ -3,14 +3,14 @@
 > **Audience**: XRK-Harness end users · integrators
 
 Standard sidebar plugin for XRK-Harness (`xrkh`): explorer · editor · terminal · git · browser, isolated per session.  
-Host serves `/sidebar/*` via the product adapter; this package ships the **client** half (and optional process manifest).
+Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package ships the **client** half.
 
 ## Install
 
-Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26.
+Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.2.3**.
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.0
+xrkh plugin add xrkh-better-sidebar@0.18.1
 xrkh restart
 ```
 
@@ -31,6 +31,11 @@ pnpm xrk web --workspace .
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
+## 0.18.1
+
+- `subagents.live`: accept nested `tool` and legacy flat `tool` wire so subagent activity previews do not crash
+- Align with Host **0.2.3** native `/sidebar/*` (nested live shape)
+
 ## 0.18.0
 
 - XRKH-native: drop DSH dual-track (`dsh` manifest · better-locale · DSH install scripts · marketplace catalogs)
@@ -46,7 +51,7 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 | Repo | `xrkseek/xrkh-better-sidebar` |
 | Manifest | `package.json` → `xrk.client` (client half) |
 | Inject | `@xrkseek/client-*` (runtime, locale, slots, conversation, modules) |
-| Host | Product adapter: `/sidebar/api` · `/sidebar/bundle` · PTY |
+| Host | Native Host: `/sidebar/api` · `/sidebar/bundle` · PTY |
 
 ## Develop
 

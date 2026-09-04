@@ -41,7 +41,7 @@ import {
   isSideThreadSummary,
   rootAncestor,
 } from './subagent-detect.ts'
-import { type LastActivity } from '../subagent-activity.ts'
+import { type LastActivity, coerceLiveActivity } from '../subagent-activity.ts'
 import { SIDE_LABEL_PREFIX } from '../side-label.ts'
 import { normalizeSubagentCatalogs } from '../subagent-catalog.ts'
 import {
@@ -161,13 +161,14 @@ function SubagentLiveLines(props: { live: LastActivity | undefined }) {
   if (live?.text === undefined && live?.tool === undefined) {
     return <span className={css.subagentLive}>{t('subagentThinking')}</span>
   }
+  const args = typeof live.tool?.args === 'string' ? live.tool.args : ''
   return (
     <>
       {live.tool !== undefined && (
         <span className={css.subagentLive}>
           <span className={css.subagentLiveTool}>{live.tool.name}</span>
-          {live.tool.args !== '' && (
-            <span className={css.subagentLiveArgs}>{preview(live.tool.args, ARGS_PREVIEW)}</span>
+          {args !== '' && (
+            <span className={css.subagentLiveArgs}>{preview(args, ARGS_PREVIEW)}</span>
           )}
         </span>
       )}
@@ -210,7 +211,13 @@ function useSubagentLive(
       controllerRef.current = controller
       try {
         const result = await api.subagentsLive(targetRootId, controller.signal)
-        if (!disposed) setLive(result.live)
+        if (!disposed) {
+          const next: Record<string, LastActivity> = {}
+          for (const [id, activity] of Object.entries(result.live ?? {})) {
+            next[id] = coerceLiveActivity(activity)
+          }
+          setLive(next)
+        }
       } catch {
         // Keep the last known live map; the next scheduled poll retries.
       } finally {

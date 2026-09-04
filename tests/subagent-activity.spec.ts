@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contentText, lastActivity } from '../src/subagent-activity.ts'
+import { contentText, coerceLiveActivity, lastActivity } from '../src/subagent-activity.ts'
 import type { SidebarSessionEvent } from '../src/context-types.ts'
 
 describe('subagent activity summary parser', () => {
@@ -101,5 +101,19 @@ describe('subagent activity summary parser', () => {
       text: 'first',
       tool: { name: 'read', args: '{"path":"a.ts"}' },
     })
+  })
+
+  it('coerceLiveActivity accepts nested and flat Host live wires', () => {
+    expect(coerceLiveActivity({
+      tool: { name: 'bash', args: 'ls' },
+      text: 'hi',
+    })).toEqual({ tool: { name: 'bash', args: 'ls' }, text: 'hi' })
+    expect(coerceLiveActivity({ tool: 'bash', args: 'ls' })).toEqual({
+      tool: { name: 'bash', args: 'ls' },
+    })
+    expect(coerceLiveActivity({ tool: 'bash' })).toEqual({
+      tool: { name: 'bash', args: '' },
+    })
+    expect(coerceLiveActivity(undefined)).toEqual({})
   })
 })

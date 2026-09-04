@@ -3,14 +3,14 @@
 > **读者**：XRK-Harness 终端用户 · 集成者
 
 XRK-Harness（`xrkh`）标准侧边栏插件：资源管理器 · 编辑器 · 终端 · Git · 浏览器等工作台，按会话隔离。  
-Host 侧 `/sidebar/*` 由产品内置兼容器接线；本包提供 **client 半包**（及可选进程清单）。
+Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`）；本包提供 **client 半包**。
 
 ## 安装
 
-前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。
+前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.2.3**。
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.0
+xrkh plugin add xrkh-better-sidebar@0.18.1
 xrkh restart
 ```
 
@@ -30,6 +30,11 @@ pnpm xrk web --workspace .
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
+
+## 0.18.1
+
+- `subagents.live`：兼容嵌套 `tool` 与旧版扁平 `tool` wire，避免子代理活动预览崩溃
+- 与 Host **0.2.3** 原生 `/sidebar/*`（嵌套 live 形状）对齐
 
 ## 0.18.0
 

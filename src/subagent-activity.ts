@@ -6,6 +6,9 @@
  * itself — the SubagentView component turns this into the card's status
  * lines. Kept framework-free so the parser is unit-testable in the node
  * environment.
+ *
+ * Host wire (`SidebarSubagentLiveActivity`) uses the same nested `tool`
+ * shape. {@link coerceLiveActivity} also accepts a brief flat legacy shape.
  */
 import type { SidebarSessionEvent } from './context-types.ts'
 
@@ -35,6 +38,32 @@ export interface LastActivity {
   text?: string
   /** The latest tool call in the tail. */
   tool?: { name: string; args: string }
+}
+
+/**
+ * Normalize Host / legacy live payloads into {@link LastActivity}.
+ * Canonical wire is nested `tool` (`SidebarSubagentLiveActivity`). Older Host
+ * builds briefly emitted flat `{ tool: string, args? }` — accept both so the
+ * Subagent page never crashes on `preview(undefined.length)`.
+ */
+export function coerceLiveActivity(raw: unknown): LastActivity {
+  if (raw === null || typeof raw !== 'object') return {}
+  const value = raw as { text?: unknown; tool?: unknown; args?: unknown }
+  const out: LastActivity = {}
+  if (typeof value.text === 'string') out.text = value.text
+  if (typeof value.tool === 'string') {
+    out.tool = {
+      name: value.tool,
+      args: typeof value.args === 'string' ? value.args : '',
+    }
+  } else if (value.tool !== null && typeof value.tool === 'object') {
+    const tool = value.tool as { name?: unknown; args?: unknown }
+    out.tool = {
+      name: typeof tool.name === 'string' ? tool.name : 'tool',
+      args: typeof tool.args === 'string' ? tool.args : '',
+    }
+  }
+  return out
 }
 
 /**
