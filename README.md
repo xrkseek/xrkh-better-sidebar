@@ -7,29 +7,16 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 
 ## 安装
 
-前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.2.3**。
+前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.2.3**。推荐从 **npmjs** 安装：
 
 ```bash
 xrkh plugin add xrkh-better-sidebar@0.18.1
 xrkh restart
 ```
 
-从源码（SSH）：
-
-```bash
-git clone git@github.com:xrkseek/xrkh-better-sidebar.git
-xrkh plugin add ./xrkh-better-sidebar
-xrkh restart
-```
-
-本机与 XRK-Harness 源码仓联调时，可将本仓放在 Harness 的 `extensions/xrkh-better-sidebar/`（主仓 gitignore，不进提交），然后：
-
-```powershell
-$env:XRK_PLUGINS_DIR = "./extensions"
-pnpm xrk web --workspace .
-```
-
 装完硬刷新浏览器（Ctrl+Shift+R）。
+
+源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
 ## 0.18.1
 

@@ -7,29 +7,16 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 
 ## Install
 
-Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.2.3**.
+Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.2.3**. Install from **npmjs**:
 
 ```bash
 xrkh plugin add xrkh-better-sidebar@0.18.1
 xrkh restart
 ```
 
-From source (SSH):
-
-```bash
-git clone git@github.com:xrkseek/xrkh-better-sidebar.git
-xrkh plugin add ./xrkh-better-sidebar
-xrkh restart
-```
-
-For local monorepo smoke tests, place this tree under Harness `extensions/xrkh-better-sidebar/` (gitignored by the main repo), then:
-
-```powershell
-$env:XRK_PLUGINS_DIR = "./extensions"
-pnpm xrk web --workspace .
-```
-
 Hard-refresh the browser after install (Ctrl+Shift+R).
+
+Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
 
 ## 0.18.1
 
