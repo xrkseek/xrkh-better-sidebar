@@ -1,12 +1,7 @@
 /**
- * Built-in plugin catalog data-integrity tests (both files: the TAB
- * catalog in plugins-tabs.ts and the FILE-PREVIEWER catalog in
- * plugins-viewers.ts). Every entry must be installable as data — a unique
- * id (npm package name), a GitHub URL, a non-empty localized description
- * (string or () => string), and an install script that mentions the dsh
- * plugin CLI. The catalogs are the discovery surface of the two "add
- * plugin" modals; a malformed entry would break the install flow, so the
- * shape is pinned here.
+ * Built-in plugin catalog integrity: XRKH ships empty curated catalogs
+ * (community entries are not bundled). Shape guards still apply when entries
+ * are added later.
  */
 import { describe, expect, it } from 'vitest'
 import { builtinTabPlugins } from '../src/client/plugins-tabs.ts'
@@ -24,11 +19,9 @@ const catalogs: Array<[string, readonly PluginEntry[]]> = [
 ]
 
 describe('builtin plugin catalogs', () => {
-  it('the viewer catalog has the office plugin, the tab catalog has the sentinel plugin', () => {
-    const ids = (list: readonly PluginEntry[]): string[] => list.map(p => p.id)
-    expect(ids(builtinViewerPlugins)).toContain('@huanlin/dsh-plugin-better-sidebar-plugin-office')
-    expect(ids(builtinTabPlugins)).toContain('@dsh-external/dsh-sentinel')
-    expect(ids(builtinTabPlugins)).not.toContain('@huanlin/dsh-plugin-better-sidebar-plugin-office')
+  it('ships empty curated catalogs (XRKH-native; no DSH marketplace bundle)', () => {
+    expect(builtinTabPlugins).toEqual([])
+    expect(builtinViewerPlugins).toEqual([])
   })
 
   for (const [name, list] of catalogs) {
@@ -47,19 +40,13 @@ describe('builtin plugin catalogs', () => {
           expect(entry.name.length).toBeGreaterThan(0)
           expect(entry.url.startsWith('https://github.com/')).toBe(true)
           expect(entry.install.length).toBeGreaterThan(0)
-          expect(entry.install).toContain('dsh plugin')
+          expect(entry.install).toMatch(/xrkh plugin|pnpm /)
         }
       })
 
       it('every description resolves to a non-empty localized string', () => {
         for (const entry of list) {
           expect(textOf(entry.description).length).toBeGreaterThan(0)
-        }
-      })
-
-      it('every install script starts at the DSH home (cd ~/.dsh) as the modal promises', () => {
-        for (const entry of list) {
-          expect(entry.install.startsWith('cd ~/.dsh')).toBe(true)
         }
       })
     })

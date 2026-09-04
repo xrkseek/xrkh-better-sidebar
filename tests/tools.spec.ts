@@ -8,7 +8,7 @@
  * covered by agent-pty.spec.ts.
  */
 import { describe, expect, it } from 'vitest'
-import { validateJsonSchemaValue, type ToolDefinition, type ToolRunContext } from '@deepseek-ai/dsh-tools'
+import { validateJsonSchemaValue, type ToolDefinition, type ToolRunContext } from '@xrkseek/xrk-tools'
 import { boundBytes, registerTools } from '../src/tools.ts'
 import type { AgentPtyRegistry } from '../src/agent-pty.ts'
 import type { Context } from '../src/context-types.ts'

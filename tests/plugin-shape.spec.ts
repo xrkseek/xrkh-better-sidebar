@@ -8,7 +8,7 @@ import * as sidebar from '../src/index.ts'
  * the official plugin repos ship (dsh-external/turtle-ui,
  * packages/ui/jsonrpc).
  */
-describe('dsh-better-sidebar plugin export shape', () => {
+describe('xrkh-better-sidebar plugin export shape', () => {
   it('has the namespace-plugin export shape (no stray default) so the Loader keeps name/inject/Config/apply', () => {
     expect('default' in sidebar).toBe(false)
     expect(typeof sidebar.apply).toBe('function')
@@ -16,7 +16,7 @@ describe('dsh-better-sidebar plugin export shape', () => {
     const loader = Object.create(Loader.prototype) as Loader
     const unwrapped = loader.unwrapExports(sidebar) as Record<string, unknown>
     expect(unwrapped).toBe(sidebar)
-    expect(unwrapped.name).toBe('dsh-better-sidebar')
+    expect(unwrapped.name).toBe('xrkh-better-sidebar')
     expect(unwrapped.inject).toEqual(['webServer', 'sessions', 'webRuntime', 'tools'])
     expect(unwrapped.Config).toBeDefined()
     expect(typeof unwrapped.apply).toBe('function')
@@ -53,7 +53,7 @@ describe('dsh-better-sidebar plugin export shape', () => {
 
   it('registers the side card preferences schema with the documented defaults', async () => {
     const { PrefsSchema, SIDEBAR_PREFS_NS } = await import('../src/config.ts')
-    expect(SIDEBAR_PREFS_NS).toBe('dsh-better-sidebar')
+    expect(SIDEBAR_PREFS_NS).toBe('xrkh-better-sidebar')
     const resolved = (PrefsSchema as unknown as {
       (input: Record<string, unknown> | undefined): Record<string, unknown>
     })(undefined)

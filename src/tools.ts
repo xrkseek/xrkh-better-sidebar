@@ -12,10 +12,10 @@
  *   C6 — `exec.signal.throwIfAborted()` before any spawn.
  *   C10 — no UI/transport vocabulary in the canonical value.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { Agent } from '@deepseek-ai/dsh-agent'
+import { defineTool } from '@xrkseek/xrk-tools'
+import type { ToolRunContext } from '@xrkseek/xrk-tools'
+import type { ContentBlock } from '@xrkseek/xrk-llm'
+import type { Agent } from '@xrkseek/xrk-agent'
 import type { Context } from './context-types.ts'
 import {
   AgentPtyRegistry,

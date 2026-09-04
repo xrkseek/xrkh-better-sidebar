@@ -190,40 +190,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   )
   void localeRevision
 
-  // better-locale override freshness: when @huanlin/dsh-plugin-better-locale
-  // is installed and the user picks an override language (e.g. ja), the
-  // store's `active` changes but the DSH locale's `active` does NOT —
-  // better-locale keeps the dsh active value (zh/en) unchanged and only
-  // patches `LocaleRuntime.prototype.lookup`. The localeRevision uSES
-  // above reads `getSnapshot().active`, so it sees no change and skips
-  // re-render. This second uSES reads the better-locale store's `active`
-  // directly, so an override switch fires a full re-render and t() picks
-  // up the new override text. Optional: ctx.get returns undefined when
-  // better-locale is absent (or when ctx is a minimal test mock without
-  // a `get` method), in which case this is a no-op uSES.
-  type BetterLocaleStore = {
-    readonly active: string | undefined
-    subscribe(listener: () => void): () => void
-  }
-  const betterLocaleStore = typeof ctx.get === 'function'
-    ? (ctx as unknown as {
-        get(name: 'betterLocale'): BetterLocaleStore | undefined
-      }).get('betterLocale')
-    : undefined
-  const betterLocaleActive = useSyncExternalStore(
-    useMemo(() => {
-      const store = betterLocaleStore
-      if (store === undefined) return (_cb: () => void) => () => {}
-      return (callback: () => void) => store.subscribe(callback)
-    }, [betterLocaleStore]),
-    useMemo(() => {
-      const store = betterLocaleStore
-      if (store === undefined) return () => undefined
-      return () => store.active
-    }, [betterLocaleStore]),
-  )
-  void betterLocaleActive
-
   // Tab-registry revision: TabContent memo cells must pick up a descriptor
   // a plugin registers/disposes after mount (the + menu / icons already read
   // the registry at render). Rare events (plugin (un)mount), so one full
@@ -448,7 +414,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         if (closed) return
         failures += 1
         if (failures >= FAILURE_LIMIT) {
-          console.error('[dsh-better-sidebar] agent-terminals connection failed; stopping reconnect loop', sessionId)
+          console.error('[xrkh-better-sidebar] agent-terminals connection failed; stopping reconnect loop', sessionId)
           return
         }
         retry = window.setTimeout(connect, 2000)
@@ -520,7 +486,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         if (closed) return
         failures += 1
         if (failures >= FAILURE_LIMIT) {
-          console.error('[dsh-better-sidebar] agent-opens connection failed; stopping reconnect loop', sessionId)
+          console.error('[xrkh-better-sidebar] agent-opens connection failed; stopping reconnect loop', sessionId)
           return
         }
         retry = window.setTimeout(connect, 2000)
@@ -1416,7 +1382,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     try {
       value = descriptor.badge(ctx, { sessionId, cwd }, state)
     } catch (error) {
-      console.error('[dsh-better-sidebar] tab badge error:', error)
+      console.error('[xrkh-better-sidebar] tab badge error:', error)
       return null
     }
     if (value === null || value === undefined || value === '') return null

@@ -7,7 +7,7 @@
  * - the manifest entry files exist in the build output,
  * - the registry client bundle registers exactly the manifest id (the
  *   browser-side `arrive()` contract), and the official client bundle keeps
- *   the package-name id (the client-modules compose contract) â€” the two
+ *   the package-name id (the client-modules compose contract) â€?the two
  *   bundles must never be swapped.
  *
  * Reads the built lib/ output, so run `pnpm build` first (the registry
@@ -57,7 +57,7 @@ const CLIENT_REQUIRE_ALLOWED = new Set([
 function bundleId(file: string): string {
   const source = readFileSync(resolve(ROOT, file), 'utf8')
   const match = /load\(\{\s*id:\s*"([^"]+)"/.exec(source)
-  if (match === null) throw new Error(`${file} registers no __ModuleLoader__.load id â€” run \`pnpm build\` first`)
+  if (match === null) throw new Error(`${file} registers no __ModuleLoader__.load id â€?run \`pnpm build\` first`)
   return match[1]!
 }
 
@@ -67,8 +67,8 @@ const CHUNK_FILES = ['terminal', 'editor', 'mermaid'].map(name => `lib/client-${
 /** The global registry slot a built chunk script assigns (its factory key). */
 function chunkSlot(file: string): string {
   const source = readFileSync(resolve(ROOT, file), 'utf8')
-  const match = /globalThis\.__dshChunks__\["([a-z0-9-]+)"\]/.exec(source)
-  if (match === null) throw new Error(`${file} assigns no globalThis.__dshChunks__ slot â€” run \`pnpm build\` first`)
+  const match = /globalThis\.__xrkhChunks__\["([a-z0-9-]+)"\]/.exec(source)
+  if (match === null) throw new Error(`${file} assigns no globalThis.__xrkhChunks__ slot â€?run \`pnpm build\` first`)
   return match[1]!
 }
 

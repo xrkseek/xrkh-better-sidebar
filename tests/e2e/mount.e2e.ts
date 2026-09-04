@@ -10,7 +10,7 @@
  *     (the same `workspace.create` / `session.create` calls the UI makes),
  *     so the sidebar has a real session to render;
  *  2. loads the page in headless Chromium and asserts the shell and the
- *     plugin's `[data-dsh-better-sidebar]` host mount;
+ *     plugin's `[data-xrkh-better-sidebar]` host mount;
  *  3. asserts the plugin's crash markers never appear (no RenderBoundary /
  *     fail() strips, no `pageerror`, no plugin-prefixed console errors);
  *  4. expands the collapsed panel (openByDefault defaults off), sweeps every
@@ -54,14 +54,17 @@ const SEEDED_README_FILE = 'readme-style.md'
  * renders a strip whose text starts with these prefixes instead of crashing
  * (see src/client/index.tsx `fail()` and src/client/RenderBoundary.tsx).
  */
-const CRASH_STRIP_PATTERNS = [/^dsh-better-sidebar:/, /^\[dsh-better-sidebar\]/]
+const CRASH_STRIP_PATTERNS = [
+  /^dsh-better-sidebar:/,
+  /^\[dsh-better-sidebar\]/,
+  /^xrkh-better-sidebar:/,
+  /^\[xrkh-better-sidebar\]/,
+]
 
-/** Built-in tab titles the sweep drives (en-US copy; follows DSH locale). */
-const BUILTIN_TABS = ['Files', 'Changes', 'Tasks', 'Side Chat (beta)', 'Terminal', 'Browser']
+/** Built-in tab titles the sweep drives (en-US copy). Side Chat was removed. */
+const BUILTIN_TABS = ['Files', 'Changes', 'Tasks', 'Terminal', 'Browser']
 
 let api: APIRequestContext
-/** The seeded session id (captured by seedSession; the Side Chat smoke's parent). */
-let seededSessionId: string
 
 /** Seed one workspace + one session (plus files for the editor/mermaid-chunk
  *  probes) through the host's unary RPC surface. */
@@ -128,8 +131,7 @@ async function seedSession(): Promise<void> {
   // the request context carries the auth cookie when the launch URL had a
   // one-time token.
   const workspace = await hostRpc<{ workspace: { workspaceId: string } }>(api, 'workspace.create', { path: WORKSPACE_PATH })
-  const session = await hostRpc<{ sessionId: string }>(api, 'session.create', { workspaceId: workspace.value.workspace.workspaceId })
-  seededSessionId = session.value.sessionId
+  await hostRpc<{ sessionId: string }>(api, 'session.create', { workspaceId: workspace.value.workspace.workspaceId })
 }
 
 test.beforeAll(async () => {
@@ -150,7 +152,7 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   })
 
   // Load the shell. The app renders into #root; the plugin appends its own
-  // [data-dsh-better-sidebar] host once its client half activates.
+  // [data-xrkh-better-sidebar] host once its client half activates.
   //
   // The editor chunk (client-editor.js) loads as soon as ANY files-window tab
   // renders — the seeded home tab mounts the moment the panel expands, long
@@ -162,7 +164,7 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   )
   await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded' })
   await expect(page.locator('#root > *')).not.toHaveCount(0, { timeout: 90_000 })
-  const sidebar = page.locator('[data-dsh-better-sidebar]')
+  const sidebar = page.locator('[data-xrkh-better-sidebar]')
   await expect(sidebar).toBeAttached({ timeout: 90_000 })
   // The unified panel host: the fixed containing block every panel lives in
   // (data-dsh-panel-host). Its presence is part of the injection contract.
@@ -288,84 +290,6 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
     await assertNoCrash()
   }
 
-  // The sweep opened the Side Chat tab, whose view auto-creates a thread and
-  // polls the transcript — that poll MUST ride the plugin's own
-  // sidechat.events route (the DSH-0.1.2-safe transport this lane locks).
-  const polledTranscript = await page.evaluate(() =>
-    performance.getEntriesByType('resource').some(entry => entry.name.includes('/sidebar/api/sidechat.events')))
-  expect(polledTranscript, 'the Side Chat tab must poll sidechat.events for its transcript').toBe(true)
-
-  // Side Chat host-route smoke against the REAL host: create a thread child
-  // under the seeded session (custom-seed creation through AgentRegistry),
-  // deliver a follow-up, cancel, and release it. The turn itself cannot run
-  // (keyless boot has no model route), but admission + creation + the wire
-  // envelope must all succeed — this is the deepest functional proof the
-  // mount lane can make without a provider.
-  const start = await api.post(sidebarApi('sidechat.start'), {
-    data: { sessionId: seededSessionId, question: 'mount lane smoke' },
-  })
-  expect(start.ok(), `sidechat.start: ${start.status()} ${await start.text()}`).toBe(true)
-  const startBody = (await start.json()) as {
-    ok: boolean
-    value?: { childId?: string }
-    error?: { code?: string; message?: string }
-  }
-  expect(startBody.ok, `sidechat.start envelope: ${JSON.stringify(startBody)}`).toBe(true)
-  const childId = startBody.value?.childId
-  expect(childId, 'sidechat.start must return a child session id').toMatch(/^session-/)
-  // The child must be a REAL session in the host's store (provider-free
-  // proof of the custom-seed creation; the boundary message itself only
-  // becomes durable when a turn claims it, which needs a model route).
-  const list = await hostRpc<{ items: Array<{ sessionId: string }> }>(api, 'session.list', {})
-  const listedItems = list.value.items
-  expect(
-    listedItems.some(item => item.sessionId === childId),
-    'the thread child must appear in the host session list',
-  ).toBe(true)
-  // Transcript read from the LIVE agent's log (the transport the tab polls;
-  // the inherited seed is cut host-side, so with no model route the own
-  // slice carries no message events).
-  const eventsLive = await api.post(sidebarApi('sidechat.events'), { data: { childId } })
-  expect(eventsLive.ok(), `sidechat.events (live): ${eventsLive.status()} ${await eventsLive.text()}`).toBe(true)
-  const eventsLiveBody = (await eventsLive.json()) as { ok: boolean; value?: { events?: Array<{ type: string }> } }
-  expect(eventsLiveBody.ok, `sidechat.events envelope: ${JSON.stringify(eventsLiveBody)}`).toBe(true)
-  expect(Array.isArray(eventsLiveBody.value?.events), 'sidechat.events must answer an events array').toBe(true)
-  for (const method of ['sidechat.prompt', 'sidechat.cancel', 'sidechat.dispose']) {
-    const response = await api.post(sidebarApi(method), {
-      data: method === 'sidechat.prompt' ? { childId, text: 'follow-up' } : { childId },
-    })
-    expect(response.ok(), `${method}: ${response.status()} ${await response.text()}`).toBe(true)
-  }
-  // After dispose the agent is gone: the same read must fall back to the
-  // PERSISTED log (the cold path a re-opened tab polls).
-  const eventsCold = await api.post(sidebarApi('sidechat.events'), { data: { childId } })
-  expect(eventsCold.ok(), `sidechat.events (cold): ${eventsCold.status()} ${await eventsCold.text()}`).toBe(true)
-
-  // The Codex-style immediate-create flow: a blank question creates an
-  // EMPTY thread (no prompt admitted), sidechat.info reports the live
-  // agent, and the first prompt delivers the boundary host-side.
-  const empty = await api.post(sidebarApi('sidechat.start'), {
-    data: { sessionId: seededSessionId, question: '' },
-  })
-  expect(empty.ok(), `sidechat.start (empty): ${empty.status()} ${await empty.text()}`).toBe(true)
-  const emptyBody = (await empty.json()) as { ok: boolean; value?: { childId?: string } }
-  const emptyChildId = emptyBody.value?.childId
-  expect(emptyChildId, 'immediate create must return a child session id').toMatch(/^session-/)
-  const info = await api.post(sidebarApi('sidechat.info'), {
-    data: { childId: emptyChildId },
-  })
-  expect(info.ok(), `sidechat.info: ${info.status()} ${await info.text()}`).toBe(true)
-  const infoBody = (await info.json()) as { ok: boolean; value?: { live?: boolean; preset?: string } }
-  expect(infoBody.ok, `sidechat.info envelope: ${JSON.stringify(infoBody)}`).toBe(true)
-  expect(infoBody.value?.live, 'the fresh thread must have a live agent').toBe(true)
-  for (const method of ['sidechat.prompt', 'sidechat.dispose']) {
-    const response = await api.post(sidebarApi(method), {
-      data: method === 'sidechat.prompt' ? { childId: emptyChildId, text: 'first message' } : { childId: emptyChildId },
-    })
-    expect(response.ok(), `${method} (immediate thread): ${response.status()} ${await response.text()}`).toBe(true)
-  }
-  await assertNoCrash()
-
   // The editor chunk (client-editor.js) only loads when a files-window tab
   // renders. Exercise the file-open path explicitly through the Files window's
   // own tree: the seeded home tab ("Files") is already open with its tree
@@ -429,7 +353,7 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   ).toHaveCount(1, { timeout: 30_000 })
   // The markdown PREVIEW must render before the mermaid chunk can be
   // requested — this assertion separates a preview/render regression from a
-  // chunk-loading one. (sidebar is already scoped to [data-dsh-better-sidebar].)
+  // chunk-loading one. (sidebar is already scoped to [data-xrkh-better-sidebar].)
   await expect(
     sidebar.getByText('tail text'),
     'the markdown preview must render the seeded document',
@@ -540,7 +464,7 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
 
   // The plugin's own console prefix must never appear in errors, and no
   // unhandled rejection may escape the sweep.
-  const pluginErrors = consoleErrors.filter((text) => /dsh-better-sidebar|Unhandled/.test(text))
+  const pluginErrors = consoleErrors.filter((text) => /xrkh-better-sidebar|dsh-better-sidebar|Unhandled/.test(text))
   expect(pluginErrors, 'plugin-prefixed or unhandled console errors during the sweep').toEqual([])
   expect(pageErrors, 'pageerrors during the sweep').toEqual([])
 
@@ -556,7 +480,7 @@ test('conservative auto: URL stamps alone never modify the layout; plugin chrome
   // semantics) — the strip/body attribute appear only for real standard
   // geometry (see the WCO scenario below) or an opt-in preset.
   await gotoPage(page, { 'dsh-desktop-mode': 'advanced', 'dsh-desktop-platform': 'win32' })
-  await expect(page.locator('[data-dsh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
+  await expect(page.locator('[data-xrkh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
   await expect(
     page.locator('body[data-dsh-title-bar-compat]'),
     'stamps alone must NOT auto-enable title-bar compatibility under auto',
@@ -604,7 +528,7 @@ test('standard WCO geometry drives the strip reactively (issue #257)', async ({ 
     }
   })
   await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded' })
-  await expect(page.locator('[data-dsh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
+  await expect(page.locator('[data-xrkh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
   // Real reported height (36px, not a hardcoded 32) drives the strip.
   await expect(page.locator('body[data-dsh-title-bar-compat]')).toBeAttached({ timeout: 90_000 })
   await expect
@@ -631,7 +555,7 @@ test('opt-in shell preset applies its strip when WCO is absent (data-driven, man
   expect(update.ok(), `settings.update: ${update.status()}`).toBe(true)
   try {
     await gotoPage(page, { 'dsh-desktop-mode': 'advanced', 'dsh-desktop-platform': 'win32' })
-    await expect(page.locator('[data-dsh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
+    await expect(page.locator('[data-xrkh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
     await expect(page.locator('body[data-dsh-title-bar-compat]')).toBeAttached({ timeout: 90_000 })
     await expect
       .poll(() => page.evaluate(() => document.documentElement.style.getPropertyValue('--dsh-title-bar-strip')))
@@ -656,7 +580,7 @@ test('custom scheme injects the user stylesheet live', async ({ request, page })
   expect(update.ok(), `settings.update: ${update.status()}`).toBe(true)
   try {
     await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded' })
-    await expect(page.locator('[data-dsh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
+    await expect(page.locator('[data-xrkh-better-sidebar]')).toBeAttached({ timeout: 90_000 })
     await expect(page.locator('style[data-dsh-custom-css="custom"]')).toBeAttached()
     // The injected CSS is live (a custom property the page can read back).
     const marker = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--dsh-e2e-marker').trim())

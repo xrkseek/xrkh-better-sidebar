@@ -62,6 +62,21 @@ describe('BetterSidebar service', () => {
     expect(service.getFileViewers()).toHaveLength(0)
   })
 
+  it('registerFileViewer coerces missing exts to catch-all []', () => {
+    const store = createSidebarStore()
+    const service = createBetterSidebarService(store)
+    service.registerFileViewer({
+      id: 'loose',
+      // Runtime-only omission (external plugins).
+      exts: undefined as unknown as string[],
+      fetchStrategy: 'fsRead',
+      priority: -50,
+      component: () => null,
+    })
+    expect(service.getFileViewers()[0]?.exts).toEqual([])
+    expect(service.matchFileViewer('any.xyz')?.id).toBe('loose')
+  })
+
   it('subscribe fires on register and dispose', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)

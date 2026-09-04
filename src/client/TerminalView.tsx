@@ -108,21 +108,29 @@ function xtermTheme(): ITheme {
   }
 }
 
-export function TerminalView(props: { scope: SessionScope; tabId: string; store: SidebarStore }) {
+export function TerminalView(props: { scope: SessionScope; tabId: string; store: SidebarStore; visible?: boolean }) {
   const { scope, tabId, store } = props
+  const visible = props.visible !== false
   const hostRef = useRef<HTMLDivElement>(null)
   const [connected, setConnected] = useState(false)
   const [fatal, setFatal] = useState<string | null>(null)
   const [depsFatal, setDepsFatal] = useState<TerminalDepsInfo | null>(null)
   const [lastUrl, setLastUrl] = useState<string | null>(null)
   const connectRef = useRef<(() => void) | null>(null)
+  const storeRef = useRef(store)
+  storeRef.current = store
 
   useEffect(() => {
     const host = hostRef.current
     if (host === null) return
+    if (!visible) {
+      setConnected(false)
+      return
+    }
+    const liveStore = storeRef.current
     // The custom font prefs (side card settings, terminal card) resolve at
     // mount; store changes re-apply them live below.
-    const font = resolveTerminalFont(store.getPrefs(), tokenValue('--ds-font-family-code'))
+    const font = resolveTerminalFont(liveStore.getPrefs(), tokenValue('--ds-font-family-code'))
     const term = new Terminal({
       cursorBlink: true,
       fontSize: font.fontSize,
@@ -253,7 +261,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
         failures += 1
         if (failures >= FAILURE_LIMIT) {
           const detail = event.reason !== '' ? ` (${event.code}: ${event.reason})` : ` (${event.code})`
-          console.error('[dsh-better-sidebar] terminal connection failed:', event.code, event.reason, url)
+          console.error('[xrkh-better-sidebar] terminal connection failed:', event.code, event.reason, url)
           setFatal(`${t('terminalConnectFailed')}${detail}`)
           return
         }
@@ -283,8 +291,8 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     // when they moved (the grid dimensions may change with the font). The
     // subscribe fires on every store change (tabs, panels…), so the diff is
     // what keeps this cheap.
-    const fontSub = store.subscribe(() => {
-      const next = resolveTerminalFont(store.getPrefs(), tokenValue('--ds-font-family-code'))
+    const fontSub = liveStore.subscribe(() => {
+      const next = resolveTerminalFont(liveStore.getPrefs(), tokenValue('--ds-font-family-code'))
       if (next.fontFamily !== term.options.fontFamily || next.fontSize !== term.options.fontSize) {
         term.options.fontFamily = next.fontFamily
         term.options.fontSize = next.fontSize
@@ -313,7 +321,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
         fit.fit()
         sendResize()
       } catch (error) {
-        console.error('[dsh-better-sidebar] xterm open failed:', error)
+        console.error('[xrkh-better-sidebar] xterm open failed:', error)
       }
     })
 
@@ -343,8 +351,8 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       // Agent terminals follow the close-frame rule; their lifetime is owned
       // by the agent, so a bare drop (case 3) already leaves them alive
       // indefinitely — no park frame needed.
-      const tabStillOpen = store.tabOpen(scope.sessionId, tabId)
-      const sessionSwitched = store.getSnapshot().sessionId !== scope.sessionId
+      const tabStillOpen = liveStore.tabOpen(scope.sessionId, tabId)
+      const sessionSwitched = liveStore.getSnapshot().sessionId !== scope.sessionId
       if (!tabStillOpen
         && socket !== null && socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: 'close' }))
@@ -357,7 +365,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       term.dispose()
       connectRef.current = null
     }
-  }, [scope.sessionId, scope.cwd, tabId, store])
+  }, [scope.sessionId, scope.cwd, tabId, visible])
 
   return (
     <div className={css.terminalWrap}>

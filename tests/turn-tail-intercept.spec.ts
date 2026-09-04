@@ -98,7 +98,7 @@ describe('turn-tail interception registration (issue #15)', () => {
     const { options, component } = fake.registered[0]!
     expect(options.name).toBe('conversation.chat.turnTail')
     expect(options.priority).toBe(-1)
-    expect(options.registrant).toBe('dsh-better-sidebar')
+    expect(options.registrant).toBe('xrkh-better-sidebar')
     expect(options.select).toBeTypeOf('function')
     expect(options.inject).toBeTypeOf('function')
     expect(component).toBeTypeOf('function')

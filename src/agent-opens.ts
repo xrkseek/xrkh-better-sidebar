@@ -24,9 +24,9 @@
 import { randomUUID } from 'node:crypto'
 import { stat } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
-import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { defineTool } from '@xrkseek/xrk-tools'
+import type { ToolRunContext } from '@xrkseek/xrk-tools'
+import type { ContentBlock } from '@xrkseek/xrk-llm'
 import type { Context } from './context-types.ts'
 import type { SidebarPrefs } from './prefs-shared.ts'
 

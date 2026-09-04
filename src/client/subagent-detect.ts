@@ -15,7 +15,7 @@ import type {
   SidebarSessionSummary,
   SidebarSubagentCatalog,
 } from '../context-types.ts'
-import { SIDE_LABEL_PREFIX } from '../sidechat-core.ts'
+import { SIDE_LABEL_PREFIX } from '../side-label.ts'
 
 /**
  * Side Chat threads ride the subagent origin (main-list hiding + the RPC

@@ -1,9 +1,9 @@
 /**
- * Client half of dsh-better-sidebar: resolves the user's "Side card"
+ * Client half of xrkh-better-sidebar: resolves the user's "Side card"
  * preferences through the plugin's own fenced settings route, mounts the
  * right sidebar portal (inside an error boundary so a rendering failure
  * shows an error strip instead of a blank panel), registers the turn-tail
- * interception, and contributes the Side card settings section to the DSH
+ * interception, and contributes the Side card settings section to the Host
  * Settings shell. Requires the runtime's slots and sessions services; the
  * bundle itself is a module-table consumer only (react + ui-primitives +
  * xterm, all provided or inlined).
@@ -24,7 +24,7 @@ import { registerSettingsNavIcon } from './settings-nav-icon.ts'
 import { loadExternalDisable, loadPrefs } from './prefs.ts'
 import { SideCardSection } from './SideCardSection.tsx'
 import { api } from './api.ts'
-import { LOCALE_NS, attachLocale, attachBetterLocale, t, zh, en,
+import { LOCALE_NS, attachLocale, t, zh, en,
   ja, de, fr, pt, ko, ar, hi, id, tr, vi, th, ru, it, nl, sv, pl,
   zhHK, zhTW, zhMO,
 } from './locales.ts'
@@ -33,11 +33,8 @@ import './layout.css'
 
 /** Services required before mounting (provided by the client runtime; the
  *  locale service backs the sidebar's copy — see locales.ts). `modules`
- *  (rc.8+) is the client module system the chunk loader resolves its
- *  externals through; `connection` (0.1.2-alpha.2+) is the Remote transport's
- *  recovery lifecycle the side chat's disconnect banner reads — Cordis guards
- *  service access without inject. */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'modules', 'connection']
+ *  resolves chunk-loader externals. */
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'modules']
 
 /**
  * Error boundary over the sidebar tree (root scope): a render error in the
@@ -51,68 +48,34 @@ export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'modules', '
  * @param ctx - the client cordis context (slots, sessions).
  */
 export function apply(ctx: Context): void {
-  // The sidebar follows the DSH i18n system: attach the locale service so
-  // the module-level t()/isZh() resolve the Host-backed language preference
-  // (and switch live — the Sidebar root subscribes to it), and register the
-  // plugin's dictionaries into the shared locale registry. The disposers
-  // run on fiber disposal, so re-activation (HMR) re-registers cleanly.
   attachLocale(ctx.locale)
   ctx.effect(() => {
-    const offZh = ctx.locale.register(LOCALE_NS, 'zh', zh)
-    const offEn = ctx.locale.register(LOCALE_NS, 'en', en)
-    return () => { offZh(); offEn() }
-  }, 'dsh-better-sidebar: dictionaries')
+    const offs = [
+      ctx.locale.register(LOCALE_NS, 'zh', zh),
+      ctx.locale.register(LOCALE_NS, 'en', en),
+      ctx.locale.register(LOCALE_NS, 'ja', ja),
+      ctx.locale.register(LOCALE_NS, 'de', de),
+      ctx.locale.register(LOCALE_NS, 'fr', fr),
+      ctx.locale.register(LOCALE_NS, 'pt', pt),
+      ctx.locale.register(LOCALE_NS, 'ko', ko),
+      ctx.locale.register(LOCALE_NS, 'ar', ar),
+      ctx.locale.register(LOCALE_NS, 'hi', hi),
+      ctx.locale.register(LOCALE_NS, 'id', id),
+      ctx.locale.register(LOCALE_NS, 'tr', tr),
+      ctx.locale.register(LOCALE_NS, 'vi', vi),
+      ctx.locale.register(LOCALE_NS, 'th', th),
+      ctx.locale.register(LOCALE_NS, 'ru', ru),
+      ctx.locale.register(LOCALE_NS, 'it', it),
+      ctx.locale.register(LOCALE_NS, 'nl', nl),
+      ctx.locale.register(LOCALE_NS, 'sv', sv),
+      ctx.locale.register(LOCALE_NS, 'pl', pl),
+      ctx.locale.register(LOCALE_NS, 'zh-HK', zhHK),
+      ctx.locale.register(LOCALE_NS, 'zh-TW', zhTW),
+      ctx.locale.register(LOCALE_NS, 'zh-MO', zhMO),
+    ]
+    return () => { for (const off of offs) off() }
+  }, 'xrkh-better-sidebar: dictionaries')
 
-  // Opt-in third-language support through @huanlin/dsh-plugin-better-locale.
-  // When that plugin is installed, it publishes `ctx.betterLocale` (the
-  // override store) and patches LocaleRuntime.prototype.lookup to consult
-  // it. We mirror the same override awareness into the sidebar's own `t()`:
-  // attachBetterLocale() makes t() consult the store's getOverride first,
-  // so the sidebar's chrome (which bypasses ctx.locale and calls t()
-  // directly) also switches to the override language. We also register
-  // the ja dict with the better-locale store so external callers of
-  // ctx.locale.lookup('betterSidebar', key) get the override text too.
-  //
-  // Activation-order-safe: ctx.get('betterLocale') is a non-reactive read
-  // (cordis only re-evaluates declared `inject` deps). If better-locale
-  // activates after better-sidebar, the initial read returns undefined.
-  // We subscribe to the locale revision — better-locale bumps it on
-  // activation (when a persisted override exists) and on every override
-  // switch — and re-check ctx.get on each bump, attaching + registering
-  // the ja dict once the store becomes available.
-  ctx.effect(() => {
-    let dispose: (() => void) | undefined
-    const sync = (): void => {
-      dispose?.()
-      dispose = undefined
-      const store = ctx.get('betterLocale') as
-        | {
-            readonly active: string | undefined
-            getOverride(dshActive: string, ns: string, key: string): string | undefined
-            isOverrideActive(dshActive: string): boolean
-            register(ns: string, dicts: Record<string, Record<string, string>>): () => void
-            subscribe(listener: () => void): () => void
-          }
-        | undefined
-      attachBetterLocale(store)
-      if (store !== undefined) {
-        dispose = store.register(LOCALE_NS, {
-          ja, de, fr, pt, ko, ar, hi, id, tr, vi, th, ru, it, nl, sv, pl,
-          'zh-HK': zhHK, 'zh-TW': zhTW, 'zh-MO': zhMO,
-        })
-      }
-    }
-    // Initial check (picks up the store if better-locale activated first).
-    sync()
-    // Re-check on every locale revision bump (better-locale bumps when it
-    // activates with a persisted override, and when the user switches).
-    const unsubscribe = ctx.locale.subscribe(sync)
-    return () => {
-      unsubscribe()
-      dispose?.()
-      attachBetterLocale(undefined)
-    }
-  }, 'dsh-better-sidebar: better-locale lazy integration')
   // One store instance per activation: production code creates it only here,
   // then hands it to the mounted panel and closes over it in the slot
   // registrations (the official createXXXStore() factory rule — no
@@ -149,19 +112,19 @@ export function apply(ctx: Context): void {
   // fiber disposal (HMR-safe).
   ctx.effect(
     () => registerBuiltins(ctx, service, { terminalTitle: () => terminalTitle }),
-    'dsh-better-sidebar: register built-in tabs and viewers',
+    'xrkh-better-sidebar: register built-in tabs and viewers',
   )
   // A failure anywhere in the client lifecycle must never take the app down
   // silently: log with the plugin prefix and pin a visible diagnostic strip
   // to the page so a blank panel is never the only symptom.
   const fail = (phase: string, error: unknown): void => {
-    console.error(`[dsh-better-sidebar] ${phase} error:`, error)
+    console.error(`[xrkh-better-sidebar] ${phase} error:`, error)
     try {
       const bar = document.createElement('div')
       bar.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:2147483000;max-width:70vw;padding:8px 12px;'
         + 'font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:#f2a1a1;background:#1b1b22;'
         + 'border:1px solid #f2a1a1;border-radius:8px;white-space:pre-wrap'
-      bar.textContent = `[dsh-better-sidebar] ${phase} error: ${error instanceof Error ? error.message : String(error)}`
+      bar.textContent = `[xrkh-better-sidebar] ${phase} error: ${error instanceof Error ? error.message : String(error)}`
       document.body.appendChild(bar)
     } catch {
       // Nothing left to report with.
@@ -231,7 +194,7 @@ export function apply(ctx: Context): void {
             return
           }
           layer.setAttribute('data-dsh-panel-host-degraded', '')
-          console.warn('[dsh-better-sidebar] panel host geometry mismatch — a page-level transform was detected; using degraded viewport sync')
+          console.warn('[xrkh-better-sidebar] panel host geometry mismatch — a page-level transform was detected; using degraded viewport sync')
           // Track our own compensating translation so the loop judges the
           // UNCORRECTED geometry: clearing degraded mode must wait for the
           // ancestor transform to actually disappear — the frame right after
@@ -262,7 +225,7 @@ export function apply(ctx: Context): void {
         if (mounted || disposed) return
         try {
           host = document.createElement('div')
-          host.setAttribute('data-dsh-better-sidebar', '')
+          host.setAttribute('data-xrkh-better-sidebar', '')
           document.body.appendChild(host)
           root = createRoot(host)
           root.render(createElement(RenderBoundary, { className: css.boundaryError }, createElement(Sidebar, { ctx, store: sidebarStore })))
@@ -307,7 +270,7 @@ export function apply(ctx: Context): void {
         offRemote?.()
         unmount()
       }
-    }, 'dsh-better-sidebar: sidebar mount')
+    }, 'xrkh-better-sidebar: sidebar mount')
 
     ctx.effect(
       () => {
@@ -318,7 +281,7 @@ export function apply(ctx: Context): void {
           return () => {}
         }
       },
-      'dsh-better-sidebar: turn-tail interception',
+      'xrkh-better-sidebar: turn-tail interception',
     )
 
     ctx.effect(
@@ -330,7 +293,7 @@ export function apply(ctx: Context): void {
           return () => {}
         }
       },
-      'dsh-better-sidebar: open-path interception',
+      'xrkh-better-sidebar: open-path interception',
     )
 
     ctx.effect(
@@ -374,7 +337,7 @@ export function apply(ctx: Context): void {
           return () => {}
         }
       },
-      'dsh-better-sidebar: link interception',
+      'xrkh-better-sidebar: link interception',
     )
 
     // The IME guard: composition keys (candidate arrows, confirm, cancel)
@@ -394,7 +357,7 @@ export function apply(ctx: Context): void {
           return () => {}
         }
       },
-      'dsh-better-sidebar: IME composition guard',
+      'xrkh-better-sidebar: IME composition guard',
     )
 
     // DSH 0.1.x does not yet carry an icon through the settings.section
@@ -404,7 +367,7 @@ export function apply(ctx: Context): void {
     // the marker for HMR / plugin disable.
     ctx.effect(
       () => registerSettingsNavIcon(() => t('settingsNav')),
-      'dsh-better-sidebar: settings navigation icon',
+      'xrkh-better-sidebar: settings navigation icon',
     )
 
     // The "Side card" settings section: appears in the DSH Settings shell

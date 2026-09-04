@@ -7,21 +7,16 @@
  * skipping node-pty's install script, a pruned store entry, a failed
  * prebuilt-binary download…) would then fail the plugin module load and —
  * because a loader entry apply failure aborts the boot — take the whole
- * `dsh web` server down with it.
+ * Host down with it.
  *
  * Instead the host half loads node-pty lazily (synchronously, via
- * createRequire — the same resolution `ensureSpawnHelper` already uses in
- * production). When the load fails the plugin stays mounted in a degraded
- * state: the terminal tab shows a friendly error carrying a pasteable
- * repair command (see scripts/install.sh / install.ps1 `--repair`), and the
- * agent terminal tools are simply not registered.
+ * createRequire). When the load fails the plugin stays mounted in a
+ * degraded state: the terminal tab shows a friendly error carrying a
+ * pasteable repair command, and the agent terminal tools are simply not
+ * registered.
  *
- * Version contract: the plugin must stay in sync with DSH core —
- * `@deepseek-ai/dsh-subprocess-local` declares `"node-pty": "^1.1.0"` in
- * its `dependencies`. Both sides then resolve the SAME pnpm store entry
- * (same range, same integrity → one native binding, no drift). Do NOT
- * switch to a fork (e.g. @lydell/node-pty) or a different range without
- * re-checking the core declaration.
+ * Version contract: keep `"node-pty": "^1.1.0"` aligned with this package's
+ * dependencies (and with Host `allowBuilds` for node-pty).
  */
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -35,11 +30,13 @@ import { SidebarError } from './wire.ts'
 export type NodePtyModule = typeof nodePtyNs
 
 /**
- * The node-pty version range this plugin ships. MUST stay identical to the
- * range DSH core declares (`@deepseek-ai/dsh-subprocess-local`): the same
- * range keeps pnpm resolving both to one physical package.
+ * The node-pty version range this plugin ships. Keep in sync with
+ * package.json `dependencies["node-pty"]`.
  */
-export const DSH_NODE_PTY_RANGE = '^1.1.0'
+export const NODE_PTY_RANGE = '^1.1.0'
+
+/** @deprecated Use {@link NODE_PTY_RANGE}. */
+export const DSH_NODE_PTY_RANGE = NODE_PTY_RANGE
 
 /**
  * The WebSocket close-code-1011 reason the host sends when node-pty is
@@ -91,7 +88,7 @@ export function loadRequiredNodePty(): NodePtyModule {
     const cause = describeCause(nodePtyLoadCause())
     throw new SidebarError(
       'pty-deps-missing',
-      `node-pty (${DSH_NODE_PTY_RANGE}) failed to load: ${cause} — run the repair command shown in the terminal tab`,
+      `node-pty (${NODE_PTY_RANGE}) failed to load: ${cause} — run the repair command shown in the terminal tab`,
       503,
     )
   }
@@ -107,7 +104,7 @@ function realDir(file: string): string {
   }
 }
 
-/** Walk up from `dir` looking for a DSH profile root (package.json + pnpm-workspace.yaml). */
+/** Walk up from `dir` looking for a profile / workspace root. */
 function walkUp(dir: string, isRoot: (dir: string) => boolean): string | null {
   let current = dir
   for (let depth = 0; depth < 16; depth += 1) {
@@ -119,26 +116,24 @@ function walkUp(dir: string, isRoot: (dir: string) => boolean): string | null {
   return null
 }
 
-/** Whether `dir` looks like a DSH profile root (the plugin lives under its node_modules). */
+/** Whether `dir` looks like a plugins workspace root (package.json + pnpm-workspace.yaml). */
 function isProfileRoot(dir: string): boolean {
   return existsSync(join(dir, 'package.json')) && existsSync(join(dir, 'pnpm-workspace.yaml'))
 }
 
 /**
- * Detect the DSH profile directory this plugin is installed into: the
- * nearest ancestor of the plugin module that carries both `package.json`
- * and `pnpm-workspace.yaml` (the profile root; the plugin resolves from the
- * profile's node_modules). Falls back to `$DSH_HOME/profiles/web` (the
- * standard web profile), then null.
+ * Detect the install directory this plugin lives under: nearest ancestor
+ * with both `package.json` and `pnpm-workspace.yaml`. Falls back to
+ * `$XRK_HOME/plugins` when that tree looks like a workspace root.
  */
 export function findProfileDir(fromFile: string = fileURLToPath(import.meta.url)): string | null {
   const detected = walkUp(realDir(fromFile), isProfileRoot)
   if (detected !== null) return detected
-  const home = process.env.DSH_HOME !== undefined && process.env.DSH_HOME.trim() !== ''
-    ? process.env.DSH_HOME
-    : join(homedir(), '.dsh')
-  const web = join(home, 'profiles', 'web')
-  return isProfileRoot(web) ? realpathSync(web) : null
+  const home = process.env.XRK_HOME !== undefined && process.env.XRK_HOME.trim() !== ''
+    ? process.env.XRK_HOME
+    : join(homedir(), '.xrk')
+  const plugins = join(home, 'plugins')
+  return isProfileRoot(plugins) ? realpathSync(plugins) : null
 }
 
 /** Whether `dir`'s package.json declares this plugin's name. */
@@ -160,45 +155,36 @@ export function findPluginRoot(fromFile: string = fileURLToPath(import.meta.url)
 
 /** Options for {@link buildRepairCommand}. */
 export interface RepairCommandOptions {
-  /** The plugin package root (where scripts/install.sh / install.ps1 live). */
+  /** The plugin package root (where scripts/ live). */
   pluginRoot: string | null
-  /** The detected profile directory (null → the standard `web` profile). */
+  /** The detected plugins workspace directory (null → default hint). */
   profileDir: string | null
   /** Platform override for tests; defaults to the live process. */
   platform?: NodeJS.Platform
 }
 
 /**
- * The pasteable repair command for a broken node-pty install: rerun the
- * plugin's own installer in `--repair` mode (idempotent: it re-writes the
- * profile's `allowBuilds: node-pty: true` and re-installs/rebuilds the
- * dependency). Falls back to DSH's plugin command when the scripts are not
- * shipped (exotic layouts).
+ * The pasteable repair command for a broken node-pty install: rebuild in the
+ * plugin package, or re-add via `xrkh plugin add`.
  */
 export function buildRepairCommand(options: RepairCommandOptions): { command: string; note?: string } {
-  const { pluginRoot, profileDir } = options
+  const { pluginRoot } = options
   const platform = options.platform ?? process.platform
-  const profileName = profileDir !== null ? basename(profileDir) : null
-  const profileArg = profileName !== null
-    ? (platform === 'win32' ? ` -Profile "${profileName}"` : ` --profile "${profileName}"`)
-    : ''
   if (pluginRoot !== null) {
     if (platform === 'win32') {
-      const script = join(pluginRoot, 'scripts', 'install.ps1')
-      if (existsSync(script)) {
-        return { command: `powershell -ExecutionPolicy Bypass -File "${script}" -Repair${profileArg}` }
-      }
-    } else {
-      const script = join(pluginRoot, 'scripts', 'install.sh')
-      if (existsSync(script)) {
-        return { command: `bash "${script}" --repair${profileArg}` }
+      return {
+        command: `cd /d "${pluginRoot}" && pnpm rebuild node-pty`,
+        note: 'Ensure pnpm-workspace allowBuilds includes node-pty, then hard-refresh the browser.',
       }
     }
+    return {
+      command: `cd "${pluginRoot}" && pnpm rebuild node-pty`,
+      note: 'Ensure pnpm-workspace allowBuilds includes node-pty, then hard-refresh the browser.',
+    }
   }
-  const name = profileName ?? 'web'
   return {
-    command: `dsh plugin --profile "${name}" install`,
-    note: 'If pnpm 11 blocked node-pty\'s build script, ensure `allowBuilds: node-pty: true` in the profile\'s pnpm-workspace.yaml (the plugin\'s scripts/install.sh / install.ps1 --repair does this automatically).',
+    command: 'xrkh plugin add xrkh-better-sidebar@latest && xrkh restart',
+    note: 'If pnpm blocked node-pty\'s build script, set `allowBuilds: node-pty: true` in the install workspace then rebuild.',
   }
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "xrkh-better-sidebar",
-  "version": "0.17.5",
+  "version": "0.18.0",
   "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {
@@ -49,8 +49,6 @@
     "lib/client-mermaid.js",
     "lib/types/**/*.d.ts",
     "src",
-    "scripts/install.sh",
-    "scripts/install.ps1",
     "cordis.patch.yml",
     "README.md",
     "README_EN.md",
@@ -73,15 +71,18 @@
     "@xrkseek/client-locale": "*",
     "@xrkseek/client-ui-conversation": "*",
     "@xrkseek/client-ui-primitives": "*",
-    "@xrkseek/client-ui-settings": "^0.1.2-alpha.3",
+    "@xrkseek/client-ui-settings": "*",
     "@xrkseek/client-ui-slots": "*",
     "@xrkseek/xrk-invariants": "*",
-    "@huanlin/dsh-plugin-better-locale": "^0.1.0",
+    "@xrkseek/xrk-settings": "*",
+    "@xrkseek/xrk-tools": "*",
+    "@xrkseek/xrk-llm": "*",
+    "@xrkseek/xrk-agent": "*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "peerDependenciesMeta": {
-    "@huanlin/dsh-plugin-better-locale": {
+    "@xrkseek/cordis": {
       "optional": true
     }
   },
@@ -119,21 +120,6 @@
   },
   "devDependencies": {
     "@cordisjs/plugin-loader": "^1.0.0-rc.5",
-    "@deepseek-ai/dsh-attachment": "0.1.2-alpha.3",
-    "@xrkseek/client-locale": "0.1.2-alpha.3",
-    "@xrkseek/client-ui-conversation": "0.1.2-alpha.3",
-    "@xrkseek/client-ui-primitives": "0.1.2-alpha.3",
-    "@xrkseek/client-ui-settings": "0.1.2-alpha.3",
-    "@xrkseek/client-ui-slots": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-code-runtime": "0.1.2-alpha.3",
-    "@xrkseek/xrk-invariants": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-scope": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-session-projection": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-system-prompt": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-user-approval": "0.1.2-alpha.3",
-    "@deepseek-ai/dsh-util-time": "0.1.2-alpha.3",
-    "@huanlin/dsh-plugin-better-locale": "^0.1.0",
-    "@playwright/test": "^1.62.1",
     "@types/node": "^24.0.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
@@ -158,18 +144,6 @@
         "@xrkseek/client-ui-slots",
         "@xrkseek/client-ui-conversation",
         "@xrkseek/client-modules"
-      ],
-      "platform": "web"
-    }
-  },
-  "dsh": {
-    "client": {
-      "inject": [
-        "@deepseek-ai/dsh-client-runtime",
-        "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-modules"
       ],
       "platform": "web"
     }

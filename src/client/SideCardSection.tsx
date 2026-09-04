@@ -41,6 +41,7 @@
  * shell.
  */
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { PACKAGE_DISPLAY_NAME } from '../identity.ts'
 import {
   IconChevronDownOutline14,
   IconPlusOutline16,
@@ -861,7 +862,7 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
           instance's, kept in lockstep with package.json by
           tests/service.spec.ts). */}
       <div className={css.versionBadge}>
-        <span className={css.versionBadgeName}>xrkh-better-sidebar</span>
+        <span className={css.versionBadgeName}>{PACKAGE_DISPLAY_NAME}</span>
         <span className={css.versionBadgeTag}>v{service.version}</span>
       </div>
 

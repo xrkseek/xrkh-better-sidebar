@@ -3,12 +3,12 @@
  * Pins the caching contract that makes the lazy mechanism correct:
  * - one in-flight promise per chunk (concurrent opens share it),
  * - a failed load clears the cache so the next call retries (the script
- *   re-executes and overwrites its global registry slot â€” assignments are
+ *   re-executes and overwrites its global registry slot â€?assignments are
  *   idempotent, no duplicate-registration class of errors),
  * - externals resolve through the module system's seed branch (the stable,
  *   version-independent part), once per page,
  * - resetChunks drops the cache and the externals memo (HMR).
- * The production path runs against a fake `window.__DSH_MODULES__` and a
+ * The production path runs against a fake `window.__XRK_MODULES__` and a
  * stub script loader that simulates the executed chunk script by assigning
  * the plugin-owned global factory registry.
  */
@@ -33,30 +33,30 @@ function installModuleSystem(): FakeModuleSystem {
   const fake: FakeModuleSystem = {
     import: vi.fn(async (specifier: string) => ({ seed: specifier })),
   }
-  ;(globalThis as Record<string, unknown>).__DSH_MODULES__ = fake
+  ;(globalThis as Record<string, unknown>).__XRK_MODULES__ = fake
   return fake
 }
 
 function removeModuleSystem(): void {
-  delete (globalThis as Record<string, unknown>).__DSH_MODULES__
+  delete (globalThis as Record<string, unknown>).__XRK_MODULES__
 }
 
 /** The global registry the chunk scripts populate (mirror of chunk-loader). */
 function registry(): Record<string, unknown> {
-  return (globalThis as { __dshChunks__?: Record<string, unknown> }).__dshChunks__ ?? {}
+  return (globalThis as { __xrkhChunks__?: Record<string, unknown> }).__xrkhChunks__ ?? {}
 }
 
 /** Simulate a chunk script executing: it assigns its factory to the registry. */
 function simulateScript(name: string, factory: (require: (spec: string) => unknown) => ChunkExports): void {
-  const g = globalThis as { __dshChunks__?: Record<string, unknown> }
-  g.__dshChunks__ = g.__dshChunks__ ?? {}
-  g.__dshChunks__[name] = factory
+  const g = globalThis as { __xrkhChunks__?: Record<string, unknown> }
+  g.__xrkhChunks__ = g.__xrkhChunks__ ?? {}
+  g.__xrkhChunks__[name] = factory
 }
 
 beforeEach(() => {
   removeModuleSystem()
   setChunkModuleSystem(undefined)
-  delete (globalThis as Record<string, unknown>).__dshChunks__
+  delete (globalThis as Record<string, unknown>).__xrkhChunks__
   resetChunks()
   setChunkScriptLoaderForTests(null)
 })
@@ -92,9 +92,9 @@ describe('test-registry path (vitest / jsdom-less environments)', () => {
 })
 
 describe('production path (script injection + global registry + externals require)', () => {
-  it('resolves externals through an injected ctx.modules system (rc.8 â€” no page global)', async () => {
+  it('resolves externals through an injected ctx.modules system (rc.8 â€?no page global)', async () => {
     const modules = installModuleSystem()
-    // rc.8 drops window.__DSH_MODULES__; the client half injects ctx.modules.
+    // rc.8 drops window.__XRK_MODULES__; the client half injects ctx.modules.
     removeModuleSystem()
     setChunkModuleSystem(modules)
     const loaded: string[] = []
@@ -108,7 +108,7 @@ describe('production path (script injection + global registry + externals requir
     expect(modules.import).toHaveBeenCalledTimes(CHUNK_EXTERNALS.length)
     // The injection also lands on a plugin-owned global so chunk-bundle
     // copies of this loader (which inline their own module instance and
-    // never run apply()) can resolve externals too â€” rc.8 has no shell
+    // never run apply()) can resolve externals too â€?rc.8 has no shell
     // page global anymore.
     expect((globalThis as Record<string, unknown>).__dshSidebarModuleSystem__).toBe(modules)
     // The injection survives resetChunks (shell state, not chunk state).
@@ -240,7 +240,7 @@ describe('revalidateChunksOnReactivate (HMR re-activation keeps unchanged chunks
   /** Let the fire-and-forget ETag recorder (recordEtag) settle. */
   const settleEtag = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 5))
 
-  it('keeps the resolved exports of an unchanged chunk â€” no re-inject / re-execute', async () => {
+  it('keeps the resolved exports of an unchanged chunk â€?no re-inject / re-execute', async () => {
     installModuleSystem()
     let scriptCalls = 0
     setChunkScriptLoaderForTests(async () => {
@@ -257,7 +257,7 @@ describe('revalidateChunksOnReactivate (HMR re-activation keeps unchanged chunks
     expect(scriptCalls).toBe(1)
   })
 
-  it('drops a chunk whose ETag changed on disk â€” the next open re-injects and re-executes', async () => {
+  it('drops a chunk whose ETag changed on disk â€?the next open re-injects and re-executes', async () => {
     installModuleSystem()
     let scriptCalls = 0
     setChunkScriptLoaderForTests(async () => {
@@ -339,7 +339,7 @@ describe('revalidateChunksOnReactivate (HMR re-activation keeps unchanged chunks
     await settleEtag()
     expect(scriptCalls).toBe(1)
     // The revalidation HEAD now hangs. The loader must hand the fetch a
-    // timeout signal and, when it fires, fail open (drop + re-fetch) â€” the
+    // timeout signal and, when it fires, fail open (drop + re-fetch) â€?the
     // barrier must never block lazy loads indefinitely.
     const controller = new AbortController()
     const timeoutSpy = vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal)
@@ -388,7 +388,7 @@ describe('revalidateChunksOnReactivate (HMR re-activation keeps unchanged chunks
     expect(after).toEqual({ TextEditor: 'editor-view:2' })
     expect(scriptCalls).toBe(2)
     // The orphaned task still settles; its identity-guarded finally no-ops.
-    // (Its sweep may later drop the freshly loaded entry â€” chunkEtags was
+    // (Its sweep may later drop the freshly loaded entry â€?chunkEtags was
     // cleared by resetChunks, so the old ETag no longer matches. That is the
     // fail-safe direction: never serve stale, at worst one redundant fetch.)
     release?.()

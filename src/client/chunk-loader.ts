@@ -1,19 +1,19 @@
 /**
  * Lazy chunk loader for the client bundle. The heavy preview/terminal
- * libraries (CodeMirror, xterm — the editor/terminal stacks, several MB)
+ * libraries (CodeMirror, xterm --the editor/terminal stacks, several MB)
  * live in separate build-time bundles (`lib/client-<name>.js`) fetched only
  * on first use of the feature that needs them, so startup downloads/parses
- * only the ~1MB core bundle. (The office stack — Univer / docx-preview /
- * pptx-renderer — is no longer bundled here: Office previews moved to the
+ * only the ~1MB core bundle. (The office stack --Univer / docx-preview /
+ * pptx-renderer --is no longer bundled here: Office previews moved to the
  * recommended office plugin, see plugins-viewers.ts.)
  *
  * How a chunk script works (see tsdown.config.ts chunkBundle):
  *
- *   globalThis.__dshChunks__ = globalThis.__dshChunks__ || {};
- *   globalThis.__dshChunks__["terminal"] = (require) => { ...exports };
+ *   globalThis.__xrkhChunks__ = globalThis.__xrkhChunks__ || {};
+ *   globalThis.__xrkhChunks__["terminal"] = (require) => { ...exports };
  *
  * The script registers its factory on a plugin-owned global registry (NOT
- * through window.__ModuleLoader__.load — the module loader's import() only
+ * through window.__ModuleLoader__.load --the module loader's import() only
  * resolves seed words, shell-own modules, registered factories, and boot
  * graph rows; a chunk id is none of those, so resolution would be version-
  * dependent). Materialization is plugin-owned:
@@ -23,7 +23,7 @@
  *    arbitrary file names, so the plugin's own host route serves the chunks),
  * 2. read the factory from the global registry,
  * 3. call it with a require that resolves the platform externals through
- *    `__DSH_MODULES__.import(spec)` — the seed-word branch, the one part of
+ *    `__XRK_MODULES__.import(spec)` --the seed-word branch, the one part of
  *    the module system that is stable across versions.
  *
  * Caching contract (three layers, each with a failure path):
@@ -31,10 +31,10 @@
  *   {@link resetChunks}; a failed load removes its entry so the next call
  *   retries from scratch. HMR re-activation keeps the resolved exports of
  *   unchanged chunks (ETag revalidation via
- *   {@link revalidateChunksOnReactivate}) — the next lazy open skips the
+ *   {@link revalidateChunksOnReactivate}) --the next lazy open skips the
  *   re-inject / re-execute.
  * - Script execution: each re-execution overwrites the global registry slot
- *   (assignment, never registration) — no "duplicate factory registration"
+ *   (assignment, never registration) --no "duplicate factory registration"
  *   class of errors; a failed materialization clears the cache so the retry
  *   re-injects and re-executes.
  * - HTTP: the bundle route revalidates every request (`cache-control:
@@ -59,7 +59,7 @@ type ChunkFactory = (require: (spec: string) => unknown) => ChunkExports
 
 /**
  * The platform externals a chunk bundle may require (mirror of
- * CLIENT_EXTERNALS in tsdown.config.ts — the chunk builds keep these
+ * CLIENT_EXTERNALS in tsdown.config.ts --the chunk builds keep these
  * external and the loader resolves them here). A superset is safe: the
  * require only answers what the chunk actually asks for. The shell's static
  * module table seeds React, Cordis, and the UI libraries (primitives/slots).
@@ -90,7 +90,7 @@ const CHUNK_REVALIDATE_TIMEOUT_MS = 5_000
  * The client module system surface this loader needs to resolve externals.
  * DSH 0.1.0-rc.8 provides it as the `ctx.modules` service (no page global
  * anymore); the plugin injects it at activation via
- * {@link setChunkModuleSystem}. The rc.7-era `window.__DSH_MODULES__` global
+ * {@link setChunkModuleSystem}. The rc.7-era `window.__XRK_MODULES__` global
  * remains as a fallback so older hosts and the test harness keep working.
  */
 export interface ChunkModuleSystem {
@@ -104,7 +104,7 @@ let injectedModuleSystem: ChunkModuleSystem | undefined
  * Plugin-owned page global carrying the injected module system across
  * bundle copies: the lazy chunk bundles (client-editor.js etc.) inline their
  * own chunk-loader instance, and rc.8 no longer exposes the shell module
- * system as a page global — so the core bundle's injection must be visible
+ * system as a page global --so the core bundle's injection must be visible
  * to the chunk copies through a namespace of our own.
  */
 const MODULE_SYSTEM_GLOBAL = '__dshSidebarModuleSystem__'
@@ -112,7 +112,7 @@ const MODULE_SYSTEM_GLOBAL = '__dshSidebarModuleSystem__'
 /**
  * Inject the client module system the chunk externals resolve through.
  * Called by the client half's apply() with `ctx.modules` (rc.8+); pass
- * undefined to clear (tests). Survives {@link resetChunks} — the module
+ * undefined to clear (tests). Survives {@link resetChunks} --the module
  * system is shell state, not chunk state, and stays live across HMR.
  */
 export function setChunkModuleSystem(system: ChunkModuleSystem | undefined): void {
@@ -128,7 +128,7 @@ function moduleSystem(): ChunkModuleSystem | undefined {
   const g = globalThis as Record<string, unknown>
   return injectedModuleSystem
     ?? g[MODULE_SYSTEM_GLOBAL] as ChunkModuleSystem | undefined
-    ?? (g as { __DSH_MODULES__?: ChunkModuleSystem }).__DSH_MODULES__
+    ?? (g as { __XRK_MODULES__?: ChunkModuleSystem }).__XRK_MODULES__
 }
 
 /** The plugin-owned chunk factory registry the chunk scripts populate. */
@@ -137,8 +137,8 @@ interface ChunkRegistry {
 }
 
 function chunkRegistry(): ChunkRegistry {
-  const g = globalThis as { __dshChunks__?: ChunkRegistry }
-  return g.__dshChunks__ ??= {}
+  const g = globalThis as { __xrkhChunks__?: ChunkRegistry }
+  return g.__xrkhChunks__ ??= {}
 }
 
 /** Script-load hook; tests replace it with a stub (the default needs a real DOM + network). */
@@ -154,7 +154,7 @@ const defaultScriptLoader: ChunkScriptLoader = (src) => new Promise((resolve, re
   }, { once: true })
   el.addEventListener('error', () => {
     el.remove()
-    reject(new Error(`[dsh-better-sidebar] chunk script ${src} failed to load`))
+    reject(new Error(`[xrkh-better-sidebar] chunk script ${src} failed to load`))
   }, { once: true })
   document.head.append(el)
 })
@@ -179,7 +179,7 @@ async function buildExternalsRequire(modules: ChunkModuleSystem): Promise<(spec:
   if (externalsRequire !== undefined) return externalsRequire
   // Per-spec tolerance: a spec the running DSH version cannot resolve (e.g.
   // the runtime/client exemption row) stays unresolved until a chunk
-  // actually requires it — only then it is a loud error.
+  // actually requires it --only then it is a loud error.
   const entries = await Promise.all(CHUNK_EXTERNALS.map(async (spec) => {
     try {
       return [spec, await modules.import(spec)] as const
@@ -191,8 +191,8 @@ async function buildExternalsRequire(modules: ChunkModuleSystem): Promise<(spec:
   externalsRequire = (spec: string): unknown => {
     if (!table.has(spec)) {
       // Single quotes: the bundle-consistency scan regexes for require("...")
-      // lexical calls — a double-quoted literal here would trip it.
-      throw new Error(`[dsh-better-sidebar] chunk require('${spec}') missed the module table`)
+      // lexical calls --a double-quoted literal here would trip it.
+      throw new Error(`[xrkh-better-sidebar] chunk require('${spec}') missed the module table`)
     }
     return table.get(spec)
   }
@@ -215,8 +215,8 @@ let revalidation: Promise<void> | null = null
 
 /** Best-effort ETag capture for revalidation. The script tag itself exposes
  *  no response headers, so after a successful load we HEAD the bundle route
- *  once. Failures (including a stuck route — bounded by the timeout) are
- *  ignored — revalidation then fails open (re-fetch). */
+ *  once. Failures (including a stuck route --bounded by the timeout) are
+ *  ignored --revalidation then fails open (re-fetch). */
 async function recordEtag(name: ChunkName): Promise<void> {
   try {
     const res = await fetch(CHUNK_URL(name), {
@@ -235,12 +235,12 @@ async function recordEtag(name: ChunkName): Promise<void> {
  * Load (once) and materialize a lazy chunk, returning its module exports.
  * Concurrent callers share one in-flight load; a failure clears the cache
  * entry so the next call retries (the script re-executes and overwrites its
- * global registry slot — assignments are idempotent).
+ * global registry slot --assignments are idempotent).
  * @param name - the chunk to load.
  */
 export async function loadChunk(name: ChunkName): Promise<ChunkExports> {
   // Barrier: never serve a cache entry that a pending revalidation is about
-  // to inspect — a stale chunk could otherwise render mid-HMR (CR #232 P1).
+  // to inspect --a stale chunk could otherwise render mid-HMR (CR #232 P1).
   if (revalidation !== null) await revalidation
   const cached = cache.get(name)
   if (cached !== undefined) return cached
@@ -250,12 +250,12 @@ export async function loadChunk(name: ChunkName): Promise<ChunkExports> {
     if (test !== undefined) return test()
     const modules = moduleSystem()
     if (modules === undefined) {
-      throw new Error(`[dsh-better-sidebar] chunk "${name}": client module system unavailable`)
+      throw new Error(`[xrkh-better-sidebar] chunk "${name}": client module system unavailable`)
     }
     await scriptLoader(CHUNK_URL(name))
     const factory = chunkRegistry()[name]
     if (typeof factory !== 'function') {
-      throw new Error(`[dsh-better-sidebar] chunk "${name}" script did not register its factory`)
+      throw new Error(`[xrkh-better-sidebar] chunk "${name}" script did not register its factory`)
     }
     const require = await buildExternalsRequire(modules)
     const exports = factory(require)
@@ -282,7 +282,7 @@ export async function loadChunk(name: ChunkName): Promise<ChunkExports> {
  * Drop all chunk state for a fresh plugin activation (HMR-safe): clear the
  * in-memory cache and any test-registry entries, so the next lazy open
  * re-fetches and re-executes the current chunk scripts (the registry slots
- * are overwritten by the re-execution — no cleanup needed). A pending
+ * are overwritten by the re-execution --no cleanup needed). A pending
  * revalidation barrier is cleared too: it was only guarding the cache reads
  * of the state being dropped, so the next load must not wait on it (the
  * orphaned task still settles and its identity-guarded `finally` no-ops).
@@ -299,7 +299,7 @@ export function resetChunks(): void {
 /**
  * HMR-safe re-activation hook (index.tsx calls this instead of a full
  * reset): keep the resolved exports of every loaded chunk and drop only the
- * ones whose script changed on disk — the bundle route revalidates every
+ * ones whose script changed on disk --the bundle route revalidates every
  * request (cache-control: no-cache + ETag), so an unchanged chunk keeps its
  * memory cache and the next lazy open skips the re-inject / re-execute.
  * Fail-open: an unreachable, ETag-less, or timed-out chunk is dropped
@@ -317,7 +317,7 @@ export function revalidateChunksOnReactivate(): Promise<void> {
   testLoaders.clear()
   const task = (async (): Promise<void> => {
     // Entries not tracked as production-loaded (test fixtures, orphans) never
-    // survive a re-activation — their resolved exports came from per-test
+    // survive a re-activation --their resolved exports came from per-test
     // stubs, not from the bundle route.
     for (const name of [...cache.keys()]) {
       if (!loadedChunks.has(name)) cache.delete(name)

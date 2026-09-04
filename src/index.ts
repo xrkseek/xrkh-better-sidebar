@@ -1,5 +1,5 @@
 /**
- * dsh-better-sidebar host half: the /sidebar JSON API (explorer listing, file
+ * xrkh-better-sidebar host half: the /sidebar JSON API (explorer listing, file
  * read/write, git), the /sidebar/file media route (images), the /sidebar/html
  * preview route, the /sidebar/bundle lazy-chunk route (client code splits),
  * and the terminal WebSocket upgrade. Every route passes the same
@@ -8,6 +8,10 @@
  * `--trusted-host` authorities), read per request from the live service
  * value so the fence tracks the same trust source the /api gateway derives
  * its list from.
+ *
+ * On XRK-Harness the product Host already owns `/sidebar/*`; this apply path
+ * remains for Cordis profile mounts that still load the package as a host
+ * plugin. Prefer client-only inject (`xrk.client`) on XRKH.
  *
  * All operations are conversation-scoped: requests carry a sessionId, the
  * session's authoritative cwd comes from the session store, and terminal
@@ -39,11 +43,11 @@ import { isTrustedApiRequest, isLoopbackHostname } from './trust-fence.ts'
 import { registerBundleRoute } from './bundle-route.ts'
 import { launchExternal } from './open-external.ts'
 import * as git from './git.ts'
-import { SettingsConflictError } from '@deepseek-ai/dsh-settings'
+import { SettingsConflictError, settingsNamespace } from '@xrkseek/xrk-settings'
 import { defaultShell, ensureSpawnHelper, PtyManager, shellDisplayName } from './pty-manager.ts'
 import { AgentPtyRegistry, clampDims, type AgentTerminalHandle } from './agent-pty.ts'
 import {
-  DSH_NODE_PTY_RANGE,
+  NODE_PTY_RANGE,
   depsStatus,
   loadNodePty,
   PTY_DEPS_MISSING,
@@ -52,7 +56,6 @@ import { registerTools } from './tools.ts'
 import { AgentOpenRegistry, registerOpenTool, type AgentOpenRequest } from './agent-opens.ts'
 import { buildJobsApi, type SidebarJobsRoutes } from './jobs-routes.ts'
 import { buildSubagentLiveApi, type SidebarSubagentLiveRoutes } from './subagent-live-route.ts'
-import { buildSidechatApi } from './sidechat-routes.ts'
 import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk } from './wire.ts'
 
 export { Config }
@@ -655,14 +658,6 @@ function buildApi(
       if (action === 'url') return launchExternal('url', requireString(payload, 'url'))
       throw new SidebarError('bad-request', 'action must be "reveal" or "url"')
     },
-    // Side Chat: create a side-thread child seeded with the parent's full
-    // log up to now, deliver follow-ups (cold-resuming when the thread's
-    // agent is gone), abort a running thread, and release a thread's agent.
-    // Every operation runs through these routes because subagent-origin
-    // identities are fenced from the generic session RPCs (agent-lookup
-    // ownership), and the thread is created with a CUSTOM seed the stock
-    // fork APIs cannot express.
-    ...buildSidechatApi(ctx),
   }
 }
 
@@ -698,7 +693,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     const detail = status.ok
       ? 'unknown cause'
       : `${status.cause}. Repair: ${status.command}`
-    ctx.logger?.warn(`[dsh-better-sidebar] node-pty (${DSH_NODE_PTY_RANGE}) failed to load: ${detail}`)
+    ctx.logger?.warn(`[xrkh-better-sidebar] node-pty (${NODE_PTY_RANGE}) failed to load: ${detail}`)
   }
   const ptyManager = nodePty !== null
     ? new PtyManager(terminalShell, resolved.terminalsPerSession, resolved.shellArgs, nodePty)
@@ -753,10 +748,8 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     }
   }
   ctx.inject(['settings'], (sctx) => {
-    // DSH 0.1.2-alpha.2 validates namespaces at compile time
-    // (SettingsNamespaceInput); the 'dsh-better-sidebar' literal passes, so the
-    // runtime helper this used to call (settingsNamespace) is gone upstream.
-    const ns = SIDEBAR_PREFS_NS
+    // Brand the prefs ns for XRKH settings (SettingsNamespace is opaque).
+    const ns = settingsNamespace(SIDEBAR_PREFS_NS)
     // The structural settings mirror types `schema` as unknown, so the
     // generic is not inferred here; the real service resolves it from the
     // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
@@ -857,7 +850,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         writeError(res, error)
       }
     },
-  }), 'dsh-better-sidebar: /sidebar/api routes')
+  }), 'xrkh-better-sidebar: /sidebar/api routes')
 
   // ── Raw upload route ───────────────────────────────────────────────────
   // One request writes one file without JSON/base64 inflation. Folder uploads
@@ -899,13 +892,13 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         writeError(res, error)
       }
     },
-  }), 'dsh-better-sidebar: /sidebar/upload route')
+  }), 'xrkh-better-sidebar: /sidebar/upload route')
 
   // ── Lazy chunk route (client bundle splits) ─────────────────────────────
   // Serves the client half's split bundles (lib/client-<name>.js) so the
   // heavy preview/terminal libraries load on first use, not at page start
   // (see bundle-route.ts / src/client/chunk-loader.ts).
-  ctx.effect(() => registerBundleRoute(ctx, fence), 'dsh-better-sidebar: /sidebar/bundle chunk route')
+  ctx.effect(() => registerBundleRoute(ctx, fence), 'xrkh-better-sidebar: /sidebar/bundle chunk route')
 
   // ── Media route (images for the editor) ─────────────────────────────────
   ctx.effect(() => ctx.webServer.register({
@@ -947,7 +940,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         writeError(res, error)
       }
     },
-  }), 'dsh-better-sidebar: /sidebar/file media route')
+  }), 'xrkh-better-sidebar: /sidebar/file media route')
 
   // ── HTML preview route (sandboxed HTML + its relative assets) ───────────
   // Serves files under the session cwd for the built-in HTML previewer. The
@@ -1009,7 +1002,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         writeError(res, error)
       }
     },
-  }), 'dsh-better-sidebar: /sidebar/html preview route')
+  }), 'xrkh-better-sidebar: /sidebar/html preview route')
 
   // ── Terminal WebSocket ──────────────────────────────────────────────────
   // One upgrade endpoint serves both UI-tab terminals (?tab=...) and
@@ -1033,7 +1026,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         void attachTerminal(ctx, ptyManager, agentPtyRegistry, ws, req, resolved, () => settingsFace)
       })
     },
-  }), 'dsh-better-sidebar: terminal WebSocket')
+  }), 'xrkh-better-sidebar: terminal WebSocket')
 
   // ── Agent terminals push WebSocket ──────────────────────────────────────
   // Pushes the live list of agent terminals for one session to the sidebar
@@ -1055,7 +1048,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         void attachAgentList(agentPtyRegistry, ws, req)
       })
     },
-  }), 'dsh-better-sidebar: agent-terminals push WebSocket')
+  }), 'xrkh-better-sidebar: agent-terminals push WebSocket')
 
   // ── Agent opens push WebSocket ─────────────────────────────────────────
   // Pushes `sidebar_open` requests for one session to the sidebar view: the
@@ -1075,7 +1068,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
         void attachAgentOpen(agentOpenRegistry, ws, req)
       })
     },
-  }), 'dsh-better-sidebar: agent-opens push WebSocket')
+  }), 'xrkh-better-sidebar: agent-opens push WebSocket')
 
   ctx.effect(() => () => {
     toolsDisposers?.()
@@ -1086,7 +1079,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     wss.close()
     agentListWss.close()
     agentOpenWss.close()
-  }, 'dsh-better-sidebar: teardown')
+  }, 'xrkh-better-sidebar: teardown')
 }
 
 /** Push queued `sidebar_open` requests for one session to a connected view. */

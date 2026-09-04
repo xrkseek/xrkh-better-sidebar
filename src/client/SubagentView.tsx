@@ -42,7 +42,8 @@ import {
   rootAncestor,
 } from './subagent-detect.ts'
 import { type LastActivity } from '../subagent-activity.ts'
-import { SIDE_LABEL_PREFIX } from '../sidechat-core.ts'
+import { SIDE_LABEL_PREFIX } from '../side-label.ts'
+import { normalizeSubagentCatalogs } from '../subagent-catalog.ts'
 import {
   collectTreeJobs,
   formatJobDuration,
@@ -249,7 +250,7 @@ function CatalogRows({
   parentSessionId, catalog, catalogs, byId, level, currentSessionId, live,
   openChild, refresh,
 }: RowsProps) {
-  const emptyLoading = catalog?.state === 'loading' && catalog.entries.length === 0
+  const emptyLoading = catalog?.state === 'loading' && (catalog.entries?.length ?? 0) === 0
   // Side Chat threads are honest catalog citizens (durable descriptor, 'Side: '
   // label) but they are NOT subagent topology — filter them out here (the tab
   // strip owns them). Legacy threads created before the descriptor fix still
@@ -303,7 +304,7 @@ function CatalogRows({
         const label = childLabel(entry, summary)
         const secondary = cardSecondary(summary, entry)
         const childLoading = childCatalog === undefined
-          || (childCatalog.state === 'loading' && childCatalog.entries.length === 0)
+          || (childCatalog.state === 'loading' && (childCatalog.entries?.length ?? 0) === 0)
         const address: SidebarSubagentAddress = {
           parentSessionId,
           childSessionId: entry.id,
@@ -656,7 +657,7 @@ export function SubagentView(props: {
     useCallback(() => sessions.list.getSnapshot(), [sessions]),
   )
   const byId = list.byId
-  const catalogs = list.subagentsByParent ?? {}
+  const catalogs = normalizeSubagentCatalogs(list.subagentsByParent)
 
   // The topology root: the main agent of the current session's tree.
   const rootId = useMemo(() => rootAncestor(byId, sessionId), [byId, sessionId])
@@ -715,7 +716,7 @@ export function SubagentView(props: {
     try {
       sessions.openSubagent?.(address)
     } catch (error) {
-      console.warn('[dsh-better-sidebar] openSubagent failed:', error)
+      console.warn('[xrkh-better-sidebar] openSubagent failed:', error)
     }
   }, [sessions, onOpenChild])
 
@@ -725,7 +726,7 @@ export function SubagentView(props: {
     try {
       sessions.open?.(rootId)
     } catch (error) {
-      console.warn('[dsh-better-sidebar] open session failed:', error)
+      console.warn('[xrkh-better-sidebar] open session failed:', error)
     }
   }, [sessions, rootId])
 
@@ -742,10 +743,10 @@ export function SubagentView(props: {
   // Session summaries can announce membership before the descriptor-backed
   // catalog catches up (or a catalog that just went ready is still empty).
   const summaryBackedLoading = rootId !== undefined
-    && (rootCatalog === undefined || (rootCatalog.state === 'ready' && rootCatalog.entries.length === 0))
+    && (rootCatalog === undefined || (rootCatalog.state === 'ready' && (rootCatalog.entries?.length ?? 0) === 0))
     && directChildren(byId, rootId).length > 0
   const readyEmpty = rootCatalog?.state === 'ready'
-    && rootCatalog.entries.length === 0
+    && (rootCatalog.entries?.length ?? 0) === 0
     && directChildren(byId, rootId ?? '').length === 0
   const countLabel = totals.count === 0
     ? undefined

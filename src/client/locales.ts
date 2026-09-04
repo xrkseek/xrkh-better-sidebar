@@ -333,49 +333,6 @@ export const zh = {
   subagentDiagUnsupported: '不支持的条目',
   subagentDiagUnavailable: '不可用',
   subagentThinking: '思考中…',
-  sideChat: '侧边对话(beta)',
-  sideChatNew: '新建对话',
-  sideChatUntitled: '新对话',
-  sideChatEmpty: '暂无侧边对话',
-  sideChatEmptyDesc: '每个侧边对话是标签栏里的独立 Tab，继承当前会话的上下文运行，不会进入主会话',
-  sideChatCreating: '正在创建侧边对话…',
-  sideChatRetry: '重试',
-  sideChatThreads: '切换线程 / 新建',
-  sideChatSave: '保存为新会话',
-  sideChatSaveTitle: '把该线程提升为顶层会话，出现在主会话列表中',
-  sideChatSaved: '已保存为新会话',
-  sideChatNoTurn: '至少完成一轮对话后才能保存',
-  sideChatPendingDrop: '最后一条未完成的追问不会包含在新会话中',
-  sideChatFirstPlaceholder: '输入第一个问题，已继承当前会话上下文…',
-  sideChatComposerPlaceholder: '追问…',
-  sideChatThinking: '正在深入…',
-  sideChatThink: '思考过程',
-  sideChatInjection: '已注入上下文',
-  sideChatSend: '发送',
-  sideChatCancel: '停止',
-  sideChatCancelTitle: '中止当前回合（保留队列）',
-  sideChatClose: '关闭线程',
-  sideChatCloseTitle: '释放线程的 agent（历史保留）',
-  sideChatError: '侧边对话出错：{message}',
-  sideChatTurnUsage: '输入 {input} tok · 输出 {output} tok',
-  sideChatBlockCollapse: '收起',
-  sideChatBlockCollapseAria: '收起',
-  sideChatBlockExpand: '展开 {hidden} 行',
-  sideChatBlockExpandAria: '展开其余 {hidden} 行',
-  sideChatBlockSignal: '信号终止：{signal}',
-  sideChatBlockExitCode: '退出码 {code}',
-  sideChatBlockRunning: '运行中',
-  sideChatBlockFailed: '失败',
-  sideChatBlockDone: '完成',
-  sideChatBlockNoOutput: '（无输出）',
-  sideChatBlockFiles: '{count} 个文件',
-  sideChatBlockWindow: '共 {total} 行 · 显示 {shown} 行',
-  sideChatConnDisconnected: '连接已断开',
-  sideChatConnReconnect: '重新连接',
-  sideChatConnConnecting: '正在重连…',
-  sideChatConnRecovered: '连接已恢复',
-  sideChatConnReconnectAction: '立即重连',
-  sideChatConnRestartAction: '重新发起连接',
   jobs: '后台任务',
   jobsCount: '{count} 个后台任务',
   jobsCountRunning: '{count} 个后台任务 · {running} 运行中',
@@ -402,7 +359,7 @@ export const zh = {
   addPluginsViewerCardDesc: '注册新的文件类型预览',
   addPluginsTabDesc: '侧边栏页面（Tab）可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到 DSH 所在环境的终端执行。',
   addPluginsViewerDesc: '文件预览器可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到 DSH 所在环境的终端执行。',
-  addPluginsBrowseMore: '在 GitHub 上浏览更多插件（topic: dsh-better-sidebar）',
+  addPluginsBrowseMore: '在 GitHub 上浏览更多插件（topic: xrkh-better-sidebar）',
   addPluginsSearch: '搜索插件名称 / 描述…',
   addPluginsNoMatch: '没有匹配的插件',
   addPluginsRecommended: '推荐插件',
@@ -414,7 +371,7 @@ export const zh = {
   pluginFlowglassDesc: '实时会话流程图：三列泳道展示用户、助手与工具调用，支持并行分组、子代理支线、逐层钻取和实时状态；安装 better-sidebar 后注册原生「流镜」Tab，未安装时保留独立抽屉',
   pluginGitForgeDesc: 'better-sidebar「Git 凭据」Tab：GitHub/Gitea 等 Forge 账号库 + 按项目授权 + push 策略硬拦；token 仅存本地 secrets，不进模型上下文；提供只读 GitForge 工具与 agent HTTPS credential helper',
   pluginGithubWorkbenchDesc: 'better-sidebar「GitHub 工作台」Tab：远端仓库目录树 + Issues / Pull requests / Actions 页签，读之外支持新建 Issue/PR、评论、编辑、关闭重开、squash·merge·rebase 合并（强确认）与重跑/取消 CI；仓库弹层自动拉取有权限列表并支持公开仓搜索；未装 better-sidebar 时自动降级为独立右侧面板',
-  pluginSuhuangScrollDesc: '把本地苏黄共阅 Runtime 接入 DSH 设置与 better-sidebar，支持模型配置、连接测试和连续阅卷控制；使用前需安装 Suhuang Scroll Runtime 与 dsh-better-sidebar',
+  pluginSuhuangScrollDesc: '把本地苏黄共阅 Runtime 接入 DSH 设置与 better-sidebar，支持模型配置、连接测试和连续阅卷控制；使用前需安装 Suhuang Scroll Runtime 与 xrkh-better-sidebar',
   pluginBetterOverleafDesc: 'better-sidebar 的 Overleaf 标签页：直连 CDP 浏览器登录（支持第三方 Chromium），项目列表/切换，<workspace>/overleaf/ 本地 git 镜像，git 双向同步（API 只读兜底），文件预览走侧边栏工作台',
   pluginGitRemotesDesc: 'better-sidebar Git 远程 Tab：看分支/上游/ahead-behind，fetch（可 prune）、ff-only pull、确认后才 push。不替换内置 Git 的暂存/提交，也不提供 force-push 或模型自动推送',
   pluginSentinelDesc: '条件驱动的 agent 唤醒系统：文件/进程/端口/HTTP/命令/webhook 传感器，条件达成自动唤醒休眠会话；注册「哨兵」Tab 展示服务器全局监控表',
@@ -742,49 +699,6 @@ export const en: Record<keyof typeof zh, string> = {
   subagentDiagUnsupported: 'Unsupported',
   subagentDiagUnavailable: 'Unavailable',
   subagentThinking: 'Thinking…',
-  sideChat: 'Side Chat (beta)',
-  sideChatNew: 'New thread',
-  sideChatUntitled: 'New thread',
-  sideChatEmpty: 'No side conversations',
-  sideChatEmptyDesc: 'Every side conversation is its own tab in the tab strip — it inherits the current session\'s context and never enters the main conversation',
-  sideChatCreating: 'Creating side conversation…',
-  sideChatRetry: 'Retry',
-  sideChatThreads: 'Switch thread / new',
-  sideChatSave: 'Save as new session',
-  sideChatSaveTitle: 'Promote this thread to a top-level session in the main session list',
-  sideChatSaved: 'Saved as a new session',
-  sideChatNoTurn: 'Save is available after the first completed turn',
-  sideChatPendingDrop: 'The last unanswered follow-up will not be included in the saved session',
-  sideChatFirstPlaceholder: 'Ask the first question — context inherited…',
-  sideChatComposerPlaceholder: 'Ask a follow-up…',
-  sideChatThinking: 'Deep diving…',
-  sideChatThink: 'Thinking',
-  sideChatInjection: 'Context injected',
-  sideChatSend: 'Send',
-  sideChatCancel: 'Stop',
-  sideChatCancelTitle: 'Abort the running turn (queued work is kept)',
-  sideChatClose: 'Close thread',
-  sideChatCloseTitle: 'Release the thread\'s agent (history is kept)',
-  sideChatError: 'Side Chat error: {message}',
-  sideChatTurnUsage: 'Input {input} tok · Output {output} tok',
-  sideChatBlockCollapse: 'Collapse',
-  sideChatBlockCollapseAria: 'Collapse',
-  sideChatBlockExpand: 'Expand {hidden} lines',
-  sideChatBlockExpandAria: 'Expand {hidden} more lines',
-  sideChatBlockSignal: 'Killed by signal: {signal}',
-  sideChatBlockExitCode: 'Exit code {code}',
-  sideChatBlockRunning: 'Running',
-  sideChatBlockFailed: 'Failed',
-  sideChatBlockDone: 'Done',
-  sideChatBlockNoOutput: '(no output)',
-  sideChatBlockFiles: '{count} files',
-  sideChatBlockWindow: '{shown} of {total} lines',
-  sideChatConnDisconnected: 'Connection lost',
-  sideChatConnReconnect: 'Reconnect',
-  sideChatConnConnecting: 'Reconnecting…',
-  sideChatConnRecovered: 'Connection restored',
-  sideChatConnReconnectAction: 'Reconnect now',
-  sideChatConnRestartAction: 'Restart connection',
   jobs: 'Background jobs',
   jobsCount: '{count} background jobs',
   jobsCountRunning: '{count} background jobs · {running} running',
@@ -811,7 +725,7 @@ export const en: Record<keyof typeof zh, string> = {
   addPluginsViewerCardDesc: 'Register a file-type preview',
   addPluginsTabDesc: 'Sidebar pages (tabs) can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a terminal where your DSH profile lives and run it.',
   addPluginsViewerDesc: 'File previewers can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a terminal where your DSH profile lives and run it.',
-  addPluginsBrowseMore: 'Browse more plugins on GitHub (topic: dsh-better-sidebar)',
+  addPluginsBrowseMore: 'Browse more plugins on GitHub (topic: xrkh-better-sidebar)',
   addPluginsSearch: 'Search by plugin name or description…',
   addPluginsNoMatch: 'No plugins match',
   addPluginsRecommended: 'Recommended plugins',
@@ -829,7 +743,7 @@ export const en: Record<keyof typeof zh, string> = {
   pluginSidebarQaDesc: 'Select-and-ask: Select conversation text → ask in the right-side panel → a dedicated follow-up session (❓追问) in the same workspace; a fast no-thinking model compresses the main context and injects it with the quote, without interrupting the main conversation. Follow-ups nest, continue, and archive',
   pluginSidenoteDesc: 'Codex-style side chat + selection annotations: fork the current session into a persistent side panel (archived out of the session list, multi-instance, /side command, survives reload, model follows the main session); select assistant text → numbered badge + note editor → an "N annotations" chip that rides your next message, or ask straight into a side chat',
   pluginSshTunnelDesc: 'SSH Tunnel tab: multi-host inventory + per-project grants + local secrets; SSHManager tool (exec/SFTP/session strategies); center interactive terminal and dual-pane SFTP',
-  pluginSuhuangScrollDesc: 'Connect the local Suhuang Scroll Runtime to DSH settings and better-sidebar for model configuration, connection tests, and continuous grading controls; requires Suhuang Scroll Runtime and dsh-better-sidebar',
+  pluginSuhuangScrollDesc: 'Connect the local Suhuang Scroll Runtime to DSH settings and better-sidebar for model configuration, connection tests, and continuous grading controls; requires Suhuang Scroll Runtime and xrkh-better-sidebar',
   pluginTurnReviewDesc: 'A human gate on the just-finished turn: Approve / Request changes per path with an optional comment; paths grouped by main session / subagent / unattributed; inline snapshot-vs-now diff before you decide. No fork, no /rewind',
   pluginVideoPreviewDesc: 'Inline video preview (.mp4/.webm/.mov/.mkv/.avi etc.) for the better-sidebar editor, backed by a dedicated /video host route with HTTP Range (206) support — scrubbing works and files are not capped by the 20MB mediaLimit',
   pluginCodeNavDesc: 'Code preview navigator: detects the language by file type and highlights syntax, symbol outline (class / method / variable filters + one-click jump), and in-file search (highlight all matches, prev/next, match case) — takes over code file preview in the better-sidebar editor',
@@ -889,29 +803,11 @@ export const zhHK: Record<keyof typeof zh, string> = zhHKDict as Record<keyof ty
 export const zhTW: Record<keyof typeof zh, string> = zhTWDict as Record<keyof typeof zh, string>
 export const zhMO: Record<keyof typeof zh, string> = zhMODict as Record<keyof typeof zh, string>
 
-/** The DSH locale service attached by the client apply (absent → browser detection). */
+/** The Host locale service attached by the client apply (absent → browser detection). */
 let localeService: { getSnapshot(): { active: string } } | undefined
 
 /**
- * The better-locale override store attached by the client apply
- * (absent → no override; the zh/en chain runs). The store's `active`
- * field holds the user's chosen override id (e.g. `'ja'`); `undefined`
- * means "no override, use DSH native zh/en".
- *
- * The override only takes effect when DSH's active locale is `'en'`
- * (it borrows DSH's English slot to render a third language). While
- * DSH is on `'zh'` the override is inert — `getOverride` returns
- * `undefined` and `isOverrideActive` returns `false` — so `t()` and
- * `isZh()` fall through to the native zh/en chain unchanged.
- */
-let betterLocaleStore: {
-  readonly active: string | undefined
-  getOverride(dshActive: string, ns: string, key: string): string | undefined
-  isOverrideActive(dshActive: string): boolean
-} | undefined
-
-/**
- * Attach (or detach, with undefined) the DSH locale service. The sidebar
+ * Attach (or detach, with undefined) the Host locale service. The sidebar
  * mounts its own React root outside the slot system's locale seat, so the
  * service rides this module-level holder: components keep calling the plain
  * `t()` function, and the Sidebar root's locale subscription re-renders the
@@ -922,25 +818,8 @@ export function attachLocale(service: { getSnapshot(): { active: string } } | un
 }
 
 /**
- * Attach (or detach, with undefined) the better-locale override store.
- * When attached with an active override, `t()` consults the store's
- * `getOverride(active, LOCALE_NS, key)` first; if it returns a string,
- * that text wins over the zh/en chain. Detaching (or the store's active
- * being `undefined`) restores the zh/en chain unchanged.
- *
- * The Sidebar root subscribes to the store separately (see Sidebar.tsx)
- * so an override change re-renders the whole tree — the locale service's
- * own revision bump (which better-locale triggers via `publish(active, true)`)
- * does NOT fire the existing `localeRevision` uSES because that snapshot
- * reads `getSnapshot().active` (unchanged) rather than `revision`.
- */
-export function attachBetterLocale(store: typeof betterLocaleStore): void {
-  betterLocaleStore = store
-}
-
-/**
- * The active locale id ('zh' | 'en'): the DSH locale service's snapshot when
- * attached, else the browser language.
+ * The active locale id: the Host locale service's snapshot when attached,
+ * else the browser language.
  */
 function activeLocale(): string {
   return localeService?.getSnapshot().active
@@ -948,30 +827,24 @@ function activeLocale(): string {
     ?? 'en'
 }
 
-/** Translate a copy key in the active locale (zh → zh, else en). */
+function dictForActive(): Record<CopyKey, string> {
+  const active = activeLocale().toLowerCase()
+  if (active.startsWith('zh-hk') || active === 'zh-hk') return zhHK
+  if (active.startsWith('zh-tw') || active === 'zh-tw') return zhTW
+  if (active.startsWith('zh-mo') || active === 'zh-mo') return zhMO
+  if (active.startsWith('zh')) return zh
+  const primary = active.split('-')[0] ?? 'en'
+  const map: Record<string, Record<CopyKey, string>> = {
+    en, ja, de, fr, pt, ko, ar, hi, id, tr, vi, th, ru, it, nl, sv, pl,
+  }
+  return map[primary] ?? en
+}
+
 export type CopyKey = keyof typeof zh
 
 /** Translate a copy key; `{name}` placeholders interpolate from `params`. */
 export function t(key: CopyKey, params?: Record<string, string | number>): string {
-  // 1. better-locale override (e.g. ja) wins when an override is active,
-  //    DSH's active locale is 'en' (the override borrows the en slot),
-  //    and the store has a translation for this (ns, key). The store's
-  //    getOverride returns undefined otherwise (no override, DSH on zh,
-  //    or missing key) and the zh/en chain runs.
-  const dshActive = localeService?.getSnapshot().active ?? ''
-  const override = betterLocaleStore?.getOverride(dshActive, LOCALE_NS, key)
-  let text: string | undefined = override
-  // 2. Fall back to the zh/en chain when no override matched.
-  if (text === undefined) {
-    const dict = activeLocale().toLowerCase().startsWith('zh') ? zh : en
-    text = dict[key]
-  }
-  if (text === undefined) {
-    // Key missing from every dict (should not happen — zh is the source of
-    // truth and en/ja are checked against it). Return the key itself so the
-    // UI shows something identifiable rather than `undefined`.
-    text = key
-  }
+  let text: string = dictForActive()[key] ?? en[key] ?? zh[key] ?? key
   if (params !== undefined) {
     for (const [name, value] of Object.entries(params)) {
       text = text.replaceAll(`{${name}}`, String(value))
@@ -982,14 +855,6 @@ export function t(key: CopyKey, params?: Record<string, string | number>): strin
 
 /** Whether the active locale is Chinese (used for selectors). */
 export function isZh(): boolean {
-  // An override is only "effectively active" when DSH is on 'en' (the
-  // override borrows the en slot). While DSH is on 'zh' the override is
-  // inert — the user sees native zh, so isZh() returns true. When an
-  // override is effectively active, the rendered text is neither zh nor
-  // en (it's ja/ko/...), so isZh() returns false to route selectors to
-  // the non-zh branch (e.g. date format, pluralization).
-  const dshActive = localeService?.getSnapshot().active ?? ''
-  if (betterLocaleStore?.isOverrideActive(dshActive) === true) return false
   return activeLocale().toLowerCase().startsWith('zh')
 }
 

@@ -1,11 +1,12 @@
 /**
- * Built-in registration tests: the plugin registers 7 tabs and 6 file
+ * Built-in registration tests: the plugin registers 6 tabs and 6 file
  * viewers through the same service external plugins use (dogfooding);
  * the catch-all `code` viewer, the NUL-sniffing `binary-download` viewer,
  * and the html sandbox settings pin the registry's behavior. (Office
  * previews are NOT built in — they moved to the recommended office plugin,
  * see src/client/plugins-viewers.ts.) The git tab is the unified changes
  * tab (git lens + session lens, PR #471's file-trace merged in).
+ * Side Chat (beta) was removed for xrkh localization.
  */
 import { describe, expect, it } from 'vitest'
 // First import: browser globals before the xterm-carrying builtin graph loads.
@@ -17,7 +18,6 @@ import { createSidebarStore } from '../src/client/state.ts'
 import { allLeaves } from '../src/client/state.ts'
 import { registerBuiltins } from '../src/client/builtins/index.ts'
 import type { BuiltinTabOptions } from '../src/client/builtins/tabs.tsx'
-import { parkSidechatReopen } from '../src/client/SideChatView.tsx'
 import { t } from '../src/client/locales.ts'
 
 function setup(options: BuiltinTabOptions = {}): { service: ReturnType<typeof createBetterSidebarService>; store: ReturnType<typeof createSidebarStore>; dispose: () => void } {
@@ -28,10 +28,10 @@ function setup(options: BuiltinTabOptions = {}): { service: ReturnType<typeof cr
 }
 
 describe('built-in tab registrations', () => {
-  it('registers the 7 built-in tabs', () => {
+  it('registers the 6 built-in tabs', () => {
     const { service } = setup()
     expect(service.getTabs().map(t => t.id).sort()).toEqual(
-      ['browser', 'diff', 'editor', 'git', 'sidechat', 'subagent', 'terminal'],
+      ['browser', 'diff', 'editor', 'git', 'subagent', 'terminal'],
     )
   })
 
@@ -71,34 +71,6 @@ describe('built-in tab registrations', () => {
     for (const id of ['git', 'subagent']) {
       expect(service.getTab(id)?.single).toBe(true)
     }
-  })
-
-  it('the side chat tab sits between tasks and terminal in the + menu', () => {
-    const { service } = setup()
-    const sidechat = service.getTab('sidechat')
-    expect(sidechat?.order).toBe(35)
-    expect(sidechat?.hidden).not.toBe(true)
-  })
-
-  it('side chat mints one tab per thread (Codex-style multi-instance)', () => {
-    const { service } = setup()
-    const sidechat = service.getTab('sidechat')
-    expect(sidechat?.single).not.toBe(true)
-    // A plain open mints a fresh autoCreate tab (the view creates the
-    // thread on mount); two opens never collide. (createTab ignores the
-    // state argument for sidechat — the cast stands in for it.)
-    const first = sidechat?.createTab?.(undefined as never)
-    const second = sidechat?.createTab?.(undefined as never)
-    expect(first?.tab.meta).toEqual({ autoCreate: true })
-    expect(first?.tab.id).not.toBe(second?.tab.id)
-    // A parked reopen target mints the deterministic reattach tab, and
-    // dedupeKey focuses an already-open thread instead of duplicating it.
-    parkSidechatReopen('session-t1')
-    const reopen = sidechat?.createTab?.(undefined as never)
-    expect(reopen?.tab.id).toBe('sidechat:session-t1')
-    expect(reopen?.tab.meta).toEqual({ threadId: 'session-t1' })
-    expect(sidechat?.dedupeKey?.(reopen!.tab)).toBe('session-t1')
-    expect(sidechat?.dedupeKey?.(first!.tab)).toBeUndefined()
   })
 
   it('the subagent tab declares its auto-open related settings', () => {

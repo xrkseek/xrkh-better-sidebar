@@ -142,7 +142,7 @@ export function registerTurnTailInterception(ctx: Context, store: SidebarStore):
       return matched
     },
     priority: -1,
-    registrant: 'dsh-better-sidebar',
+    registrant: 'xrkh-better-sidebar',
     inject: (sessionId: string) => ({
       openInSidebar: (path: string) => { openSidebarFile(ctx, store, sessionId, path) },
       onShowInFolder: (files: readonly string[]) => { revealInExplorer(ctx, store, sessionId, files) },

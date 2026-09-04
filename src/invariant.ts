@@ -1,6 +1,6 @@
 /**
- * Package-owned invariant companion for `dsh-better-sidebar`.
- * @module dsh-better-sidebar/invariant
+ * Package-owned invariant companion for `xrkh-better-sidebar`.
+ * @module xrkh-better-sidebar/invariant
  */
 
 /* jscpd:ignore-start */

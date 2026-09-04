@@ -17,7 +17,7 @@
  *   the batch still returns.
  */
 import type { Context, SidebarSubagentsService } from './context-types.ts'
-import { SIDE_LABEL_PREFIX } from './sidechat-core.ts'
+import { SIDE_LABEL_PREFIX } from './side-label.ts'
 import { lastActivity, type LastActivity } from './subagent-activity.ts'
 import { requireString, SidebarError } from './wire.ts'
 

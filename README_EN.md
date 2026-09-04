@@ -10,7 +10,7 @@ Host serves `/sidebar/*` via the product adapter; this package ships the **clien
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26.
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@latest
+xrkh plugin add xrkh-better-sidebar@0.18.0
 xrkh restart
 ```
 
@@ -22,7 +22,21 @@ xrkh plugin add ./xrkh-better-sidebar
 xrkh restart
 ```
 
+For local monorepo smoke tests, place this tree under Harness `extensions/xrkh-better-sidebar/` (gitignored by the main repo), then:
+
+```powershell
+$env:XRK_PLUGINS_DIR = "./extensions"
+pnpm xrk web --workspace .
+```
+
 Hard-refresh the browser after install (Ctrl+Shift+R).
+
+## 0.18.0
+
+- XRKH-native: drop DSH dual-track (`dsh` manifest · better-locale · DSH install scripts · marketplace catalogs)
+- Peers are `@xrkseek/*` + React only; tools/settings types via `@xrkseek/xrk-tools` / `xrk-settings`
+- No Side Chat; subagents use Host Face + `subagents.live` / `jobs.*`
+- Empty curated plugin catalogs (community entries are not bundled)
 
 ## Contract
 

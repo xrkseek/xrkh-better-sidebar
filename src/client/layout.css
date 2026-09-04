@@ -78,11 +78,11 @@ body[data-dsh-sidebar-dragging] #root :has(> [data-slot="conversation"]) {
    only this plugin's localized row; render the requested Lucide
    gallery-horizontal-end SVG as a currentColor mask so it follows the native
    nav hover/active colors without changing the shell's 16px icon rhythm. */
-[data-dsh-better-sidebar-settings-nav] > svg:first-child {
+[data-xrkh-better-sidebar-settings-nav] > svg:first-child {
   display: none;
 }
 
-[data-dsh-better-sidebar-settings-nav]::before {
+[data-xrkh-better-sidebar-settings-nav]::before {
   content: '';
   flex: none;
   width: 16px;

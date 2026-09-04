@@ -20,6 +20,7 @@
  *   then `exts`; `exts: []` is a catch-all that matches any path.
  */
 import type { ReactNode } from 'react'
+import { PACKAGE_ID } from '../identity.ts'
 import type { Context } from '../context-types.ts'
 import {
   activateTab as activateTabReducer, allLeaves, closeTab as closeTabReducer, closeFloatByTab, floatWithTab,
@@ -460,7 +461,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
     try {
       claimed = tab.urlTarget(url) === true
     } catch (error) {
-      console.error('[dsh-better-sidebar] urlTarget error:', error)
+      console.error(`[${PACKAGE_ID}] urlTarget error:`, error)
       continue
     }
     if (claimed) return tab
@@ -472,7 +473,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
  * The plugin version this service instance reports. Keep in lockstep with
  * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.17.5'
+export const SIDEBAR_SERVICE_VERSION = '0.17.8'
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features
@@ -510,7 +511,7 @@ function safeCall(fn: () => void): void {
   try {
     fn()
   } catch (error) {
-    console.error('[dsh-better-sidebar] plugin callback error:', error)
+    console.error(`[${PACKAGE_ID}] plugin callback error:`, error)
   }
 }
 
@@ -535,7 +536,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
 
   const registerTab = (descriptor: TabDescriptor): (() => void) => {
     if (tabs.has(descriptor.id)) {
-      throw new Error(`[dsh-better-sidebar] tab type "${descriptor.id}" already registered`)
+      throw new Error(`[${PACKAGE_ID}] tab type "${descriptor.id}" already registered`)
     }
     tabs.set(descriptor.id, descriptor)
     notify()
@@ -549,7 +550,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
 
   const registerFileViewer = (descriptor: FileViewerDescriptor): (() => void) => {
     if (viewers.has(descriptor.id)) {
-      throw new Error(`[dsh-better-sidebar] file viewer "${descriptor.id}" already registered`)
+      throw new Error(`[${PACKAGE_ID}] file viewer "${descriptor.id}" already registered`)
     }
     viewers.set(descriptor.id, descriptor)
     notify()
@@ -588,14 +589,14 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
         // A catch-all with detect is SNIFF-ONLY: it must not blind-claim
         // paths it never sniffed (a magic-number viewer must not swallow
         // every file before the real viewers get their turn).
-        if (v.exts.length === 0) continue
-      } else if (v.exts.length === 0) {
+        if ((v.exts?.length ?? 0) === 0) continue
+      } else if ((v.exts?.length ?? 0) === 0) {
         // Blind catch-all (no detect) claims anything; a sniff-only
         // catch-all (detect defined, no head yet) yields this round.
         if (v.detect === undefined) return v
         continue
       }
-      if (v.exts.includes(ext)) return v
+      if ((v.exts ?? []).includes(ext)) return v
     }
     return undefined
   }
@@ -605,7 +606,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
     // + menu nor from derived flows (file opens, subagent auto-open,
     // external plugins). Already-open tabs keep rendering.
     if (!isTabEnabled(seed.type)) {
-      console.warn(`[dsh-better-sidebar] tab type "${seed.type}" is disabled in the side card settings`)
+      console.warn(`[${PACKAGE_ID}] tab type "${seed.type}" is disabled in the side card settings`)
       return
     }
     const descriptor = tabs.get(seed.type)

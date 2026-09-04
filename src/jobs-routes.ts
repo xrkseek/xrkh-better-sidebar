@@ -165,7 +165,7 @@ function createJobOutputMirror(ctx: Context): { entries(sessionId: string): read
       push(sessionId, trace)
     }
   })
-  ctx.effect(() => dispose, 'dsh-better-sidebar: job-output event mirror')
+  ctx.effect(() => dispose, 'xrkh-better-sidebar: job-output event mirror')
 
   const push = (sessionId: string, trace: JobOutputTrace): void => {
     let list = perSession.get(sessionId)
