@@ -264,7 +264,7 @@ export type TitleBarScheme = typeof TITLE_BAR_SCHEMES[number]
 
 /** Fallback prefs used whenever the settings document is unreachable or malformed. */
 export const SIDEBAR_PREFS_DEFAULTS: SidebarPrefs = {
-  openByDefault: false,
+  openByDefault: true,
   defaultWidthPercent: WIDTH_PERCENT_DEFAULT,
   autoOpenSubagent: true,
   autoOpenJobs: true,

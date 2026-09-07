@@ -2536,3 +2536,54 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   animation: dsh-toc-flash 1.2s ease-out;
   border-radius: 4px;
 }
+
+
+.editorCsvWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+.editorCsv {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.editorCsv th,
+.editorCsv td {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+  text-align: left;
+  white-space: pre-wrap;
+  max-width: 28em;
+}
+
+.editorCsv th {
+  position: sticky;
+  top: 0;
+  background: var(--dsw-alias-bg-layer-3);
+  font-weight: 600;
+  z-index: 1;
+}
+
+.editorMediaWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.editorAudio {
+  width: min(100%, 480px);
+}
+
+.editorVideo {
+  max-width: 100%;
+  max-height: 100%;
+}

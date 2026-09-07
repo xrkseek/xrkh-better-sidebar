@@ -1,15 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   activateTab, allLeaves, BOTTOM_DEFAULT, BOTTOM_MIN, closeFloatByTab, closeTab, createSidebarStore,
-  dockFloat, FLOAT_MIN_H, FLOAT_MIN_W, floatTab, floatWithTab, insertLeafAt, makeDefaultState,
+  dockFloat, editorHomeTitle, FLOAT_MIN_H, FLOAT_MIN_W, floatTab, floatWithTab, insertLeafAt, makeDefaultState,
   migrateBottomTabs, moveFloat, moveTab, moveTabToEdge, openDiffTab,
   openTabInActivePane, patchTab, raiseFloat, reconcileAgentTerminals, resizeFloat, resizeSplit,
   resizeSplitIn, revealPaths, sanitizeState, setBottomHeight, setTabPin,
-  splitPane, tabOpenIn, toggleBottomPanel, toggleExpanded, togglePanel,
+  splitPane, tabDisplayTitle, tabOpenIn, toggleBottomPanel, toggleExpanded, togglePanel,
   type SidebarLeaf, type SidebarState, type SidebarTab, type SplitNode,
 } from '../src/client/state.ts'
 
 describe('sidebar state', () => {
+  it('tabDisplayTitle tracks locale for editor home tabs', () => {
+    const home: SidebarTab = { id: 'h', type: 'editor', title: 'Files' }
+    const file: SidebarTab = { id: 'f', type: 'editor', title: 'a.ts', path: 'a.ts' }
+    expect(tabDisplayTitle(home)).toBe(editorHomeTitle())
+    expect(tabDisplayTitle(file)).toBe('a.ts')
+  })
+
   const state = (): SidebarState => makeDefaultState()
 
   it('makeDefaultState seeds per the seed enum (editor-home / none)', () => {
@@ -19,7 +26,7 @@ describe('sidebar state', () => {
       const leaf = s.splits as { tabs: SidebarTab[]; active: string | null }
       expect(leaf.tabs).toHaveLength(1)
       expect(leaf.tabs[0]!.type).toBe('editor')
-      expect(leaf.tabs[0]!.title).toBe('Files')
+      expect(leaf.tabs[0]!.title).toBe(editorHomeTitle())
       expect(leaf.tabs[0]!.path).toBeUndefined()
       expect(leaf.tabs[0]!.meta).toEqual({ treeOpen: true })
       expect(leaf.active).toBe(leaf.tabs[0]!.id)
@@ -58,11 +65,11 @@ describe('sidebar state', () => {
     const right = (valid?.splits as { tabs: SidebarTab[] }).tabs
     expect(right).toHaveLength(1)
     // Migrated: editor home tab (no path), tree pinned open, prior meta kept.
-    expect(right[0]).toMatchObject({ id: 'ex-right', type: 'editor', title: 'Files', meta: { treeOpen: true, treeWidth: 300 } })
+    expect(right[0]).toMatchObject({ id: 'ex-right', type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true, treeWidth: 300 } })
     expect(right[0]!.path).toBeUndefined()
     const bottom = (valid?.bottomSplits as { tabs: SidebarTab[] }).tabs
     expect(bottom).toHaveLength(1)
-    expect(bottom[0]).toMatchObject({ id: 'ex-bottom', type: 'editor', title: 'Files', meta: { treeOpen: true } })
+    expect(bottom[0]).toMatchObject({ id: 'ex-bottom', type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true } })
   })
 
   it('opens tabs into the active pane and dedupes by id (safety net)', () => {
@@ -1159,7 +1166,7 @@ describe('free windows (v0.16.0)', () => {
       ]
       const restored = sanitizeState(parsed)!
       expect(restored.floats.map(f => f.tab.type)).toEqual(['editor'])
-      expect(restored.floats[0]!.tab).toMatchObject({ title: 'Files', meta: { treeOpen: true } })
+      expect(restored.floats[0]!.tab).toMatchObject({ title: editorHomeTitle(), meta: { treeOpen: true } })
     })
 
     it('clamps stale off-screen geometry into the current viewport', () => {

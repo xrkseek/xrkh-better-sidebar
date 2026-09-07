@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { loadExternalDisable, loadPrefs, type SidebarSettingsClient } from '../src/client/prefs.ts'
-import { allLeaves, createSidebarStore, defaultWidthFor, makeDefaultState, setWidth } from '../src/client/state.ts'
+import { allLeaves, createSidebarStore, defaultWidthFor, editorHomeTitle, makeDefaultState, setWidth } from '../src/client/state.ts'
 import { SIDEBAR_PREFS_DEFAULTS } from '../src/prefs-shared.ts'
 
 /** A fake settings wire face whose settingsGet resolves to one raw value. */
@@ -67,7 +67,7 @@ describe('side card preferences', () => {
   it('falls back per-field when a stored field is malformed', async () => {
     expect(await loadPrefs(wire({ openByDefault: 'yes', defaultWidthPercent: 33, autoOpenSubagent: 'no', agentTerminalTools: 'yes' })))
       .toEqual({
-        openByDefault: false,
+        openByDefault: true,
         defaultWidthPercent: 33,
         autoOpenSubagent: true,
         autoOpenJobs: true,
@@ -292,7 +292,7 @@ describe('side card preferences', () => {
     // The default prefs keep the panel closed (openByDefault defaults off).
     const openStore = createSidebarStore()
     openStore.setSession('another-fresh')
-    expect(openStore.getSnapshot().state?.panelOpen).toBe(false)
+    expect(openStore.getSnapshot().state?.panelOpen).toBe(true)
   })
 
   it('seeds a brand-new session COLLAPSED on narrow viewports (the panel is a full-screen drawer there)', () => {
@@ -345,7 +345,7 @@ describe('side card preferences', () => {
       const tabs = allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
       expect(tabs).toHaveLength(1)
       expect(tabs[0]!.type).toBe('editor')
-      expect(tabs[0]!.title).toBe('Files')
+      expect(tabs[0]!.title).toBe(editorHomeTitle())
       expect(tabs[0]!.path).toBeUndefined()
       expect(tabs[0]!.meta).toEqual({ treeOpen: true })
     }

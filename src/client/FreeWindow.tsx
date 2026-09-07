@@ -18,7 +18,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { IconCloseFill14, Menu } from '@xrkseek/client-ui-primitives'
 import type { FloatWindow, SidebarTab } from './state.ts'
-import { FLOAT_MIN_H, FLOAT_MIN_W } from './state.ts'
+import { FLOAT_MIN_H, FLOAT_MIN_W, tabDisplayTitle } from './state.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
@@ -257,7 +257,7 @@ export function FreeWindow(props: {
         }}
       >
         {getTabIcon?.(float.tab) ?? null}
-        <span className={css.floatTitle} title={float.tab.title}>{float.tab.title}</span>
+        <span className={css.floatTitle} title={tabDisplayTitle(float.tab)}>{tabDisplayTitle(float.tab)}</span>
         <button
           type="button"
           className={css.floatClose}

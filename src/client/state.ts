@@ -11,6 +11,7 @@
  */
 import { SIDEBAR_PREFS_DEFAULTS, type SidebarPrefs } from '../prefs-shared.ts'
 import { isNarrowWidth } from './breakpoints.ts'
+import { t } from './locales.ts'
 
 /**
  * Tab type identifier. Builtins register their ids (editor / git / terminal
@@ -43,6 +44,21 @@ export interface SidebarTab {
    *  snapshot at pin time — a `workspace`-scoped pin is only visible to
    *  sessions whose cwd matches it. Absent = unpinned (legacy states). */
   pin?: { scope: 'workspace' | 'global'; homeCwd?: string }
+}
+
+/** Path-less editor tab = the files / explorer home window. */
+export function isEditorHomeTab(tab: Pick<SidebarTab, 'type' | 'path'>): boolean {
+  return tab.type === 'editor' && tab.path === undefined
+}
+
+/** Localized title for the files home window (follows the active locale). */
+export function editorHomeTitle(): string {
+  return t('files')
+}
+
+/** Tab bar / float title: home tabs track locale; others keep their stored title. */
+export function tabDisplayTitle(tab: SidebarTab): string {
+  return isEditorHomeTab(tab) ? editorHomeTitle() : tab.title
 }
 
 /** A tab group. */
@@ -212,7 +228,7 @@ export function makeDefaultState(width = PANEL_DEFAULT, panelOpen = true, seed: 
   if (seed === 'editor-home') {
     // No path: the editor host renders its empty-state hint and the docked
     // tree panel (treeOpen defaults open for path-less tabs; meta pins it).
-    leaf.tabs = [{ id: uid('tab'), type: 'editor', title: 'Files', meta: { treeOpen: true } }]
+    leaf.tabs = [{ id: uid('tab'), type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true } }]
     leaf.active = leaf.tabs[0]!.id
   }
   // The bottom panel starts closed with an empty pane (its welcome cards
@@ -1347,7 +1363,7 @@ function sanitizePersistedTab(tab: unknown): SidebarTab | 'diff' | undefined {
     const meta = candidate.meta !== null && typeof candidate.meta === 'object' && !Array.isArray(candidate.meta)
       ? candidate.meta as Record<string, unknown>
       : undefined
-    return { id: candidate.id, type: 'editor', title: 'Files', meta: { treeOpen: true, ...meta } }
+    return { id: candidate.id, type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true, ...meta } }
   }
   // `meta` is plugin-owned JSON-serializable state (v0.12.0+): the persisted
   // value already went through JSON.parse, so it is inherently serializable —
@@ -1358,6 +1374,13 @@ function sanitizePersistedTab(tab: unknown): SidebarTab | 'diff' | undefined {
     title: candidate.title,
     ...(typeof candidate.path === 'string' ? { path: candidate.path } : {}),
     ...(candidate.meta !== undefined ? { meta: candidate.meta } : {}),
+  }
+  // Re-localize the files home window title: older sessions stored the
+  // English literal "Files" at seed time, so a Chinese UI would keep showing
+  // English until the user opened another tab. Path-bearing editors keep
+  // their filename title unchanged.
+  if (isEditorHomeTab(result) && result.title === 'Files') {
+    result.title = editorHomeTitle()
   }
   // `pin` (v0.17.0+): a pinned-terminal marker. Whitelist-validate the
   // shape so a hand-edited / corrupted pin never crashes the rail's

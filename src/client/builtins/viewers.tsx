@@ -1,31 +1,24 @@
 /**
- * The 6 built-in file viewer descriptors: every preview surface is a
- * registered viewer (image / pdf / markdown / html / code /
- * binary-download), exactly like external plugins register theirs. Office
- * previews (.docx / .xlsx / .pptx) are NOT built in anymore — they moved to
- * the recommended office plugin (see plugins-viewers.ts), which registers
- * the same ids through this service.
+ * Built-in file viewer descriptors: image / pdf / markdown / html / office /
+ * csv / audio / video / code / binary-download. Office OOXML and legacy OLE
+ * share the download pane for now (heavy Univer / docx-preview stacks stay
+ * out of the core bundle); CSV/audio/video are native light previews.
  *
- * The `binary-download` viewer sniffs NUL bytes via `detect` for unknown
- * binaries and serves legacy doc/xls/ppt by extension; `code` is the
- * catch-all (`exts: []`, lowest priority) that claims any file no other
- * viewer did.
+ * The heavy viewers (CodeMirror-backed markdown/html/code) render through
+ * {@link lazyChunkComponent} wrappers — libraries load on first open.
  *
- * The heavy viewers (the CodeMirror-backed markdown/html/code) render
- * through {@link lazyChunkComponent} wrappers — their libraries are fetched
- * only when such a file is first opened (see chunk-loader.ts). The
- * descriptor metadata (id/exts/priority/detect) is identical either way,
- * so matching semantics and external-plugin overrides are unaffected; the
- * `component` wrapper keeps the descriptor contract `(props) => ReactNode`.
- *
- * Every viewer carries the declarative settings-surface fields — `title`
- * and `icon` — so the Side card settings page can render the enable/disable
- * inventory without hardcoding (eating our own dogfood).
+ * Every viewer carries declarative settings-surface fields (`title`, `icon`)
+ * so the Side card settings page can render the enable/disable inventory.
  */
 import { IconCodeOutline16, IconDownloadOutline16 } from '@xrkseek/client-ui-primitives'
 import { lazyChunkComponent } from '../lazy-chunk.tsx'
 import { PdfView } from '../PdfView.tsx'
 import { BinaryDownload } from '../binary-download.tsx'
+import {
+  AudioPreview,
+  CsvPreview,
+  VideoPreview,
+} from '../media-previews.tsx'
 import {
   IconImageOutline16,
   IconMarkdownOutline16,
@@ -45,7 +38,7 @@ import css from '../sidebar.module.css'
  */
 const LazyTextEditor = lazyChunkComponent<FileViewerProps>('editor', (mod) => mod.TextEditor as ComponentType<FileViewerProps> | undefined)
 
-/** The 6 built-in file viewer descriptors. */
+/** Built-in file viewer descriptors (office + media + tabular included). */
 export function builtinViewers(): readonly FileViewerDescriptor[] {
   return [
     {
@@ -84,9 +77,6 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       icon: (size: number) => <IconHtmlOutline16 size={size} />,
       exts: ['html', 'htm'],
       fetchStrategy: 'fsRead',
-      // Declarative settings: the sandbox escape hatch and the default-unsafe
-      // start state render under this viewer's row in the Side card settings
-      // page (both warned on).
       settings: {
         toggles: [{
           key: 'htmlViewerNoSandbox',
@@ -101,6 +91,42 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       component: (props) => <LazyTextEditor {...props} />,
     },
     {
+      id: 'office',
+      title: () => t('viewerOffice'),
+      icon: (size: number) => <IconDownloadOutline16 size={size} />,
+      exts: ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'rtf'],
+      priority: 10,
+      fetchStrategy: 'binary-download',
+      component: ({ scope, path }) => <BinaryDownload scope={scope} path={path} />,
+    },
+    {
+      id: 'csv',
+      title: () => t('viewerCsv'),
+      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      exts: ['csv', 'tsv'],
+      priority: 20,
+      fetchStrategy: 'fsRead',
+      component: (props) => <CsvPreview {...props} />,
+    },
+    {
+      id: 'audio',
+      title: () => t('viewerAudio'),
+      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      exts: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'],
+      priority: 20,
+      fetchStrategy: 'mediaUrl',
+      component: (props) => <AudioPreview {...props} />,
+    },
+    {
+      id: 'video',
+      title: () => t('viewerVideo'),
+      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      exts: ['mp4', 'webm', 'mov', 'mkv', 'avi'],
+      priority: 20,
+      fetchStrategy: 'mediaUrl',
+      component: (props) => <VideoPreview {...props} />,
+    },
+    {
       id: 'code',
       title: () => t('viewerCode'),
       icon: (size: number) => <IconCodeOutline16 size={size} />,
@@ -113,7 +139,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       id: 'binary-download',
       title: () => t('viewerBinary'),
       icon: (size: number) => <IconDownloadOutline16 size={size} />,
-      exts: ['doc', 'xls', 'ppt'],
+      exts: ['zip', 'rar', '7z', 'gz', 'tar', 'exe', 'dll', 'wasm'],
       priority: -50,
       fetchStrategy: 'binary-download',
       // NUL probe: a file whose head bytes contain a NUL is binary — claimed

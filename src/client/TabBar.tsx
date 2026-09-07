@@ -14,7 +14,7 @@ import {
   IconCloseFill14, IconPlusOutline16, Menu,
 } from '@xrkseek/client-ui-primitives'
 import type { SidebarTab } from './state.ts'
-import { isAgentTabId } from './state.ts'
+import { isAgentTabId, tabDisplayTitle } from './state.ts'
 import { isPinnedVirtualTab } from './pinned.ts'
 import { IconPinOutline16 } from './icons.tsx'
 import { t } from './locales.ts'
@@ -189,7 +189,7 @@ export function TabBar(props: {
           <div
             key={tab.id}
             className={clsx(css.tab, active === tab.id && css.tabActive, pinned && css.pinnedTab)}
-            title={tab.title}
+            title={tabDisplayTitle(tab)}
             draggable={!pinned}
             onDragStart={pinned ? undefined : (event) => {
               setTabDragging(true)
@@ -231,7 +231,7 @@ export function TabBar(props: {
             {pinned && <IconPinOutline16 size={16} />}
             {getTabIcon?.(tab) ?? null}
             {getTabBadge?.(tab) ?? null}
-            <span className={css.tabTitle}>{tab.title}</span>
+            <span className={css.tabTitle}>{tabDisplayTitle(tab)}</span>
             <button
               type="button"
               className={css.tabClose}

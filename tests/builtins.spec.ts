@@ -3,7 +3,7 @@
  * viewers through the same service external plugins use (dogfooding);
  * the catch-all `code` viewer, the NUL-sniffing `binary-download` viewer,
  * and the html sandbox settings pin the registry's behavior. (Office
- * previews are NOT built in — they moved to the recommended office plugin,
+ * previews are built in (download pane) alongside csv/audio/video,
  * see src/client/plugins-viewers.ts.) The git tab is the unified changes
  * tab (git lens + session lens, PR #471's file-trace merged in).
  * Side Chat (beta) was removed for xrkh localization.
@@ -184,16 +184,11 @@ describe('built-in tab registrations', () => {
 })
 
 describe('built-in file viewer registrations', () => {
-  it('registers the 6 built-in file viewers (office previews live in the recommended office plugin)', () => {
+  it('registers built-in file viewers including office / csv / audio / video', () => {
     const { service } = setup()
     expect(service.getFileViewers().map(v => v.id).sort()).toEqual(
-      ['binary-download', 'code', 'html', 'image', 'markdown', 'pdf'],
+      ['audio', 'binary-download', 'code', 'csv', 'html', 'image', 'markdown', 'office', 'pdf', 'video'],
     )
-    // Office previews are not built in: docx/xlsx/pptx files fall through to
-    // the download-only binary viewer (or a registered office plugin).
-    expect(service.getFileViewers().map(v => v.id)).not.toContain('docx')
-    expect(service.getFileViewers().map(v => v.id)).not.toContain('xlsx')
-    expect(service.getFileViewers().map(v => v.id)).not.toContain('pptx')
   })
 
   it('code is the catch-all at the lowest priority', () => {
@@ -230,14 +225,14 @@ describe('built-in file viewer registrations', () => {
     expect(toggles[1]?.desc).toBeDefined()
   })
 
-  it('binary-download claims legacy office by extension (office previews are not built in)', () => {
+  it('office viewer claims OOXML and legacy office by extension', () => {
     const { service } = setup()
-    expect(service.matchFileViewer('old.doc')?.id).toBe('binary-download')
-    expect(service.matchFileViewer('old.xls')?.id).toBe('binary-download')
-    expect(service.matchFileViewer('old.ppt')?.id).toBe('binary-download')
-    // Modern office files (zip containers, NUL-free) fall through to the
-    // catch-all code viewer without an office plugin registered.
-    expect(service.matchFileViewer('book.docx', new Uint8Array([0x50, 0x4b, 0x03, 0x04]))?.id).toBe('code')
+    expect(service.matchFileViewer('old.doc')?.id).toBe('office')
+    expect(service.matchFileViewer('old.xls')?.id).toBe('office')
+    expect(service.matchFileViewer('old.ppt')?.id).toBe('office')
+    expect(service.matchFileViewer('book.docx', new Uint8Array([0x50, 0x4b, 0x03, 0x04]))?.id).toBe('office')
+    expect(service.matchFileViewer('sheet.xlsx')?.id).toBe('office')
+    expect(service.matchFileViewer('deck.pptx')?.id).toBe('office')
   })
 
   it('binary-download NUL detect claims unknown-extension binaries over code', () => {
