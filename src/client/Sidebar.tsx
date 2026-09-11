@@ -33,7 +33,7 @@ import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { IconCloseFill14, Tooltip } from '@xrkseek/client-ui-primitives'
 import type { Context, SidebarSessionList } from '../context-types.ts'
-import { appendToDraft } from './conversation-draft.ts'
+import { appendPathMention } from './conversation-draft.ts'
 import {
   BOTTOM_MIN, PANEL_MIN, activateTab, agentUuidOf, allLeaves, closeFloatByTab, closeTab, dockFloat, firstLeaf, floatTab,
   floatWithTab, isAgentTabId, leafWithTab, migrateBottomTabs,
@@ -127,7 +127,7 @@ function injectUserCss(attr: string, id: string, cssText: string): HTMLStyleElem
  *  pane; sessionId/cwd cover onReferenceFile). */
 interface TabContentProps extends TabContentMemoKey {
   onToggleDir: (path: string) => void
-  onReferenceFile: (path: string) => void
+  onReferenceFile: (path: string, kind?: 'file' | 'directory') => void
   ctx: Context
   store: SidebarStore
   /** Fired before a topology node jumps to its child session (see Sidebar). */
@@ -1299,17 +1299,12 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   }, [actions, pinnedVirtualTabs, activePinnedTabId, store])
 
   /**
-   * The explorer's @-reference button: append `@<relative path>` to the
-   * session's composer draft (space-separated). The conversation service is
-   * resolved lazily through `ctx.get` (the inject-free read — the app's own
-   * plugins read 'conversation' the same way); a missing service or scope
-   * degrades to a logged no-op, never a crash. Defined above the no-session
-   * early return — a hook must never sit behind a conditional return
-   * (React counts hooks per render).
+   * The explorer's @-reference button: append a grammar-correct `@path`
+   * / `@path/` mention to the session composer draft (space-separated).
    */
-  const referenceInChat = useCallback((path: string): void => {
+  const referenceInChat = useCallback((path: string, kind: 'file' | 'directory' = 'file'): void => {
     if (sessionId === undefined) return
-    appendToDraft(ctx, sessionId, `@${relativeTo(cwd ?? '', path)}`)
+    appendPathMention(ctx, sessionId, relativeTo(cwd ?? '', path), kind)
   }, [ctx, sessionId, cwd])
 
   if (state === undefined || sessionId === undefined) {

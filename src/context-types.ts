@@ -396,6 +396,11 @@ export interface SidebarSessionInput {
   }
   /** Replace the draft text (the input machine's single public write path). */
   setDraft(text: string): void
+  /**
+   * Return focus to the composer textarea after an external draft write
+   * (explorer `@` mention). Optional for older hosts; appenders call it when present.
+   */
+  focus?(): void
 }
 
 /** The composer draft face the sidebar reaches through `ctx.get('conversation')`. */

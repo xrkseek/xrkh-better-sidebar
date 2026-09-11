@@ -132,7 +132,7 @@ export function FileTree(props: {
   /** Toggle one target's pinned state (the submenu row's pushpin). */
   onToggleOpenWithPin?: (targetId: string) => void
   /** Insert `@<relative path>` into the composer draft. */
-  onReferenceFile: (path: string) => void
+  onReferenceFile: (path: string, kind?: 'file' | 'directory') => void
   /** Bump to wipe the level cache and reload the visible set. */
   refreshTick: number
   /** Upload into `dir` (absolute, inside the workspace); runs in the caller. */
@@ -330,9 +330,14 @@ export function FileTree(props: {
         className={css.explorerRef}
         aria-label={t('referenceFile')}
         title={t('referenceFile')}
+        onMouseDown={(event) => {
+          // Keep the composer focused: a mousedown on this button would
+          // otherwise steal caret before the click appends the @-mention.
+          event.preventDefault()
+        }}
         onClick={(event) => {
           event.stopPropagation()
-          onReferenceFile(entry.path)
+          onReferenceFile(entry.path, entry.isDir ? 'directory' : 'file')
         }}
       >
         {t('referenceFile')}
@@ -562,9 +567,10 @@ export function FileTree(props: {
                   className={css.explorerRef}
                   aria-label={t('referenceFile')}
                   title={t('referenceFile')}
+                  onMouseDown={(event) => { event.preventDefault() }}
                   onClick={(event) => {
                     event.stopPropagation()
-                    onReferenceFile(root)
+                    onReferenceFile(root, 'directory')
                   }}
                 >
                   {t('referenceFile')}
