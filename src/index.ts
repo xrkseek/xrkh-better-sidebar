@@ -11,7 +11,8 @@
  *
  * On XRK-Harness the product Host already owns `/sidebar/*`; this apply path
  * remains for Cordis profile mounts that still load the package as a host
- * plugin. Prefer client-only inject (`xrk.client`) on XRKH.
+ * plugin. Prefer client-only inject (`xrk.client`) on XRKH — do not enable
+ * this host half beside `createSidebarPublicHandler` (duplicate routes).
  *
  * All operations are conversation-scoped: requests carry a sessionId, the
  * session's authoritative cwd comes from the session store, and terminal

@@ -11,6 +11,8 @@
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import type { Context } from '../context-types.ts'
+// Type-only: `layout` inject waits until ui-layout declares center slots.
+import type {} from '@xrkseek/client-ui-layout/client'
 import { allLeaves, createSidebarStore, isAgentTabId } from './state.ts'
 import { createBetterSidebarService, matchUrlTarget } from './service.ts'
 import { revalidateChunksOnReactivate, setChunkModuleSystem } from './chunk-loader.ts'
@@ -34,7 +36,7 @@ import './layout.css'
 /** Services required before mounting (provided by the client runtime; the
  *  locale service backs the sidebar's copy — see locales.ts). `modules`
  *  resolves chunk-loader externals. */
-export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'modules']
+export const inject = ['slots', 'sessions', 'workspaces', 'locale', 'modules', 'layout']
 
 /**
  * Error boundary over the sidebar tree (root scope): a render error in the
