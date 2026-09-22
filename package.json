@@ -1,6 +1,6 @@
 {
   "name": "xrkh-better-sidebar",
-  "version": "0.18.6",
+  "version": "0.18.7",
   "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {

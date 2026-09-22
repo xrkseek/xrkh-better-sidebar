@@ -81,12 +81,13 @@
   pointer-events: auto;
 }
 
-/* Layout details (session overview) owns the top-right close control. Hide
-   the workbench toggles while it is open so they cannot cover it or steal
-   clicks (XRK AppFrame stamps data-xrk-details-open on <body>). */
-:global(body[data-xrk-details-open]) .toggleCluster {
-  visibility: hidden;
-  pointer-events: none;
+/* Shell layout insets (ui-layout public contract): when the overview
+   (`details`) is open and our panels are collapsed, shift the toggle
+   cluster left by --xrk-layout-inset-details so it does not cover the
+   overview close control. When a panel is open, #root already yields
+   margin-right to the workbench and the overview sits beside it. */
+:global(html[data-xrk-layout-details] body[data-dsh-sidebar-collapsed]) .toggleCluster {
+  right: calc(10px + var(--xrk-layout-inset-details, 0px));
 }
 
 /* The tab strip of the OPEN right panel reserves the cluster's width at its

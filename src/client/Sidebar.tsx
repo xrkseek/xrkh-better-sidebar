@@ -289,31 +289,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     return () => { document.body.removeAttribute('data-dsh-sidebar-collapsed') }
   }, [collapsed])
 
-  // Mutual exclusion with the layout details (session overview) column: both
-  // claim the right chrome and the top-right close/toggle controls. When the
-  // overview opens (AppFrame stamps data-xrk-details-open), collapse our
-  // panels so the overview is not covered and its close button is clickable.
-  useEffect(() => {
-    const yieldToOverview = (): void => {
-      if (!document.body.hasAttribute('data-xrk-details-open')) return
-      store.reduce((s) => {
-        let next = s
-        if (next.panelOpen) next = togglePanel(next)
-        if (next.bottomOpen) next = { ...next, bottomOpen: false }
-        return next
-      })
-    }
-    yieldToOverview()
-    const observer = new MutationObserver(yieldToOverview)
-    observer.observe(document.body, { attributes: true, attributeFilter: ['data-xrk-details-open'] })
-    return () => { observer.disconnect() }
-  }, [store])
-
-  /** Close the layout overview before expanding a workbench panel. */
-  const reclaimFromOverview = useCallback((): void => {
-    try { ctx.layout?.closeDetails() } catch { /* layout face may be mid-boot */ }
-  }, [ctx])
-
   // Title-bar / shell compatibility (the "位置兼容模式" scheme):
   //   auto    — CONSERVATIVE: only the standard Window Controls Overlay
   //             geometry contributes (the real caption-overlay height,
@@ -1478,10 +1453,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
               type="button"
               className={css.toggleButton}
               aria-label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')}
-              onClick={() => {
-                if (!state.bottomOpen) reclaimFromOverview()
-                store.reduce(toggleBottomPanel)
-              }}
+              onClick={() => { store.reduce(toggleBottomPanel) }}
             >
               <IconPanelBottomOutline16 />
             </button>
@@ -1492,10 +1464,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
             type="button"
             className={css.toggleButton}
             aria-label={state.panelOpen ? t('collapse') : t('expand')}
-            onClick={() => {
-              if (!state.panelOpen) reclaimFromOverview()
-              store.reduce(togglePanel)
-            }}
+            onClick={() => { store.reduce(togglePanel) }}
           >
             <IconPanelRightOutline16 />
           </button>
