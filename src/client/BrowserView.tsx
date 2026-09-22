@@ -219,7 +219,12 @@ export function BrowserView(props: TabComponentProps) {
           title={t('browserOpenExternal')}
           disabled={url === undefined}
           onClick={() => {
-            if (url !== undefined) window.open(url, '_blank', 'noopener')
+            if (url === undefined) return
+            // Hand the absolute URL to the host opener so Desktop / web
+            // shells open the OS default browser instead of another GUI tab.
+            void api.openExternal({ action: 'url', url }).catch(
+              (error: unknown) => { console.error('open external failed', error) },
+            )
           }}
         >
           <VscLinkExternal size={15} />
@@ -238,7 +243,11 @@ export function BrowserView(props: TabComponentProps) {
       ) : embedBlocked !== null && !forceEmbed ? (
         <BrowserEmbedBlocked
           url={embedBlocked}
-          onOpenInBrowser={() => { window.open(embedBlocked, '_blank', 'noopener') }}
+          onOpenInBrowser={() => {
+            void api.openExternal({ action: 'url', url: embedBlocked }).catch(
+              (error: unknown) => { console.error('open external failed', error) },
+            )
+          }}
           onLoadAnyway={() => { setForceEmbed(true) }}
         />
       ) : (

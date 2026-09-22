@@ -45,7 +45,7 @@ import { type LastActivity, coerceLiveActivity } from '../subagent-activity.ts'
 import { SIDE_LABEL_PREFIX } from '../side-label.ts'
 import { normalizeSubagentCatalogs } from '../subagent-catalog.ts'
 import {
-  collectTreeJobs,
+  collectJobsForFocus,
   formatJobDuration,
   isJobLive,
   orderJobs,
@@ -483,14 +483,15 @@ function JobOutputPane(props: {
 function JobsSection(props: {
   byId: SidebarSessionList['byId']
   jobsBySession: SidebarSessionList['jobsBySession']
-  rootId: string | undefined
+  /** The session whose OWN jobs the list shows: the main session or the one subagent the user selected. */
+  focusId: string | undefined
   /** The page is visible (active tab + open panel): skip polling otherwise. */
   active: boolean
 }) {
-  const { byId, jobsBySession, rootId, active } = props
+  const { byId, jobsBySession, focusId, active } = props
   const rows = useMemo(
-    () => orderJobs(collectTreeJobs(byId, jobsBySession, rootId)),
-    [byId, jobsBySession, rootId],
+    () => orderJobs(collectJobsForFocus(byId, jobsBySession, focusId)),
+    [byId, jobsBySession, focusId],
   )
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined)
   const [armedId, setArmedId] = useState<string | undefined>(undefined)
@@ -572,12 +573,14 @@ function JobsSection(props: {
             const killFailed = killErrorId === job.id
             const elapsed = live
               ? now - job.startedAt
-              : (job.finishedAt ?? job.startedAt) - job.startedAt
+              : job.finishedAt === undefined
+                ? undefined
+                : job.finishedAt - job.startedAt
             const secondary = [
               ...(multiOwner ? [row.ownerTitle] : []),
               jobStatusLabel(job.status, t),
               ...(job.detail !== undefined && job.detail !== '' ? [job.detail] : []),
-              formatJobDuration(elapsed, t),
+              ...(elapsed === undefined ? [] : [formatJobDuration(elapsed, t)]),
             ].filter(Boolean).join(' · ')
             return (
               <li
@@ -882,7 +885,7 @@ export function SubagentView(props: {
         <JobsSection
           byId={byId}
           jobsBySession={list.jobsBySession}
-          rootId={rootId}
+          focusId={sessionId}
           active={active}
         />
       </div>

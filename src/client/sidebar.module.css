@@ -1264,6 +1264,22 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   border-bottom: 1px solid var(--dsw-alias-border-l1);
 }
 
+/* HTML preview chrome: sandbox status + "open in system browser". */
+.editorHtmlBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+}
+
+.editorHtmlBar > :first-child {
+  flex: 1;
+  min-width: 0;
+  border-bottom: none;
+}
+
 .editorTitle {
   flex: 1;
   min-width: 0;

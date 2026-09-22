@@ -60,10 +60,9 @@ export function treeSessionIds(
 /**
  * Whether a NEW background job appeared for one session between two
  * consecutive list snapshots (a job id the previous snapshot lacked).
- * Unlike the subagent auto-open (0 → N only), ANY new job id triggers: the
- * agent may start several jobs over a session, and each new one should
- * surface the Jobs page (a fresh page load never triggers — its baseline
- * starts at the current snapshot).
+ * @deprecated The Jobs auto-open now gates on {@link detectFirstJob} (0 → N)
+ * so a running agent never steals focus mid-work; this stays for the list
+ * badge and tests that track individual new job ids.
  */
 export function detectNewJob(
   prev: SidebarSessionList,
@@ -72,6 +71,26 @@ export function detectNewJob(
 ): boolean {
   const prevIds = new Set((prev.jobsBySession?.[sessionId] ?? []).map(job => job.id))
   return (next.jobsBySession?.[sessionId] ?? []).some(job => !prevIds.has(job.id))
+}
+
+/**
+ * Whether the CURRENT conversation crossed from "no background jobs" to
+ * "at least one" between two consecutive list snapshots — the 0 → N
+ * transition, mirroring the subagent auto-open semantics. The Jobs page
+ * auto-surfaces ONCE per session on its first job; every later job the
+ * agent starts while the user is reading files or looking at another pane
+ * must NOT steal focus (the row still appears in the list and the badge
+ * still counts it — only the forced navigation is suppressed). A fresh page
+ * load never triggers: its baseline is the current snapshot.
+ */
+export function detectFirstJob(
+  prev: SidebarSessionList,
+  next: SidebarSessionList,
+  sessionId: string,
+): boolean {
+  const prevCount = (prev.jobsBySession?.[sessionId] ?? []).length
+  if (prevCount > 0) return false
+  return (next.jobsBySession?.[sessionId] ?? []).length > 0
 }
 
 /**
@@ -92,6 +111,28 @@ export function collectTreeJobs(
     const ownerTitle = byId[sessionId]?.displayTitle ?? sessionId
     for (const job of jobs) rows.push({ ownerSessionId: sessionId, ownerTitle, job })
   }
+  return rows
+}
+
+/**
+ * Collect the background jobs of ONE focused session only — the row list the
+ * Jobs section shows when the user has selected a specific agent (the main
+ * session or a single subagent). Selecting a node must scope the list to that
+ * node's OWN jobs: picking the main session shows the main session's jobs and
+ * never its children's, and picking a subagent shows only that child's. An
+ * absent mirror or a session with no jobs yields an empty list.
+ */
+export function collectJobsForFocus(
+  byId: SidebarSessionList['byId'],
+  jobsBySession: Readonly<Record<string, readonly SidebarJobView[]>> | undefined,
+  focusId: string | undefined,
+): TreeJob[] {
+  const rows: TreeJob[] = []
+  if (jobsBySession === undefined || focusId === undefined) return rows
+  const jobs = jobsBySession[focusId]
+  if (jobs === undefined || jobs.length === 0) return rows
+  const ownerTitle = byId[focusId]?.displayTitle ?? focusId
+  for (const job of jobs) rows.push({ ownerSessionId: focusId, ownerTitle, job })
   return rows
 }
 
@@ -159,3 +200,4 @@ export function formatJobDuration(
   if (minutes > 0) return t('jobDurationMinutes', { minutes, seconds })
   return t('jobDurationSeconds', { seconds })
 }
+

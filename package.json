@@ -1,6 +1,6 @@
 {
   "name": "xrkh-better-sidebar",
-  "version": "0.18.4",
+  "version": "0.18.5",
   "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {
@@ -84,6 +84,39 @@
   },
   "peerDependenciesMeta": {
     "@xrkseek/cordis": {
+      "optional": true
+    },
+    "@xrkseek/client-locale": {
+      "optional": true
+    },
+    "@xrkseek/client-ui-conversation": {
+      "optional": true
+    },
+    "@xrkseek/client-ui-layout": {
+      "optional": true
+    },
+    "@xrkseek/client-ui-primitives": {
+      "optional": true
+    },
+    "@xrkseek/client-ui-settings": {
+      "optional": true
+    },
+    "@xrkseek/client-ui-slots": {
+      "optional": true
+    },
+    "@xrkseek/xrk-invariants": {
+      "optional": true
+    },
+    "@xrkseek/xrk-settings": {
+      "optional": true
+    },
+    "@xrkseek/xrk-tools": {
+      "optional": true
+    },
+    "@xrkseek/xrk-llm": {
+      "optional": true
+    },
+    "@xrkseek/xrk-agent": {
       "optional": true
     }
   },

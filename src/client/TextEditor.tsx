@@ -20,6 +20,7 @@ import { EditorState } from '@codemirror/state'
 import { EditorView as CodeMirrorView, keymap, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { IconCheckOutline16, MarkdownText } from '@xrkseek/client-ui-primitives'
+import { VscLinkExternal } from 'react-icons/vsc'
 import { markdownTextProps } from './markdown-labels.tsx'
 import { api, htmlUrl } from './api.ts'
 import { rewriteLocalImageUrls } from './markdown-images.ts'
@@ -428,13 +429,29 @@ export function TextEditor(props: FileViewerProps) {
       )}
       {html && mode === 'preview' && (
         <>
-          <SandboxStatusBar
-            sandboxed={!htmlNoSandbox}
-            local={localUnlock}
-            dangerCopy={t('htmlNoSandboxWarning')}
-            onUnlock={() => { setLocalUnlock(true) }}
-            onRestore={() => { setLocalUnlock(false) }}
-          />
+          <div className={css.editorHtmlBar}>
+            <SandboxStatusBar
+              sandboxed={!htmlNoSandbox}
+              local={localUnlock}
+              dangerCopy={t('htmlNoSandboxWarning')}
+              onUnlock={() => { setLocalUnlock(true) }}
+              onRestore={() => { setLocalUnlock(false) }}
+            />
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={t('browserOpenExternal')}
+              title={t('browserOpenExternal')}
+              onClick={() => {
+                const absolute = new URL(htmlUrl(scope, path), window.location.origin).href
+                void api.openExternal({ action: 'url', url: absolute }).catch(
+                  (error: unknown) => { console.error('open external failed', error) },
+                )
+              }}
+            >
+              <VscLinkExternal size={15} />
+            </button>
+          </div>
           {/* Route-src (never srcdoc — a srcdoc frame inherits the parent
               origin when unsandboxed; the route URL keeps the frame
               cross-origin by construction). The preview shows the SAVED

@@ -53,20 +53,20 @@ export function urlCommand(url: string, platform: NodeJS.Platform = process.plat
   }
 }
 
-/** Validate a URL-scheme open target: a parseable custom-scheme URL (never
- *  http/https — those would only dump the URL into a browser tab). */
+/** Validate an absolute URL for the OS opener: http(s) (HTML preview /
+ *  browser tab → system browser), `file:`, or a custom scheme
+ *  (`vscode://`, `cursor://`, `zed://`, …). */
 export function validateExternalUrl(raw: string): string {
   if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) {
-    throw new SidebarError('bad-request', 'url must be a custom-scheme URL')
+    throw new SidebarError('bad-request', 'url must be an absolute URL')
   }
-  let url: URL
   try {
-    url = new URL(raw)
+    // Reject malformed hosts / illegal characters; keep the original string
+    // so custom schemes with braced placeholders (open-with templates) still
+    // round-trip to the OS handler.
+    void new URL(raw)
   } catch {
     throw new SidebarError('bad-request', 'invalid url')
-  }
-  if (url.protocol === 'http:' || url.protocol === 'https:') {
-    throw new SidebarError('bad-request', 'only custom-scheme urls can be opened externally')
   }
   return raw
 }

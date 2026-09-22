@@ -59,7 +59,7 @@ import { OrphanedTab } from './OrphanedTab.tsx'
 import { RenderBoundary } from './RenderBoundary.tsx'
 import { tabContentCompare, type TabContentMemoKey } from './tab-content-memo.ts'
 import { detectNewDirectSubagent } from './subagent-detect.ts'
-import { detectNewJob } from './subagent-jobs.ts'
+import { detectFirstJob } from './subagent-jobs.ts'
 import { t } from './locales.ts'
 import { api, type SessionScope } from './api.ts'
 import css from './sidebar.module.css'
@@ -550,20 +550,20 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   }, [sessionId])
 
   /**
-   * Job auto-activation: the moment a NEW background job appears for the
-   * current conversation (a job id the previous snapshot lacked), the
-   * auto-open pref is on, and the Jobs tab type is enabled, open the panel
-   * (if collapsed) and focus the Jobs page. Unlike the subagent trigger
-   * (0 → N only), ANY new job id triggers: the agent may start several
-   * jobs in one session, and each should surface. A fresh page load never
-   * triggers — its baseline starts at the current snapshot.
+   * Job auto-activation: the moment the CURRENT conversation crosses from
+   * "no background jobs" to "at least one" (a 0 → N transition), the
+   * auto-open pref is on, and the Subagent tab type is enabled, open the
+   * panel (if collapsed) and focus the Subagent page. Later jobs started
+   * while the user is reading files or looking at another pane must NOT
+   * steal focus — the row still appears in the list. A fresh page load
+   * never triggers: its baseline starts at the current snapshot.
    */
   const jobBaselineRef = useRef<SidebarSessionList | undefined>(undefined)
   useEffect(() => {
     const prev = jobBaselineRef.current
     jobBaselineRef.current = sessionList
     if (sessionId === undefined || prev === undefined) return
-    if (!detectNewJob(prev, sessionList, sessionId)) return
+    if (!detectFirstJob(prev, sessionList, sessionId)) return
     if (!store.getPrefs().autoOpenJobs) return
     if (ctx.get('betterSidebar')?.isTabEnabled('subagent') === false) return
     store.reduce(s => s.panelOpen ? s : togglePanel(s))
@@ -593,20 +593,19 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   }, [sessionId, store, ctx])
 
   /**
-   /**
-    * Inline pinned terminals (v0.17.0+): pinned tabs from OTHER sessions
-    * inject as VIRTUAL tabs into the first leaf of the right panel's split
-    * tree. The virtual tabs have unique ids (prefixed with the home session)
-    * and carry the home scope in meta. Clicking a virtual tab sets
-    * `activePinnedTabId` — the augmented tree overrides the leaf's `active`
-    * so the pinned tab's content renders in-place (TerminalView connects to
-    * the home session's PTY via WS, no session jump).
-    *
-    * Closing/unpinning a virtual tab targets the HOME session via reduceFor
-    * (which doesn't notify — targeted opens must not re-render the active
-    * session). The `pinnedRevision` state bump forces the pinnedEntries
-    * useMemo to recompute after such an action.
-    */
+   * Inline pinned terminals (v0.17.0+): pinned tabs from OTHER sessions
+   * inject as VIRTUAL tabs into the first leaf of the right panel's split
+   * tree. The virtual tabs have unique ids (prefixed with the home session)
+   * and carry the home scope in meta. Clicking a virtual tab sets
+   * `activePinnedTabId` — the augmented tree overrides the leaf's `active`
+   * so the pinned tab's content renders in-place (TerminalView connects to
+   * the home session's PTY via WS, no session jump).
+   *
+   * Closing/unpinning a virtual tab targets the HOME session via reduceFor
+   * (which doesn't notify — targeted opens must not re-render the active
+   * session). The `pinnedRevision` state bump forces the pinnedEntries
+   * useMemo to recompute after such an action.
+   */
   const [activePinnedTabId, setActivePinnedTabId] = useState<string | null>(null)
   const [pinnedRevision, setPinnedRevision] = useState(0)
 

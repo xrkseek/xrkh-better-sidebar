@@ -50,9 +50,10 @@ describe('validateExternalUrl', () => {
     expect(validateExternalUrl('myapp://file/{path}')).toBe('myapp://file/{path}')
   })
 
-  it('rejects http/https (only custom schemes make sense here)', () => {
-    expect(() => validateExternalUrl('https://example.com')).toThrow(SidebarError)
-    expect(() => validateExternalUrl('http://example.com')).toThrow(SidebarError)
+  it('accepts http/https so HTML preview and the browser tab can open the system browser', () => {
+    expect(validateExternalUrl('https://example.com/a')).toBe('https://example.com/a')
+    expect(validateExternalUrl('http://127.0.0.1:3080/sidebar/html/s1/a.html'))
+      .toBe('http://127.0.0.1:3080/sidebar/html/s1/a.html')
   })
 
   it('rejects non-URL / non-`scheme://` strings', () => {
@@ -67,7 +68,7 @@ describe('launchExternal validation (pre-spawn)', () => {
     expect(() => launchExternal('reveal', 'relative/path')).toThrow(SidebarError)
   })
 
-  it('rejects invalid URLs before anything is spawned', () => {
-    expect(() => launchExternal('url', 'https://example.com')).toThrow(SidebarError)
+  it('rejects non-absolute URL strings before anything is spawned', () => {
+    expect(() => launchExternal('url', '/relative')).toThrow(SidebarError)
   })
 })
