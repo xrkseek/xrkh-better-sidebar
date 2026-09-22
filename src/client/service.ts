@@ -473,7 +473,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
  * The plugin version this service instance reports. Keep in lockstep with
  * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.18.5'
+export const SIDEBAR_SERVICE_VERSION = '0.18.6'
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features
@@ -706,16 +706,16 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
       // viewports the two workbenches merge into one drawer, so the drawer
       // (panelOpen) is the only lever; on wide viewports the landing pane's
       // own panel opens — the bottom panel when the active pane lives in the
-      // bottom tree, else the right panel. Type-only opens (+ menu,
-      // agent-terminal auto-tabs) never expand (the panel behavior is their
-      // caller's business). The check runs on the post-dedupe state, so a
-      // content open that merely FOCUSES an existing tab expands the panel
-      // too — the open must never land out of sight. Opens targeted at an
-      // INACTIVE session never expand (nothing is in sight for the user).
+      // bottom tree, else the right panel. Terminal opens also expand: a
+      // type-only +menu / auto-terminal that leaves the panel closed paints
+      // an empty right chrome (xterm waits for a non-zero host). Other
+      // type-only opens (+ menu for explorer/git) keep the previous
+      // caller-owned expand behavior. Opens targeted at an INACTIVE session
+      // never expand (nothing is in sight for the user).
       if (
         !targetsInactiveSession
         && typeof window !== 'undefined'
-        && (seed.path !== undefined || seed.url !== undefined)
+        && (seed.path !== undefined || seed.url !== undefined || seed.type === 'terminal')
       ) {
         if (isNarrowWidth(window.innerWidth)) {
           if (!landed.panelOpen) return togglePanel(landed)

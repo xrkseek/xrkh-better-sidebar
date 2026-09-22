@@ -81,6 +81,14 @@
   pointer-events: auto;
 }
 
+/* Layout details (session overview) owns the top-right close control. Hide
+   the workbench toggles while it is open so they cannot cover it or steal
+   clicks (XRK AppFrame stamps data-xrk-details-open on <body>). */
+:global(body[data-xrk-details-open]) .toggleCluster {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* The tab strip of the OPEN right panel reserves the cluster's width at its
    right end, so the tabs and the + menu genuinely yield space to the cluster
    (never hiding under it). */
