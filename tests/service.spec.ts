@@ -532,7 +532,7 @@ describe('service.openTab across the two panels', () => {
   })
 })
 
-describe('service.openTab auto-expand for content opens', () => {
+describe('service.openTab auto-expand', () => {
   /** The window stub is a plain object (see the file header), so the width is writable. */
   const setWidth = (width: number): void => {
     ;(g.window as { innerWidth: number }).innerWidth = width
@@ -572,7 +572,7 @@ describe('service.openTab auto-expand for content opens', () => {
     }
   })
 
-  it('keeps a collapsed drawer for a type-only open on a narrow viewport', () => {
+  it('expands the collapsed drawer for a type-only open on a narrow viewport', () => {
     setWidth(390)
     try {
       const store = createSidebarStore()
@@ -581,7 +581,7 @@ describe('service.openTab auto-expand for content opens', () => {
       store.setSession('s1')
       store.reduce(s => ({ ...s, panelOpen: false }))
       service.openTab({ type: 'explorer', title: 'Explorer' })
-      expect(store.getSnapshot().state?.panelOpen).toBe(false)
+      expect(store.getSnapshot().state?.panelOpen).toBe(true)
     } finally {
       setWidth(1024)
     }
@@ -624,14 +624,14 @@ describe('service.openTab auto-expand for content opens', () => {
     expect(allLeaves(state.bottomSplits).flatMap(l => l.tabs).some(t => t.type === 'editor')).toBe(true)
   })
 
-  it('keeps a collapsed panel for a type-only open on a wide viewport', () => {
+  it('expands the collapsed panel for a type-only open on a wide viewport', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)
     service.registerTab({ id: 'explorer', title: 'Explorer', component: () => null })
     store.setSession('s1')
     collapseRightPanel(store)
     service.openTab({ type: 'explorer', title: 'Explorer' })
-    expect(store.getSnapshot().state?.panelOpen).toBe(false)
+    expect(store.getSnapshot().state?.panelOpen).toBe(true)
   })
 
   it('expands on a narrow viewport even when the open focuses an existing tab (id dedupe)', () => {

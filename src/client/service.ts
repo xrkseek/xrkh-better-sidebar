@@ -692,30 +692,18 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
           : candidates.find(candidate => candidate.id === tab.id)
         activated ??= tab
       }
-      // A CONTENT open that focuses an existing FLOATING tab is already in
-      // sight (free windows render regardless of panel state): expanding a
-      // panel for it would point the user at a pane the content is not in.
-      if (
-        !isCreation
-        && floatWithTab(landed, activated?.id ?? tab.id) !== undefined
-      ) {
-        return landed
-      }
-      // A CONTENT open (file / browser) must land in sight: when the panel
+      // Any open for the active session must land in sight: when the panel
       // hosting the landing pane is collapsed, expand it. On narrow
       // viewports the two workbenches merge into one drawer, so the drawer
       // (panelOpen) is the only lever; on wide viewports the landing pane's
       // own panel opens — the bottom panel when the active pane lives in the
-      // bottom tree, else the right panel. Terminal opens also expand: a
-      // type-only +menu / auto-terminal that leaves the panel closed paints
-      // an empty right chrome (xterm waits for a non-zero host). Other
-      // type-only opens (+ menu for explorer/git) keep the previous
-      // caller-owned expand behavior. Opens targeted at an INACTIVE session
+      // bottom tree, else the right panel. Type-only opens (+ menu /
+      // session-header Files / auto-terminal) expand the same way so callers
+      // need not know panel state. Opens targeted at an INACTIVE session
       // never expand (nothing is in sight for the user).
       if (
         !targetsInactiveSession
         && typeof window !== 'undefined'
-        && (seed.path !== undefined || seed.url !== undefined || seed.type === 'terminal')
       ) {
         if (isNarrowWidth(window.innerWidth)) {
           if (!landed.panelOpen) return togglePanel(landed)
