@@ -10,7 +10,7 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.8
+xrkh plugin add xrkh-better-sidebar@0.18.9
 xrkh restart
 ```
 
@@ -18,7 +18,7 @@ xrkh restart
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
-## 0.18.8
+## 0.18.9
 
 - `openTab`：当前会话下任意打开（含仅 `type` 的 Files / +菜单）都会展开已折叠侧栏，调用方无需再自行 `togglePanel`
 
