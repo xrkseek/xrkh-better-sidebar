@@ -71,8 +71,9 @@
    identical). */
 .toggleCluster {
   position: absolute;
-  /* env() resolves to 0 on devices without a top inset (desktops). */
-  top: calc(3px + env(safe-area-inset-top));
+  /* Desktop chrome height from AppFrame (`--xrk-desktop-chrome-height`);
+     env() is 0 on devices without a top inset. */
+  top: calc(3px + env(safe-area-inset-top) + var(--xrk-desktop-chrome-height, 0px));
   right: 10px;
   z-index: 45;
   display: flex;
@@ -114,8 +115,8 @@
   color: var(--dsw-alias-label-secondary);
   cursor: pointer;
   transition:
-    background var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    color var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    background var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    color var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .toggleButton:hover:not(:disabled):not([aria-disabled='true']) {
@@ -132,7 +133,9 @@
 .panel {
   box-sizing: border-box;
   position: absolute;
-  top: 0;
+  /* Clear frameless Desktop chrome (`--xrk-desktop-chrome-height` on <html>).
+     0 on web / when AppFrame has not published the var. */
+  top: var(--xrk-desktop-chrome-height, 0px);
   /* Leave a 2px window-edge strip so frameless Electron can still hit-test
      native resize on the right border (panel pointer-events would otherwise
      swallow the edge). */
@@ -164,8 +167,8 @@
   padding-bottom: env(safe-area-inset-bottom);
   /* Expand/collapse slides the panel; fullscreen animates the width. */
   transition:
-    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    width var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    width var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 /* Collapsed: slid off-screen, interactive nothing, hidden after the slide. */
@@ -174,9 +177,9 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    width var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    visibility 0s linear var(--ds-transition-duration-slow);
+    transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    width var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    visibility 0s linear var(--ds-transition-duration-slow, 380ms);
 }
 
 /* Width drags write at pointer cadence; easing would detach the edge. */
@@ -233,8 +236,8 @@
   padding-bottom: env(safe-area-inset-bottom);
   /* Expand/collapse slides the panel; height drags animate the height. */
   transition:
-    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    height var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 /* Collapsed: slid off-screen, interactive nothing, hidden after the slide. */
@@ -243,9 +246,9 @@
   pointer-events: none;
   visibility: hidden;
   transition:
-    transform var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    height var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    visibility 0s linear var(--ds-transition-duration-slow);
+    transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    visibility 0s linear var(--ds-transition-duration-slow, 380ms);
 }
 
 /* Height drags write at pointer cadence; easing would detach the edge. */
@@ -491,7 +494,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
    `titleBarStripPx`; 40px fallback). The bottom panel is unaffected: it
    sits at the window's bottom, never under the top strip. */
 :global(body[data-dsh-title-bar-compat]) .toggleCluster {
-  top: calc(var(--dsh-title-bar-strip, 40px) + 3px);
+  top: calc(
+    var(--dsh-title-bar-strip, 40px) + 3px + env(safe-area-inset-top)
+    + var(--xrk-desktop-chrome-height, 0px)
+  );
 }
 
 :global(body[data-dsh-title-bar-compat]) .panel {

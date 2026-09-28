@@ -10,13 +10,26 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.10
+xrkh plugin add xrkh-better-sidebar@0.18.12
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.12
+
+- Boot splash (`data-xrk-booting`): hide panel-host / FABs so they do not sit under the HARNESS gate
+- Session-log capsule: always right-pad while the toggle cluster is mounted (including mid-open animation)
+- Motion: cold-theme fallbacks (380ms / cubic-bezier) so expand/collapse never jumps
+- Desktop chrome: right panel + FABs clear `--xrk-desktop-chrome-height`
+
+## 0.18.11
+
+- Files tab: `openTab({ type: 'editor' })` focuses the seeded files-home instead of minting a twin Files tab
+- `applyDedupe`: still dedupes when `dedupeKey` returns `undefined` (pathless editor cohort)
+- Bottom-panel first expand: skip auto-terminal when a UI terminal already exists
 
 ## 0.18.10
 

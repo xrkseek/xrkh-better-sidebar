@@ -884,6 +884,17 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     if (state.bottomOpenedOnce) return
     if (store.getPrefs().bottomPanelAutoTerminal === false) return
     if (ctx.get('betterSidebar')?.isTabEnabled('terminal') === false) return
+    // A UI terminal already in either workbench means the user (or a prior
+    // open) already has a shell — auto-open must not stack a twin on first
+    // expand. Agent terminals (agent:) do not count.
+    const hasUiTerminal = allLeaves(state.splits)
+      .concat(allLeaves(state.bottomSplits))
+      .flatMap(leaf => leaf.tabs)
+      .some(tab => tab.type === 'terminal' && !isAgentTabId(tab.id))
+    if (hasUiTerminal) {
+      store.reduce(s => ({ ...s, bottomOpenedOnce: true }))
+      return
+    }
     // Land the tab in the bottom panel's first pane; the once-flag is set
     // atomically so later expansions never repeat the auto-open.
     store.reduce(s => ({ ...s, activePane: firstLeaf(s.bottomSplits).id, bottomOpenedOnce: true }))

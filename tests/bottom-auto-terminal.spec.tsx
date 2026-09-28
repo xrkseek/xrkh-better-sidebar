@@ -23,7 +23,7 @@ import { act } from 'react-dom/test-utils'
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
 import { Sidebar } from '../src/client/Sidebar.tsx'
-import { allLeaves, createSidebarStore, toggleBottomPanel, type SidebarStore } from '../src/client/state.ts'
+import { allLeaves, createSidebarStore, openTabInActivePane, toggleBottomPanel, type SidebarStore } from '../src/client/state.ts'
 import { createBetterSidebarService, type BetterSidebarService } from '../src/client/service.ts'
 import { t } from '../src/client/locales.ts'
 
@@ -175,5 +175,30 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
     act(() => { store.reduce(toggleBottomPanel) })
     expect(store.getSnapshot().state!.bottomOpen).toBe(true)
     expect(bottomTabs(store)).toHaveLength(0)
+  })
+
+  it('does not auto-open a twin when a UI terminal already exists', () => {
+    const { store, service } = mountSidebar()
+    registerStubTerminal(service, { count: 0 })
+    // Seed a UI terminal in the right workbench before the first expand.
+    act(() => {
+      store.reduce(s => openTabInActivePane(s, {
+        id: 'terminal:seed',
+        type: 'terminal',
+        title: 'Terminal',
+      }))
+    })
+    expect(allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .filter(t => t.type === 'terminal')).toHaveLength(1)
+
+    act(() => { store.reduce(toggleBottomPanel) })
+    expect(store.getSnapshot().state!.bottomOpen).toBe(true)
+    expect(store.getSnapshot().state!.bottomOpenedOnce).toBe(true)
+    // No new terminal in the bottom workbench; the existing one stays alone.
+    expect(bottomTabs(store)).toHaveLength(0)
+    expect(allLeaves(store.getSnapshot().state!.splits)
+      .concat(allLeaves(store.getSnapshot().state!.bottomSplits))
+      .flatMap(l => l.tabs)
+      .filter(t => t.type === 'terminal')).toHaveLength(1)
   })
 })

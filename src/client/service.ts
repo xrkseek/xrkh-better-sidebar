@@ -659,8 +659,10 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
       const key = dedupeKey?.(tab)
       const inputTabs = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
         .concat(state.floats.map(f => f.tab))
-      const existedByKey = key !== undefined
-        && inputTabs.some(candidate => candidate.type === tab.type && dedupeKey!(candidate) === key)
+      // Match applyDedupe: an undefined key still identifies the pathless cohort
+      // (files-home), so a focus must not be classified as a creation.
+      const existedByKey = dedupeKey !== undefined
+        && inputTabs.some(candidate => candidate.type === tab.type && dedupeKey(candidate) === key)
       const existedById = tabOpenIn(state, tab.id)
       const isCreation = !existedByKey && !existedById
       // A URL seed pre-fills a NEWLY CREATED tab's path (the browser tab
@@ -687,8 +689,8 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
         // raising, and the callback must see the real (patched) tab.
         const candidates = allLeaves(landed.splits).concat(allLeaves(landed.bottomSplits)).flatMap(leaf => leaf.tabs)
           .concat(landed.floats.map(f => f.tab))
-        activated = key !== undefined
-          ? candidates.find(candidate => candidate.type === tab.type && dedupeKey!(candidate) === key)
+        activated = dedupeKey !== undefined
+          ? candidates.find(candidate => candidate.type === tab.type && dedupeKey(candidate) === key)
           : candidates.find(candidate => candidate.id === tab.id)
         activated ??= tab
       }
@@ -837,17 +839,20 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
  */
 function applyDedupe(state: SidebarState, tab: SidebarTab, descriptor: TabDescriptor): SidebarState {
   const dedupeKey = descriptor.dedupeKey ?? (descriptor.single === true ? () => descriptor.id : undefined)
-  const key = dedupeKey?.(tab)
-  if (key !== undefined) {
+  // Run whenever a key function exists — including when it returns undefined
+  // (the editor's pathless files-home window). Skipping on undefined let
+  // openTab({ type: 'editor' }) mint a second Files tab beside the seed.
+  if (dedupeKey !== undefined) {
+    const key = dedupeKey(tab)
     // The scan covers BOTH trees: opening a single-instance tab from the
     // bottom panel focuses an existing instance wherever it lives.
     for (const leaf of allLeaves(state.splits).concat(allLeaves(state.bottomSplits))) {
-      const existing = leaf.tabs.find(t => t.type === tab.type && dedupeKey!(t) === key)
+      const existing = leaf.tabs.find(t => t.type === tab.type && dedupeKey(t) === key)
       if (existing !== undefined) return activateTabReducer(state, leaf.id, existing.id)
     }
     // A floating instance focuses by raising its window (no duplicate tab,
     // no panel expansion — the window is the tab's pane).
-    const floated = state.floats.find(f => f.tab.type === tab.type && dedupeKey!(f.tab) === key)
+    const floated = state.floats.find(f => f.tab.type === tab.type && dedupeKey(f.tab) === key)
     if (floated !== undefined) return raiseFloat(state, floated.id)
   }
   return openTabInActivePane(state, tab)

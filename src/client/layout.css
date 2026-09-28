@@ -1,3 +1,10 @@
+/* Soft motion: prefer theme tokens, fall back so expand/collapse never
+   jumps when --ds-* is still cold or unset on a host shell. */
+:root {
+  --xrkh-sidebar-motion-duration: var(--ds-transition-duration-slow, 380ms);
+  --xrkh-sidebar-motion-ease: var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
 /**
  * Layout push: when a panel is open it OCCUPIES the layout instead of
  * floating over it — the app shell (#root, the AppFrame three-column grid)
@@ -31,8 +38,8 @@
   margin-right: var(--dsh-sidebar-width, 0px);
   width: calc(100% - var(--dsh-sidebar-width, 0px));
   transition:
-    margin-right var(--ds-transition-duration-slow) var(--ds-ease-in-out),
-    width var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+    margin-right var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease),
+    width var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
 /* The AppFrame's center column, anchored by data attributes (see above).
@@ -51,19 +58,13 @@
      size. The host's own descendants remain responsible for scrolling. */
   min-height: 0;
   overflow-wrap: anywhere;
-  transition: margin-bottom var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+  transition: margin-bottom var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
-/* When the sidebar is collapsed, the toggle cluster reclaims the top-right
-   corner. Push the DSH session header's right padding out so its right-aligned
-   utilities (the "Session log" download capsule) yield the corner instead of
-   hiding under the cluster. The header default right-pads 28px; the 2-button
-   cluster spans right 10→70px, so 78px clears it with an 8px gap. Anchor on
-   the header's slot host wrapper ([data-slot="conversation.session.header"])
-   rather than a positional path: DSH 0.1.x nests the header several levels
-   under the center column. The Sidebar shell toggles the body attribute with
-   the panel open state. */
-body[data-dsh-sidebar-collapsed] [data-slot="conversation.session.header"] > header {
+/* Clear the session-header utilities (Session log capsule) whenever the
+   toggle cluster is mounted — including mid-open animation, when #root push
+   and the panel slide can briefly leave the capsule under the buttons. */
+body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
   padding-right: 78px;
 }
 
@@ -71,6 +72,12 @@ body[data-dsh-sidebar-dragging] #root,
 body[data-dsh-sidebar-dragging] #root [data-dsh-frame] > [data-pane="conversation"],
 body[data-dsh-sidebar-dragging] #root :has(> [data-slot="conversation"]) {
   transition: none;
+}
+
+/* Kernel splash sets data-xrk-booting — stay invisible until product ready. */
+html[data-xrk-booting] [data-dsh-panel-host] {
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* DSH 0.1.x gives external settings sections a generic gear and exposes no

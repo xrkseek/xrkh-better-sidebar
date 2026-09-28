@@ -10,13 +10,26 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.10
+xrkh plugin add xrkh-better-sidebar@0.18.12
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.12
+
+- 启动 splash（`data-xrk-booting`）：隐藏 panel-host / FAB，避免与 HARNESS 启动页叠层
+- 会话头「Session log」：有 toggle cluster 时始终右缩，展开动画中不再被按钮挡住
+- 动效：主题 token 冷启动回退 380ms / cubic-bezier，展开收起不再僵硬跳切
+- Desktop chrome：右侧面板与 FAB 避开 `--xrk-desktop-chrome-height`
+
+## 0.18.11
+
+- 文件页：`openTab({ type: 'editor' })` 聚焦已种子的 files-home，不再并排冒出第二个「文件」标签
+- `applyDedupe`：`dedupeKey` 返回 `undefined` 时仍按同 cohort 去重（与 pathless 编辑器一致）
+- 底栏首次展开：若已有 UI 终端则跳过自动再开一个
 
 ## 0.18.10
 

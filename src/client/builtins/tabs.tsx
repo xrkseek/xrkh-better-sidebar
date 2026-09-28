@@ -89,7 +89,9 @@ export function builtinTabs(ctx: Context, options: BuiltinTabOptions = {}): read
       icon: (size: number) => <IconFolderOpen16 size={size} />,
       order: 10,
       hidden: false,
-      dedupeKey: (tab) => tab.path,
+      // Pathless tabs share one key ('' after ??) so openTab({ type: 'editor' })
+      // focuses the seeded files-home instead of minting a twin Files tab.
+      dedupeKey: (tab) => tab.path ?? '',
       // Declarative settings: the file-open behavior picker (in-place switch
       // vs per-path windows) renders as an iconed select row under the
       // editor card's gear in the Side card settings page, followed by the

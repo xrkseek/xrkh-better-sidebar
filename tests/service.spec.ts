@@ -306,6 +306,51 @@ describe('service.openTab dedupe', () => {
     expect(tabs.filter(t => t.type === 'singleton')).toHaveLength(1)
   })
 
+  it('pathless editor open focuses the seeded files-home (no twin Files tab)', () => {
+    const store = createSidebarStore()
+    const service = createBetterSidebarService(store)
+    // Mirror the builtin: path ?? '' so undefined and '' share one cohort.
+    service.registerTab({
+      id: 'editor',
+      title: 'Files',
+      dedupeKey: (tab) => tab.path ?? '',
+      component: () => null,
+    })
+    store.setSession('s1')
+    // Fresh session already seeds one pathless editor (files-home).
+    const before = allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .filter(t => t.type === 'editor' && t.path === undefined)
+    expect(before).toHaveLength(1)
+    const seedId = before[0]!.id
+    // Type-only open (session-header Files / + menu) used to mint id:'editor'
+    // beside the seed because dedupe skipped on undefined keys.
+    service.openTab({ type: 'editor' })
+    const editors = allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .filter(t => t.type === 'editor' && t.path === undefined)
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.id).toBe(seedId)
+  })
+
+  it('dedupeKey that returns undefined still focuses the pathless cohort', () => {
+    const store = createSidebarStore()
+    const service = createBetterSidebarService(store)
+    service.registerTab({
+      id: 'editor',
+      title: 'Files',
+      // Pre-?? form: undefined === undefined must still dedupe.
+      dedupeKey: (tab) => tab.path,
+      component: () => null,
+    })
+    store.setSession('s1')
+    const seedId = allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .find(t => t.type === 'editor' && t.path === undefined)!.id
+    service.openTab({ type: 'editor' })
+    const editors = allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .filter(t => t.type === 'editor' && t.path === undefined)
+    expect(editors).toHaveLength(1)
+    expect(editors[0]!.id).toBe(seedId)
+  })
+
   it('no dedupeKey opens a new tab for each distinct id', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)
