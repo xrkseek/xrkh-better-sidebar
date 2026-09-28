@@ -10,13 +10,18 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.9
+xrkh plugin add xrkh-better-sidebar@0.18.10
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.10
+
+- Desktop (`xrk-app://`): terminal rides Host HTTP SSE + POST (`/sidebar/api/pty/*`) instead of looping WebSocket reconnects against a non-listening private Host
+- Frameless window: right panel leaves a 2px edge so Electron can hit-test resize
 
 ## 0.18.9
 

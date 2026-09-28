@@ -10,13 +10,18 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.9
+xrkh plugin add xrkh-better-sidebar@0.18.10
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.10
+
+- Desktop（`xrk-app://`）：终端改走 Host HTTP SSE + POST（`/sidebar/api/pty/*`），不再对无 listen 的私有 Host 死循环 WebSocket 重连
+- 无边框窗口：右侧面板留 2px 边缘，便于 Electron 命中缩放
 
 ## 0.18.9
 

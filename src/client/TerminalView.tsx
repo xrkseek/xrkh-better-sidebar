@@ -1,5 +1,7 @@
 /**
- * The interactive terminal: xterm.js over a WebSocket to the host pty.
+ * The interactive terminal: xterm.js over a Host pty carrier.
+ * Web uses WebSocket upgrades; Desktop `xrk-app://` uses HTTP SSE + POST
+ * (`pty-link.ts`) because the private Host does not listen and cannot upgrade.
  * The host replays the session's transcript on connect, then streams live
  * output; input frames are raw text, resize frames are JSON with
  * type:"resize". Transient disconnects (page refresh, host restart) reconnect
@@ -47,6 +49,7 @@ import {
   shouldActivateTerminalLink,
   openTerminalUrl,
 } from './terminal-links.ts'
+import { openPtyLink, type PtyLink } from './pty-link.ts'
 import css from './sidebar.module.css'
 
 /** How many consecutive unreasoned failures before showing the error banner. */
@@ -184,97 +187,85 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     }
     const schemeSub = subscribeColorScheme(applyTheme)
 
-    let socket: WebSocket | null = null
+    let link: PtyLink | null = null
+    let linkOpen = false
     let closed = false
     let retry: number | undefined
     let failures = 0
 
-    const wsUrl = (): string => {
-      const url = new URL('/sidebar/ws/terminal', location.origin)
-      url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-      // Agent terminals attach by uuid (the host looks them up in the agent
-      // pty registry); UI-tab terminals attach by sessionId+tab (the host
-      // uses the UI-tab pty manager). Same upgrade endpoint, different query.
+    // Agent terminals attach by uuid; UI-tab terminals by sessionId+tab(+cwd).
+    const attachParams = (): URLSearchParams => {
       if (isAgentTabId(tabId)) {
-        url.search = new URLSearchParams({ uuid: agentUuidOf(tabId) }).toString()
-      } else {
-        const params = new URLSearchParams({ sessionId: scope.sessionId, tab: tabId })
-        if (scope.cwd !== undefined && scope.cwd !== '') params.set('cwd', scope.cwd)
-        url.search = params.toString()
+        return new URLSearchParams({ uuid: agentUuidOf(tabId) })
       }
-      // Same construction the app's own downlink WebSockets use (new URL
-      // over location.origin + protocol swap): whatever the environment
-      // does to the app's websockets applies identically here.
-      return url.toString()
+      const params = new URLSearchParams({ sessionId: scope.sessionId, tab: tabId })
+      if (scope.cwd !== undefined && scope.cwd !== '') params.set('cwd', scope.cwd)
+      return params
     }
 
     const sendResize = (): void => {
-      if (socket !== null && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
+      if (link !== null && linkOpen) {
+        link.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
       }
     }
 
     const connect = (): void => {
       if (closed) return
-      const url = wsUrl()
-      setLastUrl(url)
-      socket = new WebSocket(url)
-      socket.onopen = () => {
-        failures = 0
-        setConnected(true)
-        setFatal(null)
-        sendResize()
-      }
-      socket.onmessage = (event) => {
-        if (typeof event.data === 'string') term.write(event.data)
-      }
-      socket.onclose = (event) => {
-        setConnected(false)
-        // node-pty dependency missing/broken (issue #140): the host closed
-        // with the short marker. Fetch the full repair details over HTTP —
-        // a WS close reason is capped at 123 bytes, too small for the
-        // pasteable command. A failed fetch falls back to the plain banner.
-        if (event.code === 1011 && event.reason === PTY_DEPS_MISSING) {
-          void api.terminalDeps().then((status) => {
-            if (status.ok) {
-              // The host recovered between the close and the fetch — the
-              // plain banner with a retry is the honest state.
+      link?.close()
+      linkOpen = false
+      const params = attachParams()
+      link = openPtyLink(params, {
+        onOpen: () => {
+          failures = 0
+          linkOpen = true
+          setConnected(true)
+          setFatal(null)
+          sendResize()
+        },
+        onData: (data) => { term.write(data) },
+        onClose: (event) => {
+          linkOpen = false
+          setConnected(false)
+          // node-pty dependency missing/broken (issue #140): the host closed
+          // with the short marker. Fetch the full repair details over HTTP —
+          // a WS close reason is capped at 123 bytes, too small for the
+          // pasteable command. A failed fetch falls back to the plain banner.
+          if (event.code === 1011 && event.reason === PTY_DEPS_MISSING) {
+            void api.terminalDeps().then((status) => {
+              if (status.ok) {
+                setFatal(t('terminalDepsFailed'))
+                return
+              }
+              setFatal(null)
+              setDepsFatal(status)
+            }).catch(() => {
               setFatal(t('terminalDepsFailed'))
-              return
-            }
-            setFatal(null)
-            setDepsFatal(status)
-          }).catch(() => {
-            setFatal(t('terminalDepsFailed'))
-          })
-          return
-        }
-        // A server-side refusal carries a close code + reason; retrying it
-        // forever would only spin the banner, so surface it with a retry.
-        if (event.code === 1011 && event.reason !== '') {
-          setFatal(event.reason)
-          return
-        }
-        // Unreasoned drops (upgrade rejected, host down, mid-handshake
-        // refusal) normally recover on the next attempt; after a few
-        // consecutive failures stop spinning and show the close code.
-        failures += 1
-        if (failures >= FAILURE_LIMIT) {
-          const detail = event.reason !== '' ? ` (${event.code}: ${event.reason})` : ` (${event.code})`
-          console.error('[xrkh-better-sidebar] terminal connection failed:', event.code, event.reason, url)
-          setFatal(`${t('terminalConnectFailed')}${detail}`)
-          return
-        }
-        if (!closed) retry = window.setTimeout(connect, 2000)
-      }
-      socket.onerror = () => {
-        socket?.close()
-      }
+            })
+            return
+          }
+          if (event.code === 1011 && event.reason !== '') {
+            setFatal(event.reason)
+            return
+          }
+          // Process exit on the HTTP carrier uses code 1000 + reason "exit" —
+          // do not soft-reconnect (same rule as WS: never treat exit as drop).
+          if (event.code === 1000 && event.reason === 'exit') return
+          failures += 1
+          if (failures >= FAILURE_LIMIT) {
+            const detail = event.reason !== '' ? ` (${event.code}: ${event.reason})` : ` (${event.code})`
+            console.error('[xrkh-better-sidebar] terminal connection failed:', event.code, event.reason, link?.url)
+            setFatal(`${t('terminalConnectFailed')}${detail}`)
+            return
+          }
+          if (!closed) retry = window.setTimeout(connect, 2000)
+        },
+      })
+      setLastUrl(link.url)
     }
     connectRef.current = connect
 
     const inputSub = term.onData((data) => {
-      if (socket !== null && socket.readyState === WebSocket.OPEN) socket.send(data)
+      if (link !== null && linkOpen) link.send(data)
     })
     const observer = new ResizeObserver(() => {
       try {
@@ -353,14 +344,13 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       // indefinitely — no park frame needed.
       const tabStillOpen = liveStore.tabOpen(scope.sessionId, tabId)
       const sessionSwitched = liveStore.getSnapshot().sessionId !== scope.sessionId
-      if (!tabStillOpen
-        && socket !== null && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'close' }))
+      if (!tabStillOpen && link !== null && linkOpen) {
+        link.send(JSON.stringify({ type: 'close' }))
       } else if (tabStillOpen && sessionSwitched && !isAgentTabId(tabId)
-        && socket !== null && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'park' }))
+        && link !== null && linkOpen) {
+        link.send(JSON.stringify({ type: 'park' }))
       }
-      socket?.close()
+      link?.close()
       linkProvider.dispose()
       term.dispose()
       connectRef.current = null

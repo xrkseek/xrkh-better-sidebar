@@ -133,7 +133,10 @@
   box-sizing: border-box;
   position: absolute;
   top: 0;
-  right: 0;
+  /* Leave a 2px window-edge strip so frameless Electron can still hit-test
+     native resize on the right border (panel pointer-events would otherwise
+     swallow the edge). */
+  right: 2px;
   /* Full height: the bottom panel squeezes only the center column, so the
      right panel never gives up any vertical position. */
   bottom: 0;

@@ -1,0 +1,194 @@
+/**
+ * Terminal downlink carrier. Web uses WebSocket upgrades; Desktop
+ * `xrk-app://` has no upgrade path (Host listen disabled + custom protocol),
+ * so it rides Host HTTP SSE + POST (`/sidebar/api/pty/*`).
+ */
+
+export interface PtyLink {
+  readonly url: string
+  send(data: string): void
+  close(): void
+}
+
+export interface PtyLinkHandlers {
+  onOpen(): void
+  onData(data: string): void
+  onClose(event: { code: number; reason: string }): void
+}
+
+/** True when the shell cannot open `ws:` to Host (Desktop private Host). */
+export function usesHttpPtyCarrier(): boolean {
+  try {
+    return location.protocol === 'xrk-app:'
+  } catch {
+    return false
+  }
+}
+
+function attachQuery(url: URL, params: URLSearchParams): void {
+  url.search = params.toString()
+}
+
+/** Build the WebSocket URL for `/sidebar/ws/terminal`. */
+export function buildTerminalWsUrl(params: URLSearchParams): string {
+  const url = new URL('/sidebar/ws/terminal', location.origin)
+  url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+  attachQuery(url, params)
+  return url.toString()
+}
+
+/** Build the SSE stream URL for Desktop HTTP PTY. */
+export function buildTerminalHttpStreamUrl(params: URLSearchParams): string {
+  const url = new URL('/sidebar/api/pty/stream', location.origin)
+  attachQuery(url, params)
+  return url.toString()
+}
+
+/**
+ * Open a WebSocket PTY link (product `xrkh web` / any Host that listens).
+ */
+export function openWsPtyLink(
+  params: URLSearchParams,
+  handlers: PtyLinkHandlers,
+): PtyLink {
+  const url = buildTerminalWsUrl(params)
+  const socket = new WebSocket(url)
+  socket.onopen = () => { handlers.onOpen() }
+  socket.onmessage = (event) => {
+    if (typeof event.data === 'string') handlers.onData(event.data)
+  }
+  socket.onclose = (event) => {
+    handlers.onClose({ code: event.code, reason: event.reason })
+  }
+  socket.onerror = () => { socket.close() }
+  return {
+    url,
+    send(data) {
+      if (socket.readyState === WebSocket.OPEN) socket.send(data)
+    },
+    close() { socket.close() },
+  }
+}
+
+type SseEvent = { type: 'data'; data: string }
+  | { type: 'exit' }
+  | { type: 'error'; code: number; reason: string }
+
+/**
+ * Open an HTTP SSE + POST PTY link (Desktop `xrk-app://`).
+ */
+export function openHttpPtyLink(
+  params: URLSearchParams,
+  handlers: PtyLinkHandlers,
+): PtyLink {
+  const streamUrl = buildTerminalHttpStreamUrl(params)
+  const ac = new AbortController()
+  let opened = false
+  let closed = false
+
+  const postJson = (path: string, body: unknown): void => {
+    void fetch(new URL(path, location.origin), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    }).catch(() => { /* drop while tearing down */ })
+  }
+
+  const identity = (): Record<string, string> => {
+    const out: Record<string, string> = {}
+    for (const [key, value] of params.entries()) out[key] = value
+    return out
+  }
+
+  const finish = (code: number, reason: string): void => {
+    if (closed) return
+    closed = true
+    ac.abort()
+    handlers.onClose({ code, reason })
+  }
+
+  void (async () => {
+    try {
+      const response = await fetch(streamUrl, {
+        method: 'GET',
+        headers: { accept: 'text/event-stream' },
+        signal: ac.signal,
+      })
+      if (!response.ok || response.body === null) {
+        finish(1011, `HTTP ${String(response.status)}`)
+        return
+      }
+      opened = true
+      handlers.onOpen()
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      while (!closed) {
+        const { done, value } = await reader.read()
+        if (done) {
+          finish(1006, '')
+          return
+        }
+        buffer += decoder.decode(value, { stream: true })
+        let boundary = buffer.indexOf('\n\n')
+        while (boundary !== -1) {
+          const chunk = buffer.slice(0, boundary)
+          buffer = buffer.slice(boundary + 2)
+          boundary = buffer.indexOf('\n\n')
+          const dataLine = chunk
+            .split('\n')
+            .filter(line => line.startsWith('data: '))
+            .map(line => line.slice(6))
+            .join('')
+          if (dataLine === '') continue
+          let event: SseEvent
+          try {
+            event = JSON.parse(dataLine) as SseEvent
+          } catch {
+            continue
+          }
+          if (event.type === 'data') handlers.onData(event.data)
+          else if (event.type === 'exit') finish(1000, 'exit')
+          else if (event.type === 'error') finish(event.code, event.reason)
+        }
+      }
+    } catch {
+      if (!closed) finish(opened ? 1006 : 1011, opened ? '' : 'stream failed')
+    }
+  })()
+
+  return {
+    url: streamUrl,
+    send(data) {
+      if (closed) return
+      if (data.startsWith('{')) {
+        try {
+          const msg = JSON.parse(data) as { type?: string; cols?: number; rows?: number }
+          if (msg.type === 'resize' || msg.type === 'close' || msg.type === 'park') {
+            postJson('/sidebar/api/pty/control', { ...identity(), ...msg })
+            return
+          }
+        } catch {
+          /* fall through as raw input */
+        }
+      }
+      postJson('/sidebar/api/pty/input', { ...identity(), data })
+    },
+    close() {
+      if (closed) return
+      closed = true
+      ac.abort()
+    },
+  }
+}
+
+/** Open the carrier that matches the current page protocol. */
+export function openPtyLink(
+  params: URLSearchParams,
+  handlers: PtyLinkHandlers,
+): PtyLink {
+  return usesHttpPtyCarrier()
+    ? openHttpPtyLink(params, handlers)
+    : openWsPtyLink(params, handlers)
+}
