@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.18
+xrkh plugin add xrkh-better-sidebar@0.18.19
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.19
+
+- Desktop terminal: SSE/POST back on page-origin `xrk-app://app` (drop the `xrk-app://stream` split that failed with `Failed to fetch`)
 
 ## 0.18.18
 

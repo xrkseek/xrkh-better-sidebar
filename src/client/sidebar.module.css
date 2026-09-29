@@ -495,16 +495,6 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   -webkit-app-region: no-drag;
 }
 
-/* ── Position compatibility mode (Windows native title bar) ────────────── */
-
-/* Frameless / hidden-title-bar shells reserve a top strip (WCO, URL inset,
-   or XRK DesktopChrome). The Sidebar shell writes `--dsh-title-bar-strip`
-   + `body[data-dsh-title-bar-compat]` when the resolved strip is > 0.
-   Panel + toggle cluster already read that var (with chrome fallback) as
-   a single `top` — no padding-top overlay, no second chrome add. The
-   attribute remains for e2e / custom CSS hooks. The bottom panel is
-   unaffected: it sits at the window's bottom, never under the top strip. */
-
 /* The shared corner (both panels open): the intersection of the right
    panel's left edge and the bottom panel's top edge. Horizontal drags
    resize the width, vertical drags the height — the two panels drag
