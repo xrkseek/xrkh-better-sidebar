@@ -25,6 +25,34 @@ export function usesHttpPtyCarrier(): boolean {
   }
 }
 
+/**
+ * Long-lived Desktop SSE must use the sibling `xrk-app://stream` host —
+ * same split as Face mux/host — so Chromium's custom-protocol pool on
+ * `xrk-app://app` stays free for unary RPC. A PTY stream on `app` starved
+ * describe and forced Face reconnect loops ("等待重试").
+ */
+export function resolvePtyStreamOrigin(): string {
+  try {
+    if (location.protocol === 'xrk-app:') return 'xrk-app://stream'
+  } catch {
+    /* fall through */
+  }
+  try {
+    return location.origin
+  } catch {
+    return 'http://127.0.0.1'
+  }
+}
+
+/** Unary POST origin (`input` / `control`) — stays on `xrk-app://app`. */
+export function resolvePtyUnaryOrigin(): string {
+  try {
+    return location.origin
+  } catch {
+    return 'http://127.0.0.1'
+  }
+}
+
 function attachQuery(url: URL, params: URLSearchParams): void {
   url.search = params.toString()
 }
@@ -39,7 +67,7 @@ export function buildTerminalWsUrl(params: URLSearchParams): string {
 
 /** Build the SSE stream URL for Desktop HTTP PTY. */
 export function buildTerminalHttpStreamUrl(params: URLSearchParams): string {
-  const url = new URL('/sidebar/api/pty/stream', location.origin)
+  const url = new URL('/sidebar/api/pty/stream', resolvePtyStreamOrigin())
   attachQuery(url, params)
   return url.toString()
 }
@@ -86,8 +114,9 @@ export function openHttpPtyLink(
   let opened = false
   let closed = false
 
+  const unaryOrigin = resolvePtyUnaryOrigin()
   const postJson = (path: string, body: unknown): void => {
-    void fetch(new URL(path, location.origin), {
+    void fetch(new URL(path, unaryOrigin), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),

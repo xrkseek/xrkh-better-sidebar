@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.15
+xrkh plugin add xrkh-better-sidebar@0.18.16
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.16
+
+- Desktop terminal SSE rides `xrk-app://stream` (same pool as Face mux/host) instead of holding a long-lived `xrk-app://app` connection that starved unary RPC and forced Face reconnect loops
 
 ## 0.18.15
 
