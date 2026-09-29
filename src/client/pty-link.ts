@@ -212,7 +212,12 @@ export function openHttpPtyLink(
   }
 }
 
-/** Open the carrier that matches the current page protocol. */
+/**
+ * Pick carrier by page protocol — keep the split hard:
+ * - Web (`http:` / `https:`): WebSocket → Host `/sidebar/ws/terminal`
+ * - Desktop (`xrk-app:`): HTTP SSE on `xrk-app://stream` + POST unary on `app`
+ * Never route web through the Desktop stream host.
+ */
 export function openPtyLink(
   params: URLSearchParams,
   handlers: PtyLinkHandlers,

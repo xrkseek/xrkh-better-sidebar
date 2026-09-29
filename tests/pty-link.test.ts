@@ -24,13 +24,28 @@ describe('pty-link carrier', () => {
     )
   })
 
-  it('builds ws URL on http(s)', () => {
+  it('keeps Web on Host WebSocket (no xrk-app://stream, no HTTP PTY carrier)', () => {
     vi.stubGlobal('location', { protocol: 'http:', origin: 'http://127.0.0.1:3921' })
     expect(usesHttpPtyCarrier()).toBe(false)
+    // HTTP helpers must not invent a Desktop stream host on web.
     expect(resolvePtyStreamOrigin()).toBe('http://127.0.0.1:3921')
+    expect(resolvePtyUnaryOrigin()).toBe('http://127.0.0.1:3921')
     const params = new URLSearchParams({ sessionId: 's1', tab: 't1', cwd: '/tmp' })
-    expect(buildTerminalWsUrl(params)).toBe(
+    const ws = buildTerminalWsUrl(params)
+    expect(ws).toBe(
       'ws://127.0.0.1:3921/sidebar/ws/terminal?sessionId=s1&tab=t1&cwd=%2Ftmp',
+    )
+    expect(ws.startsWith('ws:')).toBe(true)
+    expect(ws.includes('xrk-app://')).toBe(false)
+    expect(buildTerminalHttpStreamUrl(params).includes('xrk-app://stream')).toBe(false)
+  })
+
+  it('keeps https Web on wss:// Host origin', () => {
+    vi.stubGlobal('location', { protocol: 'https:', origin: 'https://example.test' })
+    expect(usesHttpPtyCarrier()).toBe(false)
+    const params = new URLSearchParams({ sessionId: 's1', tab: 't1' })
+    expect(buildTerminalWsUrl(params)).toBe(
+      'wss://example.test/sidebar/ws/terminal?sessionId=s1&tab=t1',
     )
   })
 })
