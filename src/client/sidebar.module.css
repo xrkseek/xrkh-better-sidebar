@@ -71,9 +71,14 @@
    identical). */
 .toggleCluster {
   position: absolute;
-  /* Align with conversation title row: chrome + header pad 12 + center
-     28px toggles in the 32px title band → +14px. */
-  top: calc(14px + env(safe-area-inset-top) + var(--xrk-desktop-chrome-height, 0px));
+  /* Align with conversation title row: strip/chrome + header pad → +14px.
+     Prefer `--dsh-title-bar-strip` (WCO / URL inset / custom) when set;
+     otherwise XRK DesktopChrome. Never add both — that shoved the rail
+     a full chrome band below the tab icons. */
+  top: calc(
+    14px + env(safe-area-inset-top) +
+    var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
+  );
   right: 10px;
   z-index: 45;
   display: flex;
@@ -134,9 +139,11 @@
 .panel {
   box-sizing: border-box;
   position: absolute;
-  /* Clear frameless Desktop chrome (`--xrk-desktop-chrome-height` on <html>).
-     0 on web / when AppFrame has not published the var. */
-  top: var(--xrk-desktop-chrome-height, 0px);
+  /* Single top inset — never top + padding-top for the same chrome band
+     (that left an empty strip above the tab bar on XRK Desktop). Prefer
+     `--dsh-title-bar-strip` when the shell wrote it; else AppFrame's
+     `--xrk-desktop-chrome-height`; else flush (web). */
+  top: var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px));
   /* Leave a 2px window-edge strip so frameless Electron can still hit-test
      native resize on the right border (panel pointer-events would otherwise
      swallow the edge). */
@@ -484,34 +491,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 /* ── Position compatibility mode (Windows native title bar) ────────────── */
 
-/* Windows frameless / hidden-title-bar windows draw the native caption
-   strip (minimize / maximize / close) at the window's top-right corner,
-   OVER the web content. When the user enables the "position compatibility"
-   pref, the sidebar yields the strip: the toggle cluster drops below it and
-   the right panel's content starts below it — the panel's surface still
-   spans the full height, so the caption buttons float over empty sidebar
-   fill (the VSCode hidden-title-bar look). The strip height is user-tunable
-   (`--dsh-title-bar-strip`, written by the Sidebar shell from
-   `titleBarStripPx`; 40px fallback). The bottom panel is unaffected: it
-   sits at the window's bottom, never under the top strip. */
-:global(body[data-dsh-title-bar-compat]) .toggleCluster {
-  /* `--dsh-title-bar-strip` already includes DesktopChrome / WCO / custom
-     strip — do not add `--xrk-desktop-chrome-height` again (double offset
-     made the rail toggles sit a band lower than the tab icons). */
-  top: calc(
-    var(--dsh-title-bar-strip, 40px) + 14px + env(safe-area-inset-top)
-  );
-}
-
-:global(body[data-dsh-title-bar-compat]) .panel {
-  /* `--dsh-title-bar-strip` already equals DesktopChrome / WCO height.
-     Base `.panel { top: var(--xrk-desktop-chrome-height) }` would double
-     that inset and leave an empty band above the tab bar. Pin top to 0
-     and reserve the strip via padding so tabs sit just under the window
-     controls (VSCode-style; web with strip=0 stays flush). */
-  top: 0;
-  padding-top: var(--dsh-title-bar-strip, 40px);
-}
+/* Frameless / hidden-title-bar shells reserve a top strip (WCO, URL inset,
+   or XRK DesktopChrome). The Sidebar shell writes `--dsh-title-bar-strip`
+   + `body[data-dsh-title-bar-compat]` when the resolved strip is > 0.
+   Panel + toggle cluster already read that var (with chrome fallback) as
+   a single `top` — no padding-top overlay, no second chrome add. The
+   attribute remains for e2e / custom CSS hooks. The bottom panel is
+   unaffected: it sits at the window's bottom, never under the top strip. */
 
 /* The shared corner (both panels open): the intersection of the right
    panel's left edge and the bottom panel's top edge. Horizontal drags

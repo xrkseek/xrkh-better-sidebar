@@ -4,6 +4,7 @@
  * parameter, then the opt-in preset / custom scheme — and 0 (plain web,
  * nothing modified) otherwise. No per-shell branch lives in the core.
  */
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
 import { computeTitleBarStrip } from '../src/client/titlebar-strip.ts'
 import type { DesktopEnv } from '../src/client/desktop-env.ts'
@@ -71,5 +72,28 @@ describe('computeTitleBarStrip', () => {
     expect(computeTitleBarStrip(env({}), wco(false), 'custom', noPreset, 56)).toBe(56)
     expect(computeTitleBarStrip(env({}), wco(false), 'auto', noPreset, 56)).toBe(0)
     expect(computeTitleBarStrip(env({}), wco(false), 'preset', noPreset, 56)).toBe(0)
+  })
+
+  it('reads AppFrame --xrk-desktop-chrome-height after URL inset (auto)', () => {
+    const desktop = env({ desktop: true, mode: 'advanced', platform: 'win32' })
+    // jsdom: publish the same var AppFrame writes on <html>.
+    document.documentElement.style.setProperty('--xrk-desktop-chrome-height', '36px')
+    try {
+      expect(computeTitleBarStrip(desktop, wco(false), 'auto', noPreset, 0)).toBe(36)
+      // URL inset still wins when stamped (Desktop protocol contract).
+      expect(
+        computeTitleBarStrip(
+          env({ desktop: true, mode: 'advanced', platform: 'win32', titlebarInset: 36 }),
+          wco(false),
+          'auto',
+          noPreset,
+          0,
+        ),
+      ).toBe(36)
+      // web scheme still forces 0 even with the chrome var present.
+      expect(computeTitleBarStrip(desktop, wco(false), 'web', noPreset, 0)).toBe(0)
+    } finally {
+      document.documentElement.style.removeProperty('--xrk-desktop-chrome-height')
+    }
   })
 })
