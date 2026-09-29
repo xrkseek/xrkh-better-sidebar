@@ -104,15 +104,22 @@ type SseEvent = { type: 'data'; data: string }
 
 /**
  * Open an HTTP SSE + POST PTY link (Desktop `xrk-app://`).
+ *
+ * Prefer `xrk-app://stream` (same split as Face mux/host). No `Accept`
+ * header — Face SSE omits it; a custom Accept can trip CORS preflight on
+ * the sibling host and surface as "stream failed". If the stream host
+ * fetch throws before open (old Desktop without stream routing), retry
+ * once on `xrk-app://app` so the terminal still connects.
  */
 export function openHttpPtyLink(
   params: URLSearchParams,
   handlers: PtyLinkHandlers,
 ): PtyLink {
-  const streamUrl = buildTerminalHttpStreamUrl(params)
+  const preferredUrl = buildTerminalHttpStreamUrl(params)
   const ac = new AbortController()
   let opened = false
   let closed = false
+  let activeUrl = preferredUrl
 
   const unaryOrigin = resolvePtyUnaryOrigin()
   const postJson = (path: string, body: unknown): void => {
@@ -137,13 +144,28 @@ export function openHttpPtyLink(
     handlers.onClose({ code, reason })
   }
 
+  const openStream = async (streamUrl: string): Promise<Response> => {
+    // Match Face SSE: GET + signal only (no Accept → no CORS preflight).
+    return fetch(streamUrl, { method: 'GET', signal: ac.signal })
+  }
+
   void (async () => {
     try {
-      const response = await fetch(streamUrl, {
-        method: 'GET',
-        headers: { accept: 'text/event-stream' },
-        signal: ac.signal,
-      })
+      let response: Response
+      try {
+        response = await openStream(preferredUrl)
+      } catch (first) {
+        if (closed || ac.signal.aborted) throw first
+        // Stream host unreachable (old package / Chromium reject) → app origin.
+        if (preferredUrl.startsWith('xrk-app://stream')) {
+          const fallback = new URL('/sidebar/api/pty/stream', unaryOrigin)
+          fallback.search = params.toString()
+          activeUrl = fallback.toString()
+          response = await openStream(activeUrl)
+        } else {
+          throw first
+        }
+      }
       if (!response.ok || response.body === null) {
         finish(1011, `HTTP ${String(response.status)}`)
         return
@@ -182,13 +204,18 @@ export function openHttpPtyLink(
           else if (event.type === 'error') finish(event.code, event.reason)
         }
       }
-    } catch {
-      if (!closed) finish(opened ? 1006 : 1011, opened ? '' : 'stream failed')
+    } catch (error) {
+      if (!closed) {
+        const detail = error instanceof Error && error.message.trim()
+          ? error.message.trim()
+          : 'stream failed'
+        finish(opened ? 1006 : 1011, opened ? '' : detail)
+      }
     }
   })()
 
   return {
-    url: streamUrl,
+    get url() { return activeUrl },
     send(data) {
       if (closed) return
       if (data.startsWith('{')) {

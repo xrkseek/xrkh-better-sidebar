@@ -10,13 +10,18 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.17
+xrkh plugin add xrkh-better-sidebar@0.18.18
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.18
+
+- 轨图标：面板展开时贴齐 34px 页签条（`+3`），收起时仍对齐会话标题行（`+14`），不再下偏
+- Desktop 终端：SSE 不再带 `Accept`（避免跨 `stream` 主机 CORS 预检失败）；`stream` 主机打不开时回退 `xrk-app://app` 一次
 
 ## 0.18.17
 

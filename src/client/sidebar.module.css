@@ -71,12 +71,10 @@
    identical). */
 .toggleCluster {
   position: absolute;
-  /* Align with conversation title row: strip/chrome + header pad → +14px.
-     Prefer `--dsh-title-bar-strip` (WCO / URL inset / custom) when set;
-     otherwise XRK DesktopChrome. Never add both — that shoved the rail
-     a full chrome band below the tab icons. */
+  /* Open panel: sit in the 34px tab strip (28px buttons → top: 3). Prefer
+     `--dsh-title-bar-strip` when set; else XRK DesktopChrome. Never add both. */
   top: calc(
-    14px + env(safe-area-inset-top) +
+    3px + env(safe-area-inset-top) +
     var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
   );
   right: 10px;
@@ -86,6 +84,14 @@
   align-items: center;
   gap: 4px;
   pointer-events: auto;
+}
+
+/* Collapsed: no tab strip — align with the conversation title row (+14). */
+:global(body[data-dsh-sidebar-collapsed]) .toggleCluster {
+  top: calc(
+    14px + env(safe-area-inset-top) +
+    var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
+  );
 }
 
 /* Shell layout insets (ui-layout public contract): when the overview

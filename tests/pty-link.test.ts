@@ -48,4 +48,13 @@ describe('pty-link carrier', () => {
       'wss://example.test/sidebar/ws/terminal?sessionId=s1&tab=t1',
     )
   })
+
+  it('Desktop HTTP stream URL stays on stream host (unary on app)', () => {
+    vi.stubGlobal('location', { protocol: 'xrk-app:', origin: 'xrk-app://app' })
+    const params = new URLSearchParams({ sessionId: 's1', tab: 'terminal:1', cwd: 'C:\\tmp' })
+    const stream = buildTerminalHttpStreamUrl(params)
+    expect(stream.startsWith('xrk-app://stream/sidebar/api/pty/stream?')).toBe(true)
+    expect(stream).toContain('sessionId=s1')
+    expect(resolvePtyUnaryOrigin()).toBe('xrk-app://app')
+  })
 })
