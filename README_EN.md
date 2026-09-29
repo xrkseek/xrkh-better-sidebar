@@ -10,7 +10,7 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.12
+xrkh plugin add xrkh-better-sidebar@0.18.14
 xrkh restart
 ```
 
@@ -18,9 +18,15 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
 
+## 0.18.14
+
+- `title-bar-compat`: `--dsh-title-bar-strip` already includes Desktop chrome — do not add `--xrk-desktop-chrome-height` again (rail toggles no longer sit a band lower than the tab icons)
+- Toggle cluster: vertical align with the conversation title row (`+14px` · `align-items: center`)
+- Boot-time panel/FAB hide: drop duplicate plugin CSS; kernel `data-xrk-booting` owns it
+
 ## 0.18.12
 
-- Boot splash (`data-xrk-booting`): hide panel-host / FABs so they do not sit under the HARNESS gate
+- Boot splash (`data-xrk-booting`): hide panel-host / FABs so they do not stack on the HARNESS splash
 - Session-log capsule: always right-pad while the toggle cluster is mounted (including mid-open animation)
 - Motion: cold-theme fallbacks (380ms / cubic-bezier) so expand/collapse never jumps
 - Desktop chrome: right panel + FABs clear `--xrk-desktop-chrome-height`

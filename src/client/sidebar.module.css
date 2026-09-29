@@ -71,13 +71,14 @@
    identical). */
 .toggleCluster {
   position: absolute;
-  /* Desktop chrome height from AppFrame (`--xrk-desktop-chrome-height`);
-     env() is 0 on devices without a top inset. */
-  top: calc(3px + env(safe-area-inset-top) + var(--xrk-desktop-chrome-height, 0px));
+  /* Align with conversation title row: chrome + header pad 12 + center
+     28px toggles in the 32px title band → +14px. */
+  top: calc(14px + env(safe-area-inset-top) + var(--xrk-desktop-chrome-height, 0px));
   right: 10px;
   z-index: 45;
   display: flex;
   flex-direction: row;
+  align-items: center;
   gap: 4px;
   pointer-events: auto;
 }
@@ -494,9 +495,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
    `titleBarStripPx`; 40px fallback). The bottom panel is unaffected: it
    sits at the window's bottom, never under the top strip. */
 :global(body[data-dsh-title-bar-compat]) .toggleCluster {
+  /* `--dsh-title-bar-strip` already includes DesktopChrome / WCO / custom
+     strip — do not add `--xrk-desktop-chrome-height` again (double offset
+     made the rail toggles sit a band lower than the tab icons). */
   top: calc(
-    var(--dsh-title-bar-strip, 40px) + 3px + env(safe-area-inset-top)
-    + var(--xrk-desktop-chrome-height, 0px)
+    var(--dsh-title-bar-strip, 40px) + 14px + env(safe-area-inset-top)
   );
 }
 

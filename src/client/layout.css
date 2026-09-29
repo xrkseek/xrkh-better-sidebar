@@ -61,9 +61,8 @@
   transition: margin-bottom var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
-/* Clear the session-header utilities (Session log capsule) whenever the
-   toggle cluster is mounted — including mid-open animation, when #root push
-   and the panel slide can briefly leave the capsule under the buttons. */
+/* Reserve space so the toggle cluster does not cover session-header
+   actions (概况 / 文件 / Jobs) when the cluster is mounted. */
 body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
   padding-right: 78px;
 }
@@ -72,12 +71,6 @@ body[data-dsh-sidebar-dragging] #root,
 body[data-dsh-sidebar-dragging] #root [data-dsh-frame] > [data-pane="conversation"],
 body[data-dsh-sidebar-dragging] #root :has(> [data-slot="conversation"]) {
   transition: none;
-}
-
-/* Kernel splash sets data-xrk-booting — stay invisible until product ready. */
-html[data-xrk-booting] [data-dsh-panel-host] {
-  visibility: hidden !important;
-  pointer-events: none !important;
 }
 
 /* DSH 0.1.x gives external settings sections a generic gear and exposes no
