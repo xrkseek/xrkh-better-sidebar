@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.14
+xrkh plugin add xrkh-better-sidebar@0.18.15
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.15
+
+- `title-bar-compat`: right panel uses `top: 0` + `padding-top: strip` (no stacked `--xrk-desktop-chrome-height`) so the tab bar sits flush under the window controls
 
 ## 0.18.14
 

@@ -10,13 +10,17 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.14
+xrkh plugin add xrkh-better-sidebar@0.18.15
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.15
+
+- `title-bar-compat`：右侧面板 `top: 0` + `padding-top: strip`，不再叠加 `--xrk-desktop-chrome-height`（页签紧贴窗控下方，去掉空带）
 
 ## 0.18.14
 

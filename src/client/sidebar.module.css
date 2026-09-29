@@ -504,9 +504,12 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 :global(body[data-dsh-title-bar-compat]) .panel {
-  /* The caption strip is drawn over the panel's own top edge: keep the
-     surface full-height and push the content (the tab strip) below the
-     strip instead. .panelResize is absolutely positioned and unaffected. */
+  /* `--dsh-title-bar-strip` already equals DesktopChrome / WCO height.
+     Base `.panel { top: var(--xrk-desktop-chrome-height) }` would double
+     that inset and leave an empty band above the tab bar. Pin top to 0
+     and reserve the strip via padding so tabs sit just under the window
+     controls (VSCode-style; web with strip=0 stays flush). */
+  top: 0;
   padding-top: var(--dsh-title-bar-strip, 40px);
 }
 
