@@ -1,10 +1,8 @@
 /**
  * Terminal downlink carrier. Web uses WebSocket upgrades; Desktop
- * `xrk-app://` has no upgrade path (Host listen disabled + custom protocol),
- * so it rides Host HTTP SSE + POST (`/sidebar/api/pty/*`) on the page origin
- * (`xrk-app://app`). A sibling `xrk-app://stream` host was tried for pool
- * isolation but Chromium rejects that fetch (`Failed to fetch`) on current
- * Desktop builds — keep PTY on `app` with Face.
+ * `xrk-app://` has no WS upgrade (Host listen disabled), so it rides
+ * Host HTTP SSE + POST (`/sidebar/api/pty/*`): SSE on `xrk-app://stream`,
+ * unary POST on the page origin (`xrk-app://app`).
  */
 
 export interface PtyLink {
@@ -28,9 +26,23 @@ export function usesHttpPtyCarrier(): boolean {
   }
 }
 
-/** Page origin for Desktop HTTP PTY (SSE + POST) and Web URL building. */
+/** Page origin for unary PTY POST (input/control) and Web URL building. */
 export function resolvePtyOrigin(): string {
   try {
+    return location.origin
+  } catch {
+    return 'http://127.0.0.1'
+  }
+}
+
+/**
+ * Origin for the long-lived PTY SSE downlink.
+ * Desktop mirrors Face mux/host: streams on `xrk-app://stream` so they do not
+ * share Chromium's unary `xrk-app://app` connection pool (docs/host-face).
+ */
+export function resolvePtyStreamOrigin(): string {
+  try {
+    if (location.protocol === 'xrk-app:') return 'xrk-app://stream'
     return location.origin
   } catch {
     return 'http://127.0.0.1'
@@ -51,7 +63,7 @@ export function buildTerminalWsUrl(params: URLSearchParams): string {
 
 /** Build the SSE stream URL for Desktop HTTP PTY. */
 export function buildTerminalHttpStreamUrl(params: URLSearchParams): string {
-  const url = new URL('/sidebar/api/pty/stream', resolvePtyOrigin())
+  const url = new URL('/sidebar/api/pty/stream', resolvePtyStreamOrigin())
   attachQuery(url, params)
   return url.toString()
 }
@@ -99,12 +111,15 @@ export function openHttpPtyLink(
   let closed = false
   const origin = resolvePtyOrigin()
 
+  // Unary POST must NOT share the SSE AbortController: aborting the stream
+  // would otherwise cancel in-flight resize/input, and some protocol carriers
+  // couple abort across sibling fetches when they share one signal.
   const postJson = (path: string, body: unknown): void => {
+    if (closed) return
     void fetch(new URL(path, origin), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
-      signal: ac.signal,
     }).catch(() => { /* drop while tearing down */ })
   }
 
@@ -123,7 +138,6 @@ export function openHttpPtyLink(
 
   void (async () => {
     try {
-      // Same-origin GET (no Accept) — matches Face SSE; avoids CORS preflight.
       const response = await fetch(streamUrl, { method: 'GET', signal: ac.signal })
       if (!response.ok || response.body === null) {
         finish(1011, `HTTP ${String(response.status)}`)
@@ -201,7 +215,7 @@ export function openHttpPtyLink(
 /**
  * Pick carrier by page protocol:
  * - Web (`http:` / `https:`): WebSocket → Host `/sidebar/ws/terminal`
- * - Desktop (`xrk-app:`): HTTP SSE + POST on page origin (`xrk-app://app`)
+ * - Desktop (`xrk-app:`): HTTP SSE on `xrk-app://stream` + POST on page origin
  */
 export function openPtyLink(
   params: URLSearchParams,

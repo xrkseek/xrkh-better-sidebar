@@ -54,6 +54,12 @@ import css from './sidebar.module.css'
 
 /** How many consecutive unreasoned failures before showing the error banner. */
 const FAILURE_LIMIT = 3
+/**
+ * Desktop Host restart (pipe 503 / mid-stream drop) can take longer than three
+ * 2s retries. Keep soft-reconnecting instead of pinning a fatal banner over an
+ * already-painted MOTD while Host is coming back.
+ */
+const HOST_RESTART_LIMIT = 45
 
 /**
  * The WS close-code-1011 reason the host sends when node-pty is unavailable
@@ -203,10 +209,27 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       return params
     }
 
+    // FitAddon + ResizeObserver fire every layout frame while the user drags
+    // a split. Unfiltered ConPTY resize thrash on Windows restarts cmd.exe
+    // (repeats the 「Microsoft Windows [版本 …]」 MOTD). Coalesce to one
+    // frame and skip no-op / zero-size fits.
+    let lastSentCols = 0
+    let lastSentRows = 0
+    let resizeRaf = 0
     const sendResize = (): void => {
-      if (link !== null && linkOpen) {
-        link.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }))
-      }
+      if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf)
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0
+        if (link === null || !linkOpen) return
+        if (host.clientWidth < 2 || host.clientHeight < 2) return
+        const cols = term.cols
+        const rows = term.rows
+        if (cols < 2 || rows < 2) return
+        if (cols === lastSentCols && rows === lastSentRows) return
+        lastSentCols = cols
+        lastSentRows = rows
+        link.send(JSON.stringify({ type: 'resize', cols, rows }))
+      })
     }
 
     const connect = (): void => {
@@ -218,6 +241,8 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
         onOpen: () => {
           failures = 0
           linkOpen = true
+          lastSentCols = 0
+          lastSentRows = 0
           setConnected(true)
           setFatal(null)
           sendResize()
@@ -243,21 +268,31 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
             })
             return
           }
-          if (event.code === 1011 && event.reason !== '') {
-            setFatal(event.reason)
-            return
-          }
           // Process exit on the HTTP carrier uses code 1000 + reason "exit" —
           // do not soft-reconnect (same rule as WS: never treat exit as drop).
           if (event.code === 1000 && event.reason === 'exit') return
+          // Desktop Host restart / pipe 503 / mid-stream drop: soft-reconnect.
+          // Do not pin a fatal banner over an already-painted MOTD.
+          const hostTransient =
+            (event.code === 1011 &&
+              (/^HTTP 5\d\d$/u.test(event.reason) || /unavailable/iu.test(event.reason))) ||
+            (event.code === 1006 && event.reason === '')
+          if (event.code === 1011 && event.reason !== '' && !hostTransient) {
+            setFatal(event.reason)
+            return
+          }
           failures += 1
-          if (failures >= FAILURE_LIMIT) {
+          const limit = hostTransient ? HOST_RESTART_LIMIT : FAILURE_LIMIT
+          if (failures >= limit) {
             const detail = event.reason !== '' ? ` (${event.code}: ${event.reason})` : ` (${event.code})`
             console.error('[xrkh-better-sidebar] terminal connection failed:', event.code, event.reason, link?.url)
             setFatal(`${t('terminalConnectFailed')}${detail}`)
             return
           }
-          if (!closed) retry = window.setTimeout(connect, 2000)
+          if (!closed) {
+            const delay = hostTransient ? Math.min(2000 * failures, 8000) : 2000
+            retry = window.setTimeout(connect, delay)
+          }
         },
       })
       setLastUrl(link.url)
@@ -321,6 +356,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       closed = true
       cancelOpen()
       window.clearTimeout(retry)
+      if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf)
       observer.disconnect()
       fontSub()
       schemeSub()

@@ -10,7 +10,7 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.19
+xrkh plugin add xrkh-better-sidebar@0.18.20
 xrkh restart
 ```
 
@@ -18,26 +18,25 @@ xrkh restart
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
+## 0.18.20
+
+- Desktop 终端 SSE 回到 `xrk-app://stream`（与 Face mux/host 同池；需配套 Harness Desktop ≥ 0.5.0 的 stream 路由）；unary POST 仍走页面同源 `xrk-app://app`
+- 拖拽分栏时合并 resize（一帧一次、跳过无变化），避免 Windows ConPTY 反复重打「版本」MOTD
+- Host 短暂不可用（5xx / 空 1006）时软重连更久，不把已绘出的 MOTD 盖上致命横幅
+- SSE 与 input/resize POST 不再共用 AbortController，关流时不误取消在途控制请求
+
 ## 0.18.19
 
-- Desktop 终端：SSE/POST 回到页面同源 `xrk-app://app`（去掉会 `Failed to fetch` 的 `xrk-app://stream` 分裂与回退冗余）
+- Desktop 终端：SSE/POST 曾回到页面同源 `xrk-app://app`（当时 `xrk-app://stream` 会 `Failed to fetch`；0.18.20 在 Desktop 修好 stream 路由后改回池隔离）
 
 ## 0.18.18
 
 - 轨图标：面板展开时贴齐 34px 页签条（`+3`），收起时仍对齐会话标题行（`+14`），不再下偏
-- Desktop 终端：SSE 不再带 `Accept`（避免跨 `stream` 主机 CORS 预检失败）；`stream` 主机打不开时回退 `xrk-app://app` 一次
+- Desktop 终端：SSE 不再带 `Accept`；`stream` 主机打不开时曾回退 `app`（已由 0.18.19 去掉回退）
 
 ## 0.18.17
 
 - 右侧面板顶距改为单一 `top`（`--dsh-title-bar-strip` → `--xrk-desktop-chrome-height`），去掉 `padding-top` 叠 chrome，修复 Desktop 页签上方空带
-
-## 0.18.16
-
-- Desktop 终端 SSE 改走 `xrk-app://stream`（与 Face mux/host 同池），不再占 `xrk-app://app` 长连接，避免开终端后 Face 掉线重试
-
-## 0.18.15
-
-- `title-bar-compat`：右侧面板 `top: 0` + `padding-top: strip`，不再叠加 `--xrk-desktop-chrome-height`（页签紧贴窗控下方，去掉空带）
 
 ## 0.18.14
 

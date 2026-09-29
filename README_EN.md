@@ -10,7 +10,7 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.19
+xrkh plugin add xrkh-better-sidebar@0.18.20
 xrkh restart
 ```
 
@@ -18,26 +18,25 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
 
+## 0.18.20
+
+- Desktop terminal SSE back on `xrk-app://stream` (same pool as Face mux/host; needs Harness Desktop ≥ 0.5.0 stream routing); unary POST stays on page-origin `xrk-app://app`
+- Coalesce split-drag resize to one frame / skip no-ops so Windows ConPTY does not reprint the version MOTD
+- Soft-reconnect longer on transient Host loss (5xx / empty 1006) instead of covering a painted MOTD with a fatal banner
+- Do not share AbortController between SSE and input/resize POST so tearing down the stream cannot cancel in-flight control
+
 ## 0.18.19
 
-- Desktop terminal: SSE/POST back on page-origin `xrk-app://app` (drop the `xrk-app://stream` split that failed with `Failed to fetch`)
+- Desktop terminal: SSE/POST temporarily back on page-origin `xrk-app://app` (`xrk-app://stream` then failed with `Failed to fetch`; 0.18.20 restores pool isolation after Desktop stream routing landed)
 
 ## 0.18.18
 
 - Rail toggles: `+3` inside the open 34px tab strip; `+14` when collapsed (conversation title row) — no more bottom drift
-- Desktop terminal: omit SSE `Accept` (avoids CORS preflight on `stream` host); one fallback to `xrk-app://app` if stream host fetch throws
+- Desktop terminal: omit SSE `Accept`; optional stream→app fallback (removed in 0.18.19)
 
 ## 0.18.17
 
 - Right panel top inset is a single `top` chain (`--dsh-title-bar-strip` → `--xrk-desktop-chrome-height`); drop stacked `padding-top` that left an empty band above Desktop tabs
-
-## 0.18.16
-
-- Desktop terminal SSE rides `xrk-app://stream` (same pool as Face mux/host) instead of holding a long-lived `xrk-app://app` connection that starved unary RPC and forced Face reconnect loops
-
-## 0.18.15
-
-- `title-bar-compat`: right panel uses `top: 0` + `padding-top: strip` (no stacked `--xrk-desktop-chrome-height`) so the tab bar sits flush under the window controls
 
 ## 0.18.14
 
