@@ -20,14 +20,14 @@ Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-
 
 ## 0.18.20
 
-- Desktop terminal SSE back on `xrk-app://stream` (same pool as Face mux/host; needs Harness Desktop ≥ 0.5.0 stream routing); unary POST stays on page-origin `xrk-app://app`
 - Coalesce split-drag resize to one frame / skip no-ops so Windows ConPTY does not reprint the version MOTD
 - Soft-reconnect longer on transient Host loss (5xx / empty 1006) instead of covering a painted MOTD with a fatal banner
 - Do not share AbortController between SSE and input/resize POST so tearing down the stream cannot cancel in-flight control
+- Carrier unchanged from 0.18.19: page-origin `xrk-app://app` (pool isolation belongs in Desktop/Face, not this plugin)
 
 ## 0.18.19
 
-- Desktop terminal: SSE/POST temporarily back on page-origin `xrk-app://app` (`xrk-app://stream` then failed with `Failed to fetch`; 0.18.20 restores pool isolation after Desktop stream routing landed)
+- Desktop terminal: SSE/POST back on page-origin `xrk-app://app` (drop the `xrk-app://stream` split that failed with `Failed to fetch`)
 
 ## 0.18.18
 

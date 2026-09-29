@@ -20,14 +20,14 @@ xrkh restart
 
 ## 0.18.20
 
-- Desktop 终端 SSE 回到 `xrk-app://stream`（与 Face mux/host 同池；需配套 Harness Desktop ≥ 0.5.0 的 stream 路由）；unary POST 仍走页面同源 `xrk-app://app`
 - 拖拽分栏时合并 resize（一帧一次、跳过无变化），避免 Windows ConPTY 反复重打「版本」MOTD
 - Host 短暂不可用（5xx / 空 1006）时软重连更久，不把已绘出的 MOTD 盖上致命横幅
 - SSE 与 input/resize POST 不再共用 AbortController，关流时不误取消在途控制请求
+- 载波仍同 0.18.19：页面同源 `xrk-app://app`（池隔离归 Desktop/Face，不在本插件翻）
 
 ## 0.18.19
 
-- Desktop 终端：SSE/POST 曾回到页面同源 `xrk-app://app`（当时 `xrk-app://stream` 会 `Failed to fetch`；0.18.20 在 Desktop 修好 stream 路由后改回池隔离）
+- Desktop 终端：SSE/POST 回到页面同源 `xrk-app://app`（去掉会 `Failed to fetch` 的 `xrk-app://stream` 分裂与回退冗余）
 
 ## 0.18.18
 

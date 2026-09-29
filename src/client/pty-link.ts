@@ -1,8 +1,9 @@
 /**
  * Terminal downlink carrier. Web uses WebSocket upgrades; Desktop
  * `xrk-app://` has no WS upgrade (Host listen disabled), so it rides
- * Host HTTP SSE + POST (`/sidebar/api/pty/*`): SSE on `xrk-app://stream`,
- * unary POST on the page origin (`xrk-app://app`).
+ * Host HTTP SSE + POST (`/sidebar/api/pty/*`) on the page origin
+ * (`xrk-app://app`). Face mux/host pool isolation lives in Desktop/Face —
+ * not this plugin.
  */
 
 export interface PtyLink {
@@ -26,23 +27,9 @@ export function usesHttpPtyCarrier(): boolean {
   }
 }
 
-/** Page origin for unary PTY POST (input/control) and Web URL building. */
+/** Page origin for Desktop HTTP PTY (SSE + POST) and Web URL building. */
 export function resolvePtyOrigin(): string {
   try {
-    return location.origin
-  } catch {
-    return 'http://127.0.0.1'
-  }
-}
-
-/**
- * Origin for the long-lived PTY SSE downlink.
- * Desktop mirrors Face mux/host: streams on `xrk-app://stream` so they do not
- * share Chromium's unary `xrk-app://app` connection pool (docs/host-face).
- */
-export function resolvePtyStreamOrigin(): string {
-  try {
-    if (location.protocol === 'xrk-app:') return 'xrk-app://stream'
     return location.origin
   } catch {
     return 'http://127.0.0.1'
@@ -63,7 +50,7 @@ export function buildTerminalWsUrl(params: URLSearchParams): string {
 
 /** Build the SSE stream URL for Desktop HTTP PTY. */
 export function buildTerminalHttpStreamUrl(params: URLSearchParams): string {
-  const url = new URL('/sidebar/api/pty/stream', resolvePtyStreamOrigin())
+  const url = new URL('/sidebar/api/pty/stream', resolvePtyOrigin())
   attachQuery(url, params)
   return url.toString()
 }
@@ -215,7 +202,7 @@ export function openHttpPtyLink(
 /**
  * Pick carrier by page protocol:
  * - Web (`http:` / `https:`): WebSocket → Host `/sidebar/ws/terminal`
- * - Desktop (`xrk-app:`): HTTP SSE on `xrk-app://stream` + POST on page origin
+ * - Desktop (`xrk-app:`): HTTP SSE + POST on page origin (`xrk-app://app`)
  */
 export function openPtyLink(
   params: URLSearchParams,

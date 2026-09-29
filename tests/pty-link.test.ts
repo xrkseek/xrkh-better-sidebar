@@ -12,24 +12,29 @@ afterEach(() => {
 })
 
 describe('pty-link carrier', () => {
-  it('selects HTTP SSE on xrk-app stream origin (not unary app pool)', () => {
+  it('selects HTTP on xrk-app and keeps SSE on the page origin', () => {
     vi.stubGlobal('location', { protocol: 'xrk-app:', origin: 'xrk-app://app' })
     expect(usesHttpPtyCarrier()).toBe(true)
     expect(resolvePtyOrigin()).toBe('xrk-app://app')
     const params = new URLSearchParams({ sessionId: 's1', tab: 't1' })
     expect(buildTerminalHttpStreamUrl(params)).toBe(
-      'xrk-app://stream/sidebar/api/pty/stream?sessionId=s1&tab=t1',
+      'xrk-app://app/sidebar/api/pty/stream?sessionId=s1&tab=t1',
     )
+    expect(buildTerminalHttpStreamUrl(params).includes('xrk-app://stream')).toBe(false)
   })
 
-  it('keeps Web on Host WebSocket', () => {
+  it('keeps Web on Host WebSocket (no xrk-app://, no HTTP PTY carrier)', () => {
     vi.stubGlobal('location', { protocol: 'http:', origin: 'http://127.0.0.1:3921' })
     expect(usesHttpPtyCarrier()).toBe(false)
     expect(resolvePtyOrigin()).toBe('http://127.0.0.1:3921')
     const params = new URLSearchParams({ sessionId: 's1', tab: 't1', cwd: '/tmp' })
-    expect(buildTerminalWsUrl(params)).toBe(
+    const ws = buildTerminalWsUrl(params)
+    expect(ws).toBe(
       'ws://127.0.0.1:3921/sidebar/ws/terminal?sessionId=s1&tab=t1&cwd=%2Ftmp',
     )
+    expect(ws.startsWith('ws:')).toBe(true)
+    expect(ws.includes('xrk-app://')).toBe(false)
+    expect(buildTerminalHttpStreamUrl(params).includes('xrk-app://stream')).toBe(false)
   })
 
   it('keeps https Web on wss:// Host origin', () => {
