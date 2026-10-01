@@ -10,13 +10,17 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.20
+xrkh plugin add xrkh-better-sidebar@0.18.21
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.21
+
+- `openTab({ type: 'editor' })` 固定落到侧栏分栏（`splits`），不因 `activePane` 在底栏而撑开底部面板（避免聊天开文件先出空白底栏 / 自动终端）
 
 ## 0.18.20
 

@@ -504,6 +504,18 @@ describe('sidebar state', () => {
     expect((after.bottomSplits as { tabs: SidebarTab[] }).tabs.map(t => t.id)).toEqual(['git'])
   })
 
+  it('openTabInActivePane keeps editor tabs on the side tree even when activePane is bottom', () => {
+    let s = state()
+    s = toggleBottomPanel(s)
+    const bottomPane = (s.bottomSplits as { id: string }).id
+    const sidePane = (s.splits as { id: string }).id
+    s = { ...s, activePane: bottomPane }
+    s = openTabInActivePane(s, { id: 'e:file', type: 'editor', title: 'a.ts', path: '/w/a.ts' })
+    expect((s.splits as { tabs: SidebarTab[] }).tabs.map(t => t.id)).toContain('e:file')
+    expect((s.bottomSplits as { tabs: SidebarTab[] }).tabs.map(t => t.id)).not.toContain('e:file')
+    expect(s.activePane).toBe(sidePane)
+  })
+
   it('openTabInActivePane falls back to the right tree when the active pane is stale', () => {
     let s = state()
     s = toggleBottomPanel(s)

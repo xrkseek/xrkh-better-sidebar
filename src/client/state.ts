@@ -650,7 +650,12 @@ export function setTabPin(
  * first pane instead of swallowing the open.
  */
 export function openTabInActivePane(state: SidebarState, tab: SidebarTab): SidebarState {
-  let targetId = state.activePane ?? firstLeaf(state.splits).id
+  // Editor / file tabs always land on the side workbench — never the bottom
+  // panel (bottom focus made chat openFile expand a blank bottom pane then
+  // auto-terminal). Terminal / git / browser still follow activePane.
+  let targetId = tab.type === 'editor'
+    ? firstLeaf(state.splits).id
+    : (state.activePane ?? firstLeaf(state.splits).id)
   // A stale activePane (its pane was closed since) must not swallow the
   // open: fall back to the first pane of the right tree instead of dropping
   // the tab.

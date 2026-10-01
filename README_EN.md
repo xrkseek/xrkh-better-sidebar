@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.20
+xrkh plugin add xrkh-better-sidebar@0.18.21
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.21
+
+- `openTab({ type: 'editor' })` always lands on the side split tree (`splits`), never expands the bottom panel because `activePane` is a bottom leaf (chat file-open no longer opens a blank bottom pane / auto-terminal)
 
 ## 0.18.20
 
