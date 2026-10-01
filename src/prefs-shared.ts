@@ -56,8 +56,8 @@ export interface SidebarPrefs {
   /**
    * Whether expanding the bottom panel for the FIRST time in a session tries
    * to open a fresh terminal tab there (the terminal quota/type still gates
-   * the attempt). On by default; the switch lives under the terminal tab's
-   * row in the Side card settings.
+   * the attempt). Off by default (matches Host `SIDEBAR_PREFS_DEFAULT`); the
+   * switch lives under the terminal tab's row in the Side card settings.
    */
   bottomPanelAutoTerminal: boolean
   /**
@@ -264,13 +264,14 @@ export type TitleBarScheme = typeof TITLE_BAR_SCHEMES[number]
 
 /** Fallback prefs used whenever the settings document is unreachable or malformed. */
 export const SIDEBAR_PREFS_DEFAULTS: SidebarPrefs = {
-  openByDefault: true,
+  // Match Host `packages/server/http` SIDEBAR_PREFS_DEFAULT (open + auto-terminal off).
+  openByDefault: false,
   defaultWidthPercent: WIDTH_PERCENT_DEFAULT,
   autoOpenSubagent: true,
   autoOpenJobs: true,
   agentTerminalTools: false,
   agentOpenTools: false,
-  bottomPanelAutoTerminal: true,
+  bottomPanelAutoTerminal: false,
   terminalFontFamily: '',
   terminalFontSize: TERMINAL_FONT_SIZE_DEFAULT,
   interceptOpenPath: true,

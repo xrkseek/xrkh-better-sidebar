@@ -87,6 +87,7 @@
 }
 
 /* Collapsed: no tab strip — align with the conversation title row (+14). */
+:global(body[data-xrkh-sidebar-collapsed]) .toggleCluster,
 :global(body[data-dsh-sidebar-collapsed]) .toggleCluster {
   top: calc(
     14px + env(safe-area-inset-top) +
@@ -99,6 +100,7 @@
    cluster left by --xrk-layout-inset-details so it does not cover the
    overview close control. When a panel is open, #root already yields
    margin-right to the workbench and the overview sits beside it. */
+:global(html[data-xrk-layout-details] body[data-xrkh-sidebar-collapsed]) .toggleCluster,
 :global(html[data-xrk-layout-details] body[data-dsh-sidebar-collapsed]) .toggleCluster {
   right: calc(10px + var(--xrk-layout-inset-details, 0px));
 }
@@ -281,6 +283,8 @@
   contain: layout style;
 }
 
+body[data-xrkh-sidebar-dragging] .panel,
+body[data-xrkh-sidebar-dragging] .bottomPanel,
 body[data-dsh-sidebar-dragging] .panel,
 body[data-dsh-sidebar-dragging] .bottomPanel {
   will-change: transform;
@@ -506,7 +510,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .cornerHandle {
   position: absolute;
   left: -6px;
-  bottom: calc(var(--dsh-sidebar-height, 0px) + 6px);
+  bottom: calc(var(--xrkh-workbench-height, var(--dsh-sidebar-height, 0px)) + 6px);
   width: 12px;
   height: 12px;
   z-index: 2;

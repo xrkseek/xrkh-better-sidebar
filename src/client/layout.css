@@ -35,8 +35,9 @@
  * layout tracks the pointer.
  */
 #root {
-  margin-right: var(--dsh-sidebar-width, 0px);
-  width: calc(100% - var(--dsh-sidebar-width, 0px));
+  /* Prefer XRKH workbench vars; fall back to legacy DSH aliases. */
+  margin-right: var(--xrkh-workbench-width, var(--dsh-sidebar-width, 0px));
+  width: calc(100% - var(--xrkh-workbench-width, var(--dsh-sidebar-width, 0px)));
   transition:
     margin-right var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease),
     width var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
@@ -50,7 +51,7 @@
    the rule against a host rename without touching shell-specific markup. */
 #root [data-dsh-frame] > [data-pane="conversation"],
 #root :has(> [data-slot="conversation"]) {
-  margin-bottom: var(--dsh-sidebar-height, 0px);
+  margin-bottom: var(--xrkh-workbench-height, var(--dsh-sidebar-height, 0px));
   /* Grid/flex items default to min-height:auto. A long unbreakable token
      (OAuth URL) then grows this column past the viewport and clips the
      composer + left-rail Settings row. min-height:0 lets the cell shrink;
@@ -67,6 +68,9 @@ body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > 
   padding-right: 78px;
 }
 
+body[data-xrkh-sidebar-dragging] #root,
+body[data-xrkh-sidebar-dragging] #root [data-dsh-frame] > [data-pane="conversation"],
+body[data-xrkh-sidebar-dragging] #root :has(> [data-slot="conversation"]),
 body[data-dsh-sidebar-dragging] #root,
 body[data-dsh-sidebar-dragging] #root [data-dsh-frame] > [data-pane="conversation"],
 body[data-dsh-sidebar-dragging] #root :has(> [data-slot="conversation"]) {

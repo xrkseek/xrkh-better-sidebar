@@ -1,12 +1,12 @@
 /**
- * Minimal zh/en/ja copy for the sidebar. The copy follows the DSH i18n system:
+ * Minimal zh/en/ja copy for the sidebar. The copy follows the Host i18n system:
  * the client apply attaches the locale service (`ctx.locale`, provided by
  * `@xrkseek/client-locale`) through {@link attachLocale}, and
  * `t()`/`isZh()` resolve the active locale from it — the Host-backed
  * `locale.preference` wins over the raw browser language and switches live.
  * Without an attached service (standalone/test compositions) the browser
  * language is used, matching the previous behavior. The dictionaries are
- * also registered into the DSH locale registry under {@link LOCALE_NS}.
+ * also registered into the Host locale registry under {@link LOCALE_NS}.
  *
  * ja (Japanese) is opt-in through `@huanlin/dsh-plugin-better-locale`: when
  * that plugin is installed, the client apply also calls
@@ -14,14 +14,14 @@
  * the store's active override id first; if it is `'ja'` (or any id whose
  * dict has the requested key) the ja text wins, otherwise the existing
  * zh/en chain runs unchanged. better-locale itself patches
- * `LocaleRuntime.prototype.lookup` so DSH's own translate chain also
+ * `LocaleRuntime.prototype.lookup` so the Host translate chain also
  * returns ja where the `betterSidebar` namespace has a ja entry — that
  * path covers external callers of `ctx.locale.bind('betterSidebar')`,
  * while the override-aware `t()` here covers better-sidebar's own
  * components (which bypass `ctx.locale` and call `t()` directly).
  */
 
-/** The zh dictionary (also registered into the DSH locale registry under {@link LOCALE_NS}). */
+/** The zh dictionary (also registered into the Host locale registry under {@link LOCALE_NS}). */
 export const zh = {
   files: '文件',
   changesSessionEmpty: '本会话还没有文件操作',
@@ -103,7 +103,7 @@ export const zh = {
   terminalConnectFailed: '终端多次连接失败',
   terminalRetry: '重试',
   terminalDepsFailed: '终端依赖 node-pty 加载失败',
-  terminalDepsHint: '在 DSH 所在环境的终端或 cmd 中执行以下命令修复，然后点重试（node-pty 与 DSH 核心保持同一版本）：',
+  terminalDepsHint: '在 XRK-Harness 所在环境的终端或 cmd 中执行以下命令修复，然后点重试（node-pty 与 Host 运行时保持同一版本）：',
   terminalDepsProfile: '（检测到 profile：{profile}）',
   preview: '预览',
   toc: '目录',
@@ -233,19 +233,19 @@ export const zh = {
   settingsOpenToolsTitle: '为模型注入侧边栏打开工具',
   settingsOpenToolsDesc: '开启后，模型可通过 sidebar_open 工具在侧边栏主动打开文件、文件夹和 HTTP(S) 网页（默认关闭）',
   settingsTitleBarTitle: '位置兼容模式',
-  settingsTitleBarDesc: '选择顶栏兼容方案：自动检测（默认，保守）/ DSH官方Web / 已知桌面壳 / 自定义方案（下移距离 + 自定义 CSS）',
+  settingsTitleBarDesc: '选择顶栏兼容方案：自动检测（默认，保守）/ XRK 官方 Web / 已知桌面壳 / 自定义方案（下移距离 + 自定义 CSS）',
   settingsTitleBarStripTitle: '下移距离',
   settingsTitleBarStripDesc: '标题栏条带高度：侧边栏按钮与内容下移的像素数（0–120，默认 40；自定义方案下生效）',
   settingsSchemeAutoTitle: '自动检测',
   settingsSchemeAutoDesc: '保守方案：仅在 Window Controls Overlay 标准 API 可用时按真实标题栏高度让位；网页环境下不做任何修改',
-  settingsSchemeWebTitle: 'DSH官方Web',
+  settingsSchemeWebTitle: 'XRK 官方 Web',
   settingsSchemeWebDesc: '显式声明运行在官方网页版：不做任何适配（连标准 WCO 几何也不适用）',
   settingsSchemeCustomTitle: '自定义方案',
   settingsSchemeCustomDesc: '完全由你控制：注入自定义 CSS（可覆盖内置样式），并指定标题栏下移距离',
   settingsSchemeDetectedSuffix: '已检测',
   settingsCustomCssTitle: '自定义 CSS',
   settingsCustomCssDesc: '追加到页面末尾的样式（同优先级下后写胜出；覆盖 JS 内联变量需用 !important）',
-  settingsCustomCssPlaceholder: '/* 例：为自绘标题栏的壳预留 36px */\nhtml[data-dsh-title-bar-height="36"] {\n  --dsh-title-bar-strip: 36px !important;\n}',
+  settingsCustomCssPlaceholder: '/* 例：为自绘标题栏的壳预留 36px */\nhtml[data-xrk-desktop-chrome-height="36"] {\n  --xrk-desktop-chrome-height: 36px !important;\n}',
   settingsSaveFailed: '保存失败',
   settingsConflict: '设置已被其他窗口修改，请重试',
   binaryNoPreview: '此文件类型不支持预览',
@@ -261,7 +261,7 @@ export const zh = {
   fenceErrorReason: '此路径在会话工作区之外，已被工作区检测拦截',
   fenceDisableAction: '关闭工作区检测',
   settingsBottomTerminalTitle: '底部面板首次展开自动开终端',
-  settingsBottomTerminalDesc: '每次会话中第一次展开底部面板时，尝试在底部面板自动打开一个新终端标签（终端数量上限仍会限制；默认开启）',
+  settingsBottomTerminalDesc: '每次会话中第一次展开底部面板时，尝试在底部面板自动打开一个新终端标签（终端数量上限仍会限制；默认关闭）',
   settingsFontFamilyTitle: '终端字体',
   settingsFontFamilyDesc: '自定义终端字体族（CSS font-family，如 "JetBrains Mono", monospace；留空跟随主题等宽字体）',
   settingsFontFamilyPlaceholder: '"JetBrains Mono", monospace',
@@ -361,8 +361,8 @@ export const zh = {
   addPluginsTabCardDesc: '注册新的侧边栏页面',
   addPluginsViewerCard: '添加预览插件',
   addPluginsViewerCardDesc: '注册新的文件类型预览',
-  addPluginsTabDesc: '侧边栏页面（Tab）可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到 DSH 所在环境的终端执行。',
-  addPluginsViewerDesc: '文件预览器可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到 DSH 所在环境的终端执行。',
+  addPluginsTabDesc: '侧边栏页面（Tab）可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到本机终端执行（`xrkh plugin add …`）。',
+  addPluginsViewerDesc: '文件预览器可以由插件扩展。插件通过 ctx.betterSidebar 服务注册；点击「安装」复制安装命令，粘贴到本机终端执行（`xrkh plugin add …`）。',
   addPluginsBrowseMore: '在 GitHub 上浏览更多插件（topic: xrkh-better-sidebar）',
   addPluginsSearch: '搜索插件名称 / 描述…',
   addPluginsNoMatch: '没有匹配的插件',
@@ -375,7 +375,7 @@ export const zh = {
   pluginFlowglassDesc: '实时会话流程图：三列泳道展示用户、助手与工具调用，支持并行分组、子代理支线、逐层钻取和实时状态；安装 better-sidebar 后注册原生「流镜」Tab，未安装时保留独立抽屉',
   pluginGitForgeDesc: 'better-sidebar「Git 凭据」Tab：GitHub/Gitea 等 Forge 账号库 + 按项目授权 + push 策略硬拦；token 仅存本地 secrets，不进模型上下文；提供只读 GitForge 工具与 agent HTTPS credential helper',
   pluginGithubWorkbenchDesc: 'better-sidebar「GitHub 工作台」Tab：远端仓库目录树 + Issues / Pull requests / Actions 页签，读之外支持新建 Issue/PR、评论、编辑、关闭重开、squash·merge·rebase 合并（强确认）与重跑/取消 CI；仓库弹层自动拉取有权限列表并支持公开仓搜索；未装 better-sidebar 时自动降级为独立右侧面板',
-  pluginSuhuangScrollDesc: '把本地苏黄共阅 Runtime 接入 DSH 设置与 better-sidebar，支持模型配置、连接测试和连续阅卷控制；使用前需安装 Suhuang Scroll Runtime 与 xrkh-better-sidebar',
+  pluginSuhuangScrollDesc: '把本地苏黄共阅 Runtime 接入 XRK Settings 与 better-sidebar，支持模型配置、连接测试和连续阅卷控制；使用前需安装 Suhuang Scroll Runtime 与 xrkh-better-sidebar',
   pluginBetterOverleafDesc: 'better-sidebar 的 Overleaf 标签页：直连 CDP 浏览器登录（支持第三方 Chromium），项目列表/切换，<workspace>/overleaf/ 本地 git 镜像，git 双向同步（API 只读兜底），文件预览走侧边栏工作台',
   pluginGitRemotesDesc: 'better-sidebar Git 远程 Tab：看分支/上游/ahead-behind，fetch（可 prune）、ff-only pull、确认后才 push。不替换内置 Git 的暂存/提交，也不提供 force-push 或模型自动推送',
   pluginSentinelDesc: '条件驱动的 agent 唤醒系统：文件/进程/端口/HTTP/命令/webhook 传感器，条件达成自动唤醒休眠会话；注册「哨兵」Tab 展示服务器全局监控表',
@@ -386,8 +386,8 @@ export const zh = {
   pluginTurnReviewDesc: '对「刚刚这一回合」的 diff 做 Approve / Request changes 的人闸门：只审上一回合，不 fork 会话；文件按主会话/子代理/未归因分组，按文件勾选打回 + 可选评语，点文件先看回合开始快照 vs 现在的 diff。不是 /rewind',
   pluginVideoPreviewDesc: '在 better-sidebar 编辑器内联预览视频文件（.mp4/.webm/.mov/.mkv/.avi 等），自带支持 HTTP Range（206）的 /video 宿主路由，可拖动进度条、不受 20MB mediaLimit 限制',
   pluginCodeNavDesc: '代码预览导航：按文件类型自动识别语言并高亮语法，符号大纲（类/方法/变量筛选 + 一键跳转），文件内查找（全部匹配高亮、上/下一处、区分大小写），接管 better-sidebar 的代码文件预览',
-  pluginDocsPanelDesc: 'DSH 侧边栏里的「全局文档」：全局 Markdown 笔记，任何工作区随时可读——列表点选阅读、悬浮大纲跳转、Chrome / VS Code 外部打开、代码复制，目录可配置（默认 ~/.dsh/docs）',
-  pluginEgoBrowserDesc: '把 CitroLabs/ego-lite 接进 DeepSeek Harness 的 agent 浏览器：32 个 ego_* 工具驱动真实 Chromium，侧边栏原生「ego 浏览器」Tab 实时观察 agent 逛的每个页面，可直接点击/拖拽/输入接管；装 better-sidebar 时自动注册 Tab，没装则退回浮动浮窗',
+  pluginDocsPanelDesc: 'XRK 侧边栏里的「全局文档」：全局 Markdown 笔记，任何工作区随时可读——列表点选阅读、悬浮大纲跳转、Chrome / VS Code 外部打开、代码复制，目录可配置（默认 ~/.xrk/docs）',
+  pluginEgoBrowserDesc: '把 CitroLabs/ego-lite 接进 XRK-Harness 的 agent 浏览器：32 个 ego_* 工具驱动真实 Chromium，侧边栏原生「ego 浏览器」Tab 实时观察 agent 逛的每个页面，可直接点击/拖拽/输入接管；装 better-sidebar 时自动注册 Tab，没装则退回浮动浮窗',
   pluginBilingualReaderDesc: '在 DSH 侧边栏读论文 PDF：原生 PDF 显示，选中一段文字即用大模型划词翻译，结合上下文、完全隔离主对话，只作阅读辅助',
 }
 
@@ -473,7 +473,7 @@ export const en: Record<keyof typeof zh, string> = {
   terminalConnectFailed: 'Terminal failed to connect repeatedly',
   terminalRetry: 'Retry',
   terminalDepsFailed: 'Terminal dependency node-pty failed to load',
-  terminalDepsHint: 'Run the command below in a terminal or cmd on the DSH machine to repair it, then retry (node-pty stays in sync with the DSH core version):',
+  terminalDepsHint: 'Run the command below in a terminal or cmd on the XRK-Harness machine to repair it, then retry (node-pty stays in sync with the Host runtime version):',
   terminalDepsProfile: ' (detected profile: {profile})',
   preview: 'Preview',
   toc: 'Table of contents',
@@ -603,19 +603,19 @@ export const en: Record<keyof typeof zh, string> = {
   settingsOpenToolsTitle: 'Inject the sidebar-open tool for the model',
   settingsOpenToolsDesc: 'When enabled, the model can actively open files, folders, and HTTP(S) pages in the sidebar through the sidebar_open tool (off by default)',
   settingsTitleBarTitle: 'Position compatibility mode',
-  settingsTitleBarDesc: 'Pick the title-bar compatibility scheme: auto-detect (default, conservative) / DSH official web / known desktop shells / custom (shift distance + custom CSS)',
+  settingsTitleBarDesc: 'Pick the title-bar compatibility scheme: auto-detect (default, conservative) / XRK official web / known desktop shells / custom (shift distance + custom CSS)',
   settingsTitleBarStripTitle: 'Shift distance',
   settingsTitleBarStripDesc: 'Title-bar strip height: how far the sidebar buttons and content move down in px (0–120, default 40; applies under the custom scheme)',
   settingsSchemeAutoTitle: 'Auto-detect',
   settingsSchemeAutoDesc: 'Conservative: only the standard Window Controls Overlay API contributes (real caption-overlay height); plain web environments get no modification',
-  settingsSchemeWebTitle: 'DSH official web',
+  settingsSchemeWebTitle: 'XRK official web',
   settingsSchemeWebDesc: 'Explicitly declare the official web UI: no adaptation at all (not even standard WCO geometry)',
   settingsSchemeCustomTitle: 'Custom',
   settingsSchemeCustomDesc: 'Full control: inject custom CSS (can override built-in styles) and set the title-bar shift distance',
   settingsSchemeDetectedSuffix: 'detected',
   settingsCustomCssTitle: 'Custom CSS',
   settingsCustomCssDesc: 'Styles appended at the end of the page (later in the cascade wins ties; use !important to override JS-written inline variables)',
-  settingsCustomCssPlaceholder: '/* e.g. reserve 36px for a shell with a custom-drawn title bar */\nhtml[data-dsh-title-bar-height="36"] {\n  --dsh-title-bar-strip: 36px !important;\n}',
+  settingsCustomCssPlaceholder: '/* e.g. reserve 36px for a shell with a custom-drawn title bar */\nhtml[data-xrk-desktop-chrome-height="36"] {\n  --xrk-desktop-chrome-height: 36px !important;\n}',
   settingsSaveFailed: 'Failed to save',
   settingsConflict: 'The setting changed in another window — please retry',
   binaryNoPreview: 'This file type cannot be previewed',
@@ -631,7 +631,7 @@ export const en: Record<keyof typeof zh, string> = {
   fenceErrorReason: 'This path is outside the session workspace and was blocked by the workspace fence',
   fenceDisableAction: 'Turn off the workspace fence',
   settingsBottomTerminalTitle: 'Auto-open a terminal on the bottom panel\'s first expansion',
-  settingsBottomTerminalDesc: 'When the bottom panel is expanded for the first time in a session, try to open a fresh terminal tab there (the terminal quota still applies; on by default)',
+  settingsBottomTerminalDesc: 'When the bottom panel is expanded for the first time in a session, try to open a fresh terminal tab there (the terminal quota still applies; off by default)',
   settingsFontFamilyTitle: 'Terminal font family',
   settingsFontFamilyDesc: 'Custom terminal font family (a CSS font-family stack like "JetBrains Mono", monospace; leave empty to follow the theme\'s monospace font)',
   settingsFontFamilyPlaceholder: '"JetBrains Mono", monospace',
@@ -731,8 +731,8 @@ export const en: Record<keyof typeof zh, string> = {
   addPluginsTabCardDesc: 'Register a new sidebar page',
   addPluginsViewerCard: 'Add preview plugins',
   addPluginsViewerCardDesc: 'Register a file-type preview',
-  addPluginsTabDesc: 'Sidebar pages (tabs) can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a terminal where your DSH profile lives and run it.',
-  addPluginsViewerDesc: 'File previewers can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a terminal where your DSH profile lives and run it.',
+  addPluginsTabDesc: 'Sidebar pages (tabs) can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a local terminal and run it (`xrkh plugin add …`).',
+  addPluginsViewerDesc: 'File previewers can be extended by plugins. Plugins register through the ctx.betterSidebar service; clicking Install copies the install command — paste it into a local terminal and run it (`xrkh plugin add …`).',
   addPluginsBrowseMore: 'Browse more plugins on GitHub (topic: xrkh-better-sidebar)',
   addPluginsSearch: 'Search by plugin name or description…',
   addPluginsNoMatch: 'No plugins match',
@@ -751,19 +751,19 @@ export const en: Record<keyof typeof zh, string> = {
   pluginSidebarQaDesc: 'Select-and-ask: Select conversation text → ask in the right-side panel → a dedicated follow-up session (❓追问) in the same workspace; a fast no-thinking model compresses the main context and injects it with the quote, without interrupting the main conversation. Follow-ups nest, continue, and archive',
   pluginSidenoteDesc: 'Codex-style side chat + selection annotations: fork the current session into a persistent side panel (archived out of the session list, multi-instance, /side command, survives reload, model follows the main session); select assistant text → numbered badge + note editor → an "N annotations" chip that rides your next message, or ask straight into a side chat',
   pluginSshTunnelDesc: 'SSH Tunnel tab: multi-host inventory + per-project grants + local secrets; SSHManager tool (exec/SFTP/session strategies); center interactive terminal and dual-pane SFTP',
-  pluginSuhuangScrollDesc: 'Connect the local Suhuang Scroll Runtime to DSH settings and better-sidebar for model configuration, connection tests, and continuous grading controls; requires Suhuang Scroll Runtime and xrkh-better-sidebar',
+  pluginSuhuangScrollDesc: 'Connect the local Suhuang Scroll Runtime to XRK Settings and better-sidebar for model configuration, connection tests, and continuous grading controls; requires Suhuang Scroll Runtime and xrkh-better-sidebar',
   pluginTurnReviewDesc: 'A human gate on the just-finished turn: Approve / Request changes per path with an optional comment; paths grouped by main session / subagent / unattributed; inline snapshot-vs-now diff before you decide. No fork, no /rewind',
   pluginVideoPreviewDesc: 'Inline video preview (.mp4/.webm/.mov/.mkv/.avi etc.) for the better-sidebar editor, backed by a dedicated /video host route with HTTP Range (206) support — scrubbing works and files are not capped by the 20MB mediaLimit',
   pluginCodeNavDesc: 'Code preview navigator: detects the language by file type and highlights syntax, symbol outline (class / method / variable filters + one-click jump), and in-file search (highlight all matches, prev/next, match case) — takes over code file preview in the better-sidebar editor',
-  pluginDocsPanelDesc: 'Global docs in the DSH sidebar: read your own Markdown notes from any workspace — a file list, an outline, open in Chrome / VS Code, and copy buttons; the docs directory is configurable (default ~/.dsh/docs)',
-  pluginEgoBrowserDesc: 'The agent browser for DeepSeek Harness: 32 ego_* tools drive a real Chromium, with a native sidebar "ego browser" tab giving a live view of every page the agent visits — you can click, drag, and type to take over. Registers the tab automatically when better-sidebar is present, otherwise falls back to a floating bubble',
+  pluginDocsPanelDesc: 'Global docs in the XRK sidebar: read your own Markdown notes from any workspace — a file list, an outline, open in Chrome / VS Code, and copy buttons; the docs directory is configurable (default ~/.xrk/docs)',
+  pluginEgoBrowserDesc: 'The agent browser for XRK-Harness: 32 ego_* tools drive a real Chromium, with a native sidebar "ego browser" tab giving a live view of every page the agent visits — you can click, drag, and type to take over. Registers the tab automatically when better-sidebar is present, otherwise falls back to a floating bubble',
   pluginBetterOverleafDesc: 'Overleaf tab for better-sidebar: direct-CDP browser login (third-party Chromium supported), project list/switch, local git mirrors under <workspace>/overleaf/, two-way git sync with read-only API fallback, and file preview through the sidebar workbench',
-  pluginBilingualReaderDesc: 'Read paper PDFs in the DSH sidebar: native PDF rendering, select text to translate it with the LLM, using context while staying fully isolated from the main conversation — a reading aid only',
+  pluginBilingualReaderDesc: 'Read paper PDFs in the XRK sidebar: native PDF rendering, select text to translate it with the LLM, using context while staying fully isolated from the main conversation — a reading aid only',
 }
 
 /**
- * The dictionary namespace this plugin owns in the DSH locale registry
- * (`'sidebar'` is taken by DSH's own ui-sidebar, hence this distinct name).
+ * The dictionary namespace this plugin owns in the Host locale registry
+ * (`'sidebar'` is reserved by the shell ui-sidebar, hence this distinct name).
  */
 export const LOCALE_NS = 'betterSidebar'
 

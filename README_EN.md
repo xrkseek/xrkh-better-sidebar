@@ -10,13 +10,20 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.21
+xrkh plugin add xrkh-better-sidebar@0.18.26
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.26
+
+- Terminal: after OS sleep/wake, fit/refresh a blank xterm canvas; remount + reattach PTY if the grid stays dead; disable `allowTransparency` to reduce GPU-sleep blanking
+- Desktop: ignore collapsed `visualViewport` as a keyboard inset (stops a blank layout-push strip and panels clipped by `overflow: clip`)
+- Pref defaults match Host: `openByDefault` / `bottomPanelAutoTerminal` off
+- Layout: dual-write `data-xrkh-sidebar-*` and `--xrkh-workbench-*`; storage key `xrkh-sidebar:v1` (migrates legacy `dsh-sidebar:v1`)
 
 ## 0.18.21
 

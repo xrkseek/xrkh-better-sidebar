@@ -18,7 +18,11 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const harness = path.resolve(pluginRoot, '../..')
+// Prefer XRK_HARNESS when the plugin lives outside the monorepo tree
+// (e.g. ~/.xrk/community-plugin-src/…); else assume ../../ is the harness root.
+const harness = process.env.XRK_HARNESS
+  ? path.resolve(process.env.XRK_HARNESS)
+  : path.resolve(pluginRoot, '../..')
 const pkgPath = path.join(pluginRoot, 'package.json')
 const workspacePath = path.join(pluginRoot, 'pnpm-workspace.yaml')
 

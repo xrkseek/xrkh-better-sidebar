@@ -123,7 +123,7 @@ export const PrefsSchema: z<SidebarPrefs> = z.object({
   autoOpenJobs: z.boolean().default(true),
   agentTerminalTools: z.boolean().default(false),
   agentOpenTools: z.boolean().default(false),
-  bottomPanelAutoTerminal: z.boolean().default(true),
+  bottomPanelAutoTerminal: z.boolean().default(false),
   terminalFontFamily: z.string().default(''),
   terminalFontSize: z.number().step(1).min(TERMINAL_FONT_SIZE_MIN).max(TERMINAL_FONT_SIZE_MAX).default(TERMINAL_FONT_SIZE_DEFAULT),
   interceptOpenPath: z.boolean().default(true),

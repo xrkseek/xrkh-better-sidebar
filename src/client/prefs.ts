@@ -1,12 +1,12 @@
 /**
  * Client-side read of the user-facing "Side card" preferences. The host owns
- * the namespace through the settings seam (in-process); the DSH settings RPC
- * domain only serves allowlisted namespaces to configuration clients, so the
- * client reads and writes THIS namespace through the plugin's own fenced
- * /sidebar routes instead (api.settingsGet/settingsUpdate). Any failure
- * (route rejected, namespace absent, a field of the wrong type, a value out
- * of the contract range) falls back to the schema defaults — the side card
- * must keep working exactly as composed when the settings surface is missing.
+ * the namespace through the settings seam (in-process); Host settings RPC only
+ * serves allowlisted namespaces to configuration clients, so the client reads
+ * and writes THIS namespace through the plugin's own fenced /sidebar routes
+ * instead (api.settingsGet/settingsUpdate). Any failure (route rejected,
+ * namespace absent, a field of the wrong type, a value out of the contract
+ * range) falls back to the schema defaults — the side card must keep working
+ * exactly as composed when the settings surface is missing.
  */
 import type { api } from './api.ts'
 import {

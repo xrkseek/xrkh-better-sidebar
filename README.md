@@ -10,13 +10,20 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.21
+xrkh plugin add xrkh-better-sidebar@0.18.26
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.26
+
+- 终端：挂起唤醒后画布空白时 fit/refresh；网格仍死则 remount 并重挂 PTY；关闭 `allowTransparency` 减轻 GPU 挂起后整页空白
+- Desktop：忽略塌缩的 `visualViewport` 当键盘 inset（避免布局推挤空白条与 `overflow: clip` 裁切面板）
+- 偏好默认与 Host 对齐：`openByDefault` / `bottomPanelAutoTerminal` 默认关
+- 布局：双写 `data-xrkh-sidebar-*` 与 `--xrkh-workbench-*`；存储键 `xrkh-sidebar:v1`（迁移旧 `dsh-sidebar:v1`）
 
 ## 0.18.21
 

@@ -11,7 +11,7 @@
  *   — a button, so the sidebar link takeover cannot reroute it);
  * - 「安装」only COPIES the install script to the clipboard (writeClipboard)
  *   with a transient "已复制" feedback on the button — the user pastes and
- *   runs it wherever they manage their DSH profile. No terminal is opened,
+ *   runs it wherever they manage their XRK profile. No terminal is opened,
  *   nothing is closed, nothing can fail outward.
  *
  * The body is extracted as {@link PluginListBody} so tests render it

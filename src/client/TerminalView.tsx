@@ -50,6 +50,7 @@ import {
   openTerminalUrl,
 } from './terminal-links.ts'
 import { openPtyLink, type PtyLink } from './pty-link.ts'
+import { terminalPaintBroken } from './terminal-paint.ts'
 import css from './sidebar.module.css'
 
 /** How many consecutive unreasoned failures before showing the error banner. */
@@ -117,6 +118,14 @@ function xtermTheme(): ITheme {
   }
 }
 
+/**
+ * Host has a real box but xterm's paint grid is dead — the post-sleep blank
+ * terminal: fit left rows/cols at 0, or the `.xterm-screen` layer collapsed
+ * while the panel chrome still looks open.
+ * @see terminal-paint.ts
+ */
+export { terminalPaintBroken } from './terminal-paint.ts'
+
 export function TerminalView(props: { scope: SessionScope; tabId: string; store: SidebarStore; visible?: boolean }) {
   const { scope, tabId, store } = props
   const visible = props.visible !== false
@@ -125,6 +134,13 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
   const [fatal, setFatal] = useState<string | null>(null)
   const [depsFatal, setDepsFatal] = useState<TerminalDepsInfo | null>(null)
   const [lastUrl, setLastUrl] = useState<string | null>(null)
+  // Bumped on wake when fit/refresh cannot revive a blank xterm canvas
+  // (GPU compositor reset after OS sleep) — remounts the effect so open+pty
+  // reattach cleanly. Alt-tab alone does not bump: only a detected dead grid.
+  const [remountToken, setRemountToken] = useState(0)
+  // One hard remount per hide→show cycle so a persistently broken host
+  // cannot spin remountToken on every visibility tick.
+  const wakeRemountedRef = useRef(false)
   const connectRef = useRef<(() => void) | null>(null)
   const storeRef = useRef(store)
   storeRef.current = store
@@ -136,6 +152,8 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       setConnected(false)
       return
     }
+    // A successful mount after a wake remount clears the one-shot latch.
+    wakeRemountedRef.current = false
     const liveStore = storeRef.current
     // The custom font prefs (side card settings, terminal card) resolve at
     // mount; store changes re-apply them live below.
@@ -144,7 +162,10 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       cursorBlink: true,
       fontSize: font.fontSize,
       fontFamily: font.fontFamily,
-      allowTransparency: true,
+      // Transparent backgrounds go blank after Chromium/Electron GPU sleep
+      // more often than opaque ones; the panel already paints an opaque
+      // surface behind the host.
+      allowTransparency: false,
       convertEol: false,
       scrollback: 4000,
       theme: xtermTheme(),
@@ -312,6 +333,54 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     })
     observer.observe(host)
 
+    // After OS sleep/wake the xterm canvas often goes blank (GPU compositor
+    // reset) while the host size is unchanged — ResizeObserver stays quiet.
+    // Soft path: double-rAF (wait for post-wake layout) → fit + refresh +
+    // layer nudge. Hard path: if the grid is still dead while the host has
+    // a real box, bump remountToken so the effect rebuilds open+pty.
+    let opened = false
+    let wakeFrame = 0
+    const recoverAfterWake = (): void => {
+      if (document.visibilityState === 'hidden') {
+        wakeRemountedRef.current = false
+        return
+      }
+      if (document.visibilityState !== 'visible' || closed) return
+      if (wakeFrame !== 0) cancelAnimationFrame(wakeFrame)
+      wakeFrame = requestAnimationFrame(() => {
+        wakeFrame = requestAnimationFrame(() => {
+          wakeFrame = 0
+          if (closed || !opened || term.element === undefined) return
+          try {
+            if (host.clientWidth < 2 || host.clientHeight < 2) return
+            fit.fit()
+            sendResize()
+            if (terminalPaintBroken(host, term)) {
+              if (wakeRemountedRef.current) return
+              wakeRemountedRef.current = true
+              setRemountToken(token => token + 1)
+              return
+            }
+            term.refresh(0, Math.max(0, term.rows - 1))
+            // Nudge Chromium to recomposite the screen layer after GPU sleep.
+            const screen = term.element.querySelector('.xterm-screen')
+            if (screen instanceof HTMLElement) {
+              const prev = screen.style.transform
+              screen.style.transform = 'translateZ(0)'
+              void screen.offsetWidth
+              screen.style.transform = prev
+            }
+          } catch {
+            if (wakeRemountedRef.current) return
+            wakeRemountedRef.current = true
+            setRemountToken(token => token + 1)
+          }
+        })
+      })
+    }
+    document.addEventListener('visibilitychange', recoverAfterWake)
+    window.addEventListener('pageshow', recoverAfterWake)
+
     // Custom font prefs (the terminal card's secondary settings) apply LIVE:
     // on any store change re-resolve and diff the two options, re-fitting
     // when they moved (the grid dimensions may change with the font). The
@@ -344,6 +413,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     const cancelOpen = openWhenSized(host, () => {
       try {
         term.open(host)
+        opened = true
         fit.fit()
         sendResize()
       } catch (error) {
@@ -357,6 +427,9 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       cancelOpen()
       window.clearTimeout(retry)
       if (resizeRaf !== 0) cancelAnimationFrame(resizeRaf)
+      if (wakeFrame !== 0) cancelAnimationFrame(wakeFrame)
+      document.removeEventListener('visibilitychange', recoverAfterWake)
+      window.removeEventListener('pageshow', recoverAfterWake)
       observer.disconnect()
       fontSub()
       schemeSub()
@@ -391,7 +464,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       term.dispose()
       connectRef.current = null
     }
-  }, [scope.sessionId, scope.cwd, tabId, visible])
+  }, [scope.sessionId, scope.cwd, tabId, visible, remountToken])
 
   return (
     <div className={css.terminalWrap}>

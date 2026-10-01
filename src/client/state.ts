@@ -1,9 +1,10 @@
 /**
  * Per-session sidebar state: the panel geometry, the split-pane workbench
  * tree, open tabs, and the explorer expansion set. One state instance per
- * conversation id, persisted to localStorage under `dsh-sidebar:v1:<id>` so
+ * conversation id, persisted to localStorage under `xrkh-sidebar:v1:<id>` so
  * a reload restores the exact layout of the session it belongs to — switching
- * conversations swaps the whole state (memory + isolation).
+ * conversations swaps the whole state (memory + isolation). Legacy
+ * `dsh-sidebar:v1:<id>` blobs are read once and migrated.
  *
  * The split tree is a recursive structure: a leaf holds a tab group, a split
  * divides the space row- or column-wise with fractional sizes. All tree
@@ -1083,7 +1084,9 @@ export function reconcileAgentTerminals(
 
 // ── The per-session store ──────────────────────────────────────────────────
 
-const STORAGE_PREFIX = 'dsh-sidebar:v1'
+const STORAGE_PREFIX = 'xrkh-sidebar:v1'
+/** Pre-0.18.23 key — read once and migrate into {@link STORAGE_PREFIX}. */
+const LEGACY_STORAGE_PREFIX = 'dsh-sidebar:v1'
 
 /**
  * Cross-session panel width: the last dragged width, shared by EVERY
@@ -1092,7 +1095,8 @@ const STORAGE_PREFIX = 'dsh-sidebar:v1'
  * cache-hit session switches, so a drag in one conversation carries to all
  * the others (last drag wins).
  */
-const GLOBAL_WIDTH_KEY = 'dsh-sidebar:v1:width'
+const GLOBAL_WIDTH_KEY = 'xrkh-sidebar:v1:width'
+const LEGACY_GLOBAL_WIDTH_KEY = 'dsh-sidebar:v1:width'
 
 /** Clamp one width to the contract and the current viewport (mirror of {@link setWidth}). */
 function clampWidth(width: number): number {
@@ -1103,10 +1107,16 @@ function clampWidth(width: number): number {
 /** Read the cross-session panel width (undefined when never dragged). */
 function readGlobalWidth(): number | undefined {
   try {
-    const raw = localStorage.getItem(GLOBAL_WIDTH_KEY)
-    if (raw !== null) {
+    for (const key of [GLOBAL_WIDTH_KEY, LEGACY_GLOBAL_WIDTH_KEY]) {
+      const raw = localStorage.getItem(key)
+      if (raw === null) continue
       const parsed = Number(raw)
-      if (Number.isFinite(parsed) && parsed > 0) return clampWidth(parsed)
+      if (Number.isFinite(parsed) && parsed > 0) {
+        const clamped = clampWidth(parsed)
+        // Promote legacy key so the next write only touches the XRKH namespace.
+        if (key === LEGACY_GLOBAL_WIDTH_KEY) writeGlobalWidth(clamped)
+        return clamped
+      }
     }
   } catch {
     // Storage unavailable: fall back to the per-session behavior.
@@ -1143,19 +1153,22 @@ export function defaultWidthFor(viewport: number, percent: number): number {
 }
 
 /**
- * URL escape hatch (#369): loading the app with `?dsh-sidebar-reset` drops
- * the persisted layout for the session instead of restoring it. When a
- * restored tab hangs the page on mount (the #369 freeze loop), reloading
- * into the same state replays the hang forever; this param starts from the
- * default layout and clears the stored copy, breaking the loop. Persisting
- * resumes as soon as the param is gone from the URL.
+ * URL escape hatch (#369): loading the app with `?xrkh-sidebar-reset`
+ * (or legacy `?dsh-sidebar-reset`) drops the persisted layout for the
+ * session instead of restoring it. When a restored tab hangs the page on
+ * mount (the #369 freeze loop), reloading into the same state
+ * replays the hang forever; this param starts from the default layout and
+ * clears the stored copy, breaking the loop. Persisting resumes as soon as
+ * the param is gone from the URL.
  */
-const RESET_PARAM = 'dsh-sidebar-reset'
+const RESET_PARAM = 'xrkh-sidebar-reset'
+const LEGACY_RESET_PARAM = 'dsh-sidebar-reset'
 
 /** Whether the current page load asked for a persisted-state reset. */
 function resetRequested(): boolean {
   try {
-    return new URLSearchParams(window.location.search).has(RESET_PARAM)
+    const params = new URLSearchParams(window.location.search)
+    return params.has(RESET_PARAM) || params.has(LEGACY_RESET_PARAM)
   } catch {
     return false
   }
@@ -1166,7 +1179,9 @@ function loadState(sessionId: string, prefs: SidebarPrefs): SidebarState {
   if (reset) {
     try {
       localStorage.removeItem(`${STORAGE_PREFIX}:${sessionId}`)
+      localStorage.removeItem(`${LEGACY_STORAGE_PREFIX}:${sessionId}`)
       localStorage.removeItem(GLOBAL_WIDTH_KEY)
+      localStorage.removeItem(LEGACY_GLOBAL_WIDTH_KEY)
     } catch {
       // Storage unavailable: the default layout below is still the escape.
     }
@@ -1177,7 +1192,12 @@ function loadState(sessionId: string, prefs: SidebarPrefs): SidebarState {
   const globalWidth = reset ? undefined : readGlobalWidth()
   if (!reset) {
     try {
-      const raw = localStorage.getItem(`${STORAGE_PREFIX}:${sessionId}`)
+      let raw = localStorage.getItem(`${STORAGE_PREFIX}:${sessionId}`)
+      let fromLegacy = false
+      if (raw === null) {
+        raw = localStorage.getItem(`${LEGACY_STORAGE_PREFIX}:${sessionId}`)
+        fromLegacy = raw !== null
+      }
       if (raw !== null) {
         const parsed = JSON.parse(raw) as unknown
         // Seed the uid counter past the persisted ids (it resets on reload);
@@ -1185,7 +1205,17 @@ function loadState(sessionId: string, prefs: SidebarPrefs): SidebarState {
         nextIdCounter = maxCounterId(parsed)
         const sanitized = sanitizeState(parsed)
         if (sanitized !== undefined) {
-          return globalWidth === undefined ? sanitized : { ...sanitized, width: globalWidth }
+          const next = globalWidth === undefined ? sanitized : { ...sanitized, width: globalWidth }
+          // Promote legacy session blob into the XRKH key once.
+          if (fromLegacy) {
+            try {
+              localStorage.setItem(`${STORAGE_PREFIX}:${sessionId}`, JSON.stringify(next))
+              localStorage.removeItem(`${LEGACY_STORAGE_PREFIX}:${sessionId}`)
+            } catch {
+              // Best-effort migrate.
+            }
+          }
+          return next
         }
       }
     } catch {

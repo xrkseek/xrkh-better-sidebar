@@ -119,6 +119,8 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
     const { container, store, service } = mountSidebar()
     const renders = { count: 0 }
     registerStubTerminal(service, renders)
+    // Pref defaults OFF (Host parity); enable explicitly for this trigger-chain test.
+    act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: true }) })
 
     act(() => { store.reduce(toggleBottomPanel) })
 
@@ -134,8 +136,11 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
     expect(container.textContent).toContain('terminal-stub-content')
     // The panel itself survived (the #42 symptom was a WHOLE blank panel):
     // the close control is present and the layout push for the bottom panel
-    // height is live.
+    // height is live (XRKH primary + legacy DSH alias).
     expect(container.querySelector(`[aria-label="${t('collapseBottomPanel')}"]`)).not.toBeNull()
+    expect(document.documentElement.style.getPropertyValue('--xrkh-workbench-height')).toBe(
+      `${state.bottomHeight}px`,
+    )
     expect(document.documentElement.style.getPropertyValue('--dsh-sidebar-height')).toBe(
       `${state.bottomHeight}px`,
     )
@@ -144,6 +149,7 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
   it('never repeats the auto-open on later expansions (once per session)', () => {
     const { store, service } = mountSidebar()
     registerStubTerminal(service, { count: 0 })
+    act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: true }) })
 
     act(() => { store.reduce(toggleBottomPanel) })
     expect(bottomTabs(store)).toHaveLength(1)
@@ -158,8 +164,7 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
   it('does not auto-open when the bottomPanelAutoTerminal pref is off', () => {
     const { store, service } = mountSidebar()
     registerStubTerminal(service, { count: 0 })
-    // setPrefs REPLACES the prefs record — spread the current one so only
-    // the toggle moves.
+    // Defaults are already off; keep the explicit set for clarity.
     act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: false }) })
 
     act(() => { store.reduce(toggleBottomPanel) })
@@ -170,7 +175,7 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
   it('does not auto-open when the terminal tab type is disabled in settings', () => {
     const { store, service } = mountSidebar()
     registerStubTerminal(service, { count: 0 })
-    act(() => { store.setPrefs({ ...store.getPrefs(), tabsEnabled: { terminal: false } }) })
+    act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: true, tabsEnabled: { terminal: false } }) })
 
     act(() => { store.reduce(toggleBottomPanel) })
     expect(store.getSnapshot().state!.bottomOpen).toBe(true)
@@ -180,6 +185,7 @@ describe('bottom-panel first-expand auto terminal (issue #42 trigger chain)', ()
   it('does not auto-open a twin when a UI terminal already exists', () => {
     const { store, service } = mountSidebar()
     registerStubTerminal(service, { count: 0 })
+    act(() => { store.setPrefs({ ...store.getPrefs(), bottomPanelAutoTerminal: true }) })
     // Seed a UI terminal in the right workbench before the first expand.
     act(() => {
       store.reduce(s => openTabInActivePane(s, {

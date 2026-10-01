@@ -1,5 +1,8 @@
 /**
- * Size written to `--dsh-sidebar-width` / `--dsh-sidebar-height`.
+ * Size written to `--xrkh-workbench-width` / `--xrkh-workbench-height`
+ * (aliases `--dsh-sidebar-width` / `--dsh-sidebar-height` for older skins).
+ * Shell `LayoutInsets` (`--xrk-layout-inset-details`) remain Host-owned;
+ * this push only reserves the floating workbench strip.
  * The conversation column (output + composer) must keep at least
  * {@link PANEL_MIN} of the viewport after the bottom panel claims height.
  */

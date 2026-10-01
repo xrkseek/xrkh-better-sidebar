@@ -213,16 +213,15 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   const viewport = useViewportSize()
   const narrow = isNarrowWidth(viewport.width)
 
-  // On-screen keyboard / visual-viewport inset (mobile, split-screen, …):
-  // when the visual viewport shrinks below the layout viewport, bottom-
-  // anchored panels would hide under the keyboard. Track the inset and
-  // offset the bottom-anchored surfaces by it. The obscured bottom strip is
-  // innerHeight − (vv.height + vv.offsetTop): offsetTop is nonzero while
-  // the visual viewport is scrolled/zoomed under browser chrome, so
-  // omitting it would over-lift the panels (CR #232 P2). offsetTop changes
-  // through the viewport's scroll event too, so both events are listened.
-  // Guarded: browsers without visualViewport (older WebViews, jsdom) stay
-  // at 0. rAF-throttled, same pattern as useNarrowViewport.
+  // On-screen keyboard inset via visualViewport (narrow/touch only — see
+  // effectiveKeyboardInset). Desktop must ignore vv deltas: after OS
+  // sleep/wake Chromium/Electron often reports a collapsed vv.height while
+  // innerHeight stays full; treating that gap as a "keyboard" inflates
+  // `--xrkh-workbench-height` and offsets the bottom panel past the host's
+  // `overflow: clip`, leaving a blank strip under the composer.
+  // Formula: innerHeight − (vv.height + vv.offsetTop); offsetTop is
+  // nonzero while the visual viewport is scrolled/zoomed under browser
+  // chrome (CR #232 P2). Listen to both resize and scroll.
   const [keyboardInset, setKeyboardInset] = useState(0)
   const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null)
   useEffect(() => {
@@ -231,24 +230,40 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     let frame: number | null = null
     const measure = (): void => {
       frame = null
-      const inset = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop))
-      setKeyboardInset(inset > 1 ? Math.round(inset) : 0)
+      const raw = Math.max(0, window.innerHeight - (vv.height + vv.offsetTop))
+      // Bogus post-wake collapse: a "keyboard" larger than 40% of the
+      // layout viewport is never a real OSK — drop it.
+      const sane = raw > 1 && raw <= window.innerHeight * 0.4
+      setKeyboardInset(sane ? Math.round(raw) : 0)
       setVisualViewportHeight(Math.max(0, Math.round(vv.height)))
     }
     const onResize = (): void => { if (frame === null) frame = requestAnimationFrame(measure) }
+    const onWake = (): void => {
+      if (document.visibilityState === 'visible') onResize()
+    }
     vv.addEventListener('resize', onResize)
     vv.addEventListener('scroll', onResize)
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('pageshow', onWake)
     measure()
     return () => {
       vv.removeEventListener('resize', onResize)
       vv.removeEventListener('scroll', onResize)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('pageshow', onWake)
       if (frame !== null) cancelAnimationFrame(frame)
     }
   }, [])
-  // The bottom panel is offset above the on-screen keyboard. Cap its height
-  // against that same visible area, not the taller layout viewport, so the
-  // conversation keeps PANEL_MIN even on wide touch devices.
-  const layoutViewportHeight = visualViewportHeight ?? viewport.height
+  // Cap geometry against the visible area ABOVE the keyboard on narrow
+  // (touch) viewports only. Desktop always uses the layout viewport —
+  // never a possibly-collapsed visualViewport after sleep.
+  const layoutViewportHeight = narrow
+    ? (visualViewportHeight ?? viewport.height)
+    : viewport.height
+  // Keyboard lift applies only in the narrow overlay-drawer mode (same
+  // gate as the right panel's `bottom` style). Desktop push/position stay
+  // free of visualViewport noise.
+  const effectiveKeyboardInset = narrow ? keyboardInset : 0
 
   // Current conversation (the sessions list feed).
   const sessionList = useSyncExternalStore(
@@ -277,16 +292,24 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     viewportHeight: layoutViewportHeight,
   }).height
 
-  // The collapsed toggle cluster reclaims the top-right corner, so the DSH
-  // session header's right-aligned utilities (the "Session log" download
-  // capsule) must yield. layout.css keys off this body attribute to push the
-  // header's right padding out past the cluster. Only the CLOSED panel needs
-  // it — an open panel already squeezes `#root` left, moving the header clear.
+  // The collapsed toggle cluster reclaims the top-right corner, so the Host
+  // session header's right-aligned utilities must yield. layout.css keys off
+  // these body attributes to push the header's right padding out past the
+  // cluster. Only the CLOSED panel needs it — an open panel already squeezes
+  // `#root` left, moving the header clear. Dual-stamp XRKH + legacy DSH attrs.
   const collapsed = state === undefined || !state.panelOpen
   useEffect(() => {
-    if (collapsed) document.body.setAttribute('data-dsh-sidebar-collapsed', '')
-    else document.body.removeAttribute('data-dsh-sidebar-collapsed')
-    return () => { document.body.removeAttribute('data-dsh-sidebar-collapsed') }
+    if (collapsed) {
+      document.body.setAttribute('data-xrkh-sidebar-collapsed', '')
+      document.body.setAttribute('data-dsh-sidebar-collapsed', '')
+    } else {
+      document.body.removeAttribute('data-xrkh-sidebar-collapsed')
+      document.body.removeAttribute('data-dsh-sidebar-collapsed')
+    }
+    return () => {
+      document.body.removeAttribute('data-xrkh-sidebar-collapsed')
+      document.body.removeAttribute('data-dsh-sidebar-collapsed')
+    }
   }, [collapsed])
 
   // Title-bar / shell compatibility (the "位置兼容模式" scheme):
@@ -766,10 +789,23 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     // matter what sequence the shell used. locate() is cheap when nothing
     // changed (one querySelector + an identity compare; no forced layout).
     const retry = window.setInterval(locate, 1500)
+    // After OS sleep/wake the center column's viewport rect can go stale
+    // without a ResizeObserver fire (same CSS box, new screen metrics).
+    // Remeasure when the document becomes visible again.
+    const onWake = (): void => {
+      if (document.visibilityState !== 'visible') return
+      centerColRef.current = null
+      locate()
+      measureCenter()
+    }
+    document.addEventListener('visibilitychange', onWake)
+    window.addEventListener('pageshow', onWake)
     return () => {
       disposed = true
       if (locateFrame !== null) cancelAnimationFrame(locateFrame)
       window.clearInterval(retry)
+      document.removeEventListener('visibilitychange', onWake)
+      window.removeEventListener('pageshow', onWake)
       observer?.disconnect()
       watcher.disconnect()
       htmlStyleWatcher.disconnect()
@@ -939,12 +975,18 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
    *  layout.css's margins. Every size change — drag frames and committed
    *  state — flows through here so the push never forks between paths. */
   const writeGeometry = (width: number, height: number): void => {
-    document.documentElement.style.setProperty('--dsh-sidebar-width', `${width}px`)
-    document.documentElement.style.setProperty('--dsh-sidebar-height', `${height}px`)
+    const root = document.documentElement
+    // Canonical XRKH workbench push (layout.css). Dual-write legacy
+    // `--dsh-sidebar-*` so older skins / community CSS keep working.
+    // Do not overwrite Host `--xrk-layout-inset-*` (LayoutInsets / Overview).
+    root.style.setProperty('--xrkh-workbench-width', `${width}px`)
+    root.style.setProperty('--xrkh-workbench-height', `${height}px`)
+    root.style.setProperty('--dsh-sidebar-width', `${width}px`)
+    root.style.setProperty('--dsh-sidebar-height', `${height}px`)
     // The corner handle positions itself relative to the panel (CSS
-    // `bottom: calc(var(--dsh-sidebar-height) + 6px)`), so these two layout
-    // variables are all it needs — no viewport coordinates written here
-    // (issue #106: skins that inset the panels must not fight JS coords).
+    // `bottom: calc(var(--xrkh-workbench-height, var(--dsh-sidebar-height)) + 6px)`),
+    // so these layout variables are all it needs — no viewport coordinates
+    // written here (issue #106: skins that inset the panels must not fight JS coords).
   }
 
   /** Last size a drag actually applied to the DOM (updated by applyDrag).
@@ -968,7 +1010,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     // `width + detailsWidth` — derived from the measured column, keeping the
     // drag write-only (no React re-render mid-drag).
     bottomRef.current?.style.setProperty('right', `${(window.innerWidth - centerRectRef.current.right) + (width - (state?.width ?? 0))}px`)
-    const bottomPush = !narrow && state?.bottomOpen === true ? height + keyboardInset : 0
+    const bottomPush = !narrow && state?.bottomOpen === true ? height + effectiveKeyboardInset : 0
     writeGeometry(width, bottomPush)
   }
 
@@ -1131,10 +1173,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       viewportHeight: layoutViewportHeight,
     })
     const bottomPush = !narrow && snapshot.state?.bottomOpen === true
-      ? height + keyboardInset
+      ? height + effectiveKeyboardInset
       : 0
     writeGeometry(width, bottomPush)
-  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight, viewport.width, layoutViewportHeight, keyboardInset])
+  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight, viewport.width, layoutViewportHeight, effectiveKeyboardInset])
   // Unmount must release the push (issue #31): when the boundary swaps the
   // whole sidebar after a render crash (or the plugin fiber is disposed /
   // HMR), the CSS variables would otherwise stay on <html> and layout.css
@@ -1149,13 +1191,24 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // mounted makes the push invisible to mid-flush style recals.
   useEffect(() => {
     return () => {
+      document.documentElement.style.removeProperty('--xrkh-workbench-width')
+      document.documentElement.style.removeProperty('--xrkh-workbench-height')
       document.documentElement.style.removeProperty('--dsh-sidebar-width')
       document.documentElement.style.removeProperty('--dsh-sidebar-height')
     }
   }, [])
   useEffect(() => {
-    if (anyDragging) document.body.setAttribute('data-dsh-sidebar-dragging', '')
-    else document.body.removeAttribute('data-dsh-sidebar-dragging')
+    if (anyDragging) {
+      document.body.setAttribute('data-xrkh-sidebar-dragging', '')
+      document.body.setAttribute('data-dsh-sidebar-dragging', '')
+    } else {
+      document.body.removeAttribute('data-xrkh-sidebar-dragging')
+      document.body.removeAttribute('data-dsh-sidebar-dragging')
+    }
+    return () => {
+      document.body.removeAttribute('data-xrkh-sidebar-dragging')
+      document.body.removeAttribute('data-dsh-sidebar-dragging')
+    }
   }, [anyDragging])
 
 
@@ -1631,8 +1684,8 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
           height: bottomPanelHeight,
           left: centerRectRef.current.left,
           // Keep the panel above the on-screen keyboard when the visual
-          // viewport shrinks (see the keyboardInset effect).
-          bottom: keyboardInset > 0 ? `${keyboardInset}px` : undefined,
+          // viewport shrinks (narrow/touch only — desktop ignores vv inset).
+          bottom: effectiveKeyboardInset > 0 ? `${effectiveKeyboardInset}px` : undefined,
           // Direct from the center column's measured right edge: the bottom
           // panel spans ONLY the center column, ending exactly at the
           // details column's left edge (the details column sits between the

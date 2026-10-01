@@ -38,7 +38,7 @@ describe('side card preferences', () => {
         autoOpenSubagent: false,
         autoOpenJobs: true,
         agentTerminalTools: true, agentOpenTools: false,
-        bottomPanelAutoTerminal: true,
+        bottomPanelAutoTerminal: false,
         terminalFontFamily: '',
         terminalFontSize: 13,
         interceptOpenPath: true,
@@ -67,12 +67,12 @@ describe('side card preferences', () => {
   it('falls back per-field when a stored field is malformed', async () => {
     expect(await loadPrefs(wire({ openByDefault: 'yes', defaultWidthPercent: 33, autoOpenSubagent: 'no', agentTerminalTools: 'yes' })))
       .toEqual({
-        openByDefault: true,
+        openByDefault: false,
         defaultWidthPercent: 33,
         autoOpenSubagent: true,
         autoOpenJobs: true,
         agentTerminalTools: false, agentOpenTools: false,
-        bottomPanelAutoTerminal: true,
+        bottomPanelAutoTerminal: false,
         terminalFontFamily: '',
         terminalFontSize: 13,
         interceptOpenPath: true,
@@ -106,7 +106,7 @@ describe('side card preferences', () => {
         autoOpenSubagent: true,
         autoOpenJobs: true,
         agentTerminalTools: false, agentOpenTools: false,
-        bottomPanelAutoTerminal: true,
+        bottomPanelAutoTerminal: false,
         terminalFontFamily: '',
         terminalFontSize: 13,
         interceptOpenPath: true,
@@ -292,7 +292,7 @@ describe('side card preferences', () => {
     // The default prefs keep the panel closed (openByDefault defaults off).
     const openStore = createSidebarStore()
     openStore.setSession('another-fresh')
-    expect(openStore.getSnapshot().state?.panelOpen).toBe(true)
+    expect(openStore.getSnapshot().state?.panelOpen).toBe(false)
   })
 
   it('seeds a brand-new session COLLAPSED on narrow viewports (the panel is a full-screen drawer there)', () => {
