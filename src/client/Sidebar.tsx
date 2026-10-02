@@ -1536,12 +1536,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   return (
     <div data-dsh-panel-host {...osFileDragShield}>
       {/*
-        The persistent toggle cluster at the top-right corner: the bottom
-        panel's button (bottom glyph) LEFT of the right panel's (side glyph).
-        Always pinned to the viewport corner — inside the right panel's
-        top-right while it is open, sitting flush in the tab strip whose
-        right end it really squeezes (the strip reserves its width via CSS),
-        so the tabs genuinely yield space to it.
+        Persistent toggle cluster: bottom glyph LEFT of the side glyph.
+        Vertically fixed to the conversation title-row band; horizontally
+        rides Host `--xrk-layout-inset-details` + `--xrkh-workbench-width`
+        so Overview and the workbench both keep it in the main column seam.
       */}
       <div className={css.toggleCluster} data-dsh-toggle-cluster>
         {/*

@@ -10,13 +10,23 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.30
+xrkh plugin add xrkh-better-sidebar@0.19.1
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.19.1
+
+- Fix internal SIDEBAR_SERVICE_VERSION still reporting 0.18.32 (same features as 0.19.0; npm 0.19.0 tarball left the string stale)
+
+## 0.19.0
+
+- Improve coexistence with Host **Overview**: toggle cluster always uses `details inset + workbench width` and stays on the **main conversation column** seam (not on the Overview tab strip)
+- Improve expand/collapse motion: shared duration/easing with the Host shell; session-header padding tracks Overview open/close
+- Prefer **XRK-Harness ≥ 0.5.9** (LayoutInsets / Overview inset contract)
 
 ## 0.18.30
 

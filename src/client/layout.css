@@ -63,9 +63,17 @@
 }
 
 /* Reserve space so the toggle cluster does not cover session-header
-   actions (概况 / 文件 / Jobs) when the cluster is mounted. */
+   actions when the cluster sits in the conversation band. Ease with the
+   same motion as Overview / workbench push so padding tracks the cluster. */
 body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
   padding-right: 78px;
+  transition: padding-right var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
+}
+
+/* Overview open: cluster already yields `--xrk-layout-inset-details`, so the
+   conversation header only needs the control footprint (not a second strip). */
+html[data-xrk-layout-details] body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
+  padding-right: 72px;
 }
 
 body[data-xrkh-sidebar-dragging] #root,

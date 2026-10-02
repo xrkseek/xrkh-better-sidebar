@@ -58,58 +58,42 @@
   left: 0;
 }
 
-/* The persistent expand/collapse cluster at the top-right corner: two rail
-   controls side by side (bottom panel's glyph LEFT of the right panel's).
-   Always pinned to the viewport corner — inside the right panel's top-right
-   while it is open, sitting flush in the 34px tab strip (28px buttons at
-   top: 3) whose right end it really squeezes. Host-internal z-index 45
-   (above the panels' 40); the host's global layer is z-index 25, so the
-   whole cluster stays below DSH's ui-cordis dynamic-plugin panel (30) and
-   the app's overlay stack (menus/tooltips/modals sit at 100+), so a cordis
-   approval popup is never hidden behind the workbench (issue #52). Absolute
-   within the panel host (the host's inset: 0 makes viewport coordinates
-   identical). */
+/* The persistent expand/collapse cluster: two rail controls (bottom glyph
+   LEFT of the right-panel glyph). Lives in the main (conversation) band —
+   never on top of Overview or the workbench. Horizontally:
+     right = 10px + Host details inset + workbench width
+   so Overview and the floating workbench both push the cluster left to the
+   conversation seam. Absolute within the panel host (inset: 0 = viewport).
+   Host-internal z-index 45 (above panels' 40); host global layer is 25. */
 .toggleCluster {
   position: absolute;
-  /* Open panel: sit in the 34px tab strip (28px buttons → top: 3). Prefer
-     `--dsh-title-bar-strip` when set; else XRK DesktopChrome. Never add both. */
   top: calc(
-    3px + env(safe-area-inset-top) +
+    14px + env(safe-area-inset-top) +
     var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
   );
-  right: 10px;
+  /* Always yield Overview (`--xrk-layout-inset-details`) AND the workbench
+     strip. Workbench alone is not enough: it sits outside #root, to the
+     right of the details column — omitting details parks the toggles on
+     the Overview chrome. */
+  right: calc(
+    10px
+    + var(--xrk-layout-inset-details, 0px)
+    + var(--xrkh-workbench-width, var(--dsh-sidebar-width, 0px))
+  );
   z-index: 45;
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 4px;
   pointer-events: auto;
+  /* Same curve as #root workbench push (layout.css) and AppFrame tracks. */
+  transition: right var(--xrkh-sidebar-motion-duration, var(--ds-transition-duration-slow, 380ms))
+    var(--xrkh-sidebar-motion-ease, var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)));
 }
 
-/* Collapsed: no tab strip — align with the conversation title row (+14). */
-:global(body[data-xrkh-sidebar-collapsed]) .toggleCluster,
-:global(body[data-dsh-sidebar-collapsed]) .toggleCluster {
-  top: calc(
-    14px + env(safe-area-inset-top) +
-    var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
-  );
-}
-
-/* Shell layout insets (ui-layout public contract): when the overview
-   (`details`) is open and our panels are collapsed, shift the toggle
-   cluster left by --xrk-layout-inset-details so it does not cover the
-   overview close control. When a panel is open, #root already yields
-   margin-right to the workbench and the overview sits beside it. */
-:global(html[data-xrk-layout-details] body[data-xrkh-sidebar-collapsed]) .toggleCluster,
-:global(html[data-xrk-layout-details] body[data-dsh-sidebar-collapsed]) .toggleCluster {
-  right: calc(10px + var(--xrk-layout-inset-details, 0px));
-}
-
-/* The tab strip of the OPEN right panel reserves the cluster's width at its
-   right end, so the tabs and the + menu genuinely yield space to the cluster
-   (never hiding under it). */
-.panel:not(.panelHidden) .tabBar {
-  padding-right: 72px;
+:global(body[data-xrkh-sidebar-dragging]) .toggleCluster,
+:global(body[data-dsh-sidebar-dragging]) .toggleCluster {
+  transition: none;
 }
 
 /* The closed-state affordance is the native rail icon control: a plain
@@ -2402,10 +2386,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
    switches (which panels render, the migration) are JS-driven via
    useNarrowViewport; this block only adapts the pure style details. */
 @media (max-width: 767px) {
-  /* The toggle cluster holds a single button on narrow viewports (the
-     bottom panel button is not rendered), so the open panel's tab strip
-     reserves 40px instead of the desktop 72px — the tabs and + menu still
-     yield space to the one remaining control. */
+  /* Narrow drawer does not layout-push (width 0), so the cluster stays at
+     the viewport corner inside the sheet — reserve tab-strip space. */
   .panel:not(.panelHidden) .tabBar {
     padding-right: 40px;
   }

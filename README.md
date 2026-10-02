@@ -10,13 +10,23 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.30
+xrkh plugin add xrkh-better-sidebar@0.19.1
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.19.1
+
+- 修复内部 SIDEBAR_SERVICE_VERSION 仍报 0.18.32 的疏漏（功能与 0.19.0 相同；npm 0.19.0 包内版本串未对齐）
+
+## 0.19.0
+
+- 完善右侧工作台与 Host **概况（Overview）** 共存：toggle 集群始终按 `details inset + workbench width` 停在**主对话列右缘**，不再叠在概况顶栏
+- 完善展开/收起过渡：与 Host shell 共用 motion 时长与缓动；会话顶栏为 toggle 预留的 padding 跟随概况开合
+- 建议搭配 **XRK-Harness ≥ 0.5.9**（LayoutInsets / 概况 inset 契约）
 
 ## 0.18.30
 
