@@ -10,13 +10,25 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.27
+xrkh plugin add xrkh-better-sidebar@0.18.28
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.28
+
+- 文件树增量自动刷新：AI 建/改/删文件后，已展开的树无感更新。Host 侧新增按 `sessionId` + 目录管理的非递归 `fs.watch` registry（per-subscriber 引用计数、单调 sequence + 有界 replay、watcher 失效自动重开），配 `fs.watch.sync`（只回「哪几层变了」+ 游标）与 `fs.tree.batch`（批量 listing + 可选 `statPaths`）
+- 客户端共享 watch broker：同一会话/cwd 的文件树与多个编辑器合并成一份订阅与一轮请求；活动页 ~1.2s、隐藏页 ~6s、失败退避 4s；健康时每 20 轮全量 sweep，有不可监听目录时 5 轮
+- 刷新语义：只替换真正变化的已加载层（`levelSignature` 比对，相同则跳过 setState），不显示 loading、不调 `refreshTick`、不物化未展开目录、不动展开/搜索/滚动/拖拽状态
+- 打开中文件的外部修改：`mtimeMs` 贯穿 `fs.read` → 渲染 → baseline；内容 clean 时静默重载，dirty 时绝不覆盖草稿，显示「文件已被外部修改，草稿未覆盖」提示条与刷新按钮；无 baseline 的 viewer 不循环重载
+- 修复：`fs.tree.batch` 的 listing/stat 回显改为调用方传入的原始路径（此前回显 Host 解析后的 realpath——symlink workspace root、Windows 大小写或分隔符规范化下，客户端的层级 key 与 stat 行会永久匹配不上，树看起来「不再刷新」）
+- 点击卡顿（静态定位）：`TreePanel` 加 memo 渲染边界、树回调 `useCallback` 稳定化、`FileTree` 单次 `setData` 批量提交（原为逐层提交）、CodeMirror 语言包按语言 key 缓存
+- 测试环境：`vitest.config.ts` 加 `resolve.dedupe: ['react', 'react-dom']`（插件与宿主根各装一份 React，经 `client-ui-primitives` 跨界渲染时全部 UI 测试死于 `Invalid hook call`）
+- i18n：19 个语言字典补齐 7 个漏键（`fileChangedOnDisk` / `laneModified` / `laneDeleted` / 四个 `viewer*`）
+- 冗余清理：删除无消费者的 `onDegraded` 钩子、`mergeLevel` 导出与重复的 `messageOf`；`locales.spec.ts` 里测 0.18.0 已删除的 `attachBetterLocale` 覆盖层协议的残留一并清掉
 
 ## 0.18.27
 

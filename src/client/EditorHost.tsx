@@ -30,13 +30,14 @@ import type { Context } from '../context-types.ts'
 import { api, isOutsideWorkspaceMessage, mediaUrl, type SessionScope } from './api.ts'
 import { BinaryDownload } from './binary-download.tsx'
 import { FenceErrorNotice } from './FenceErrorNotice.tsx'
-import { planFirstMatch, planFsReadOutcome, type EditorLoadAction } from './editor-load.ts'
+import { decideExternalChange, planFirstMatch, planFsReadOutcome, type EditorLoadAction } from './editor-load.ts'
 import { baseName } from './FileTree.tsx'
 import { createFrameBatcher } from './frame-batcher.ts'
 import { openSidebarFile } from './intercept.tsx'
 import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTargets } from './open-with.ts'
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
+import { subscribeTreeWatch } from './tree-watch.ts'
 import { t } from './locales.ts'
 import { relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
@@ -47,7 +48,7 @@ import css from './sidebar.module.css'
 type EditorLoad =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; viewer: FileViewerDescriptor; content?: string; truncated?: boolean; mediaUrl?: string; customData?: unknown }
+  | { status: 'ready'; viewer: FileViewerDescriptor; content?: string; truncated?: boolean; mediaUrl?: string; customData?: unknown; mtimeMs?: number }
   | { status: 'binary' }
 
 /** The docked tree panel's width bounds (drag-resize clamps into them). */
@@ -157,25 +158,32 @@ export function EditorHost(props: {
    * merged mode switches this tab in place (stable id, meta survives);
    * split mode opens a per-path dedupe tab through openSidebarFile.
    */
-  const openFile = (absolute: string): void => {
+  // The five callbacks below are all the docked tree sees as props. They are
+  // `useCallback`-stable on purpose: `TreePanel` is memoised, and this host
+  // re-renders on EVERY path switch (in-place mode rewrites the tab in place).
+  // With inline callbacks a single file click re-reconciled the whole explorer
+  // subtree — hundreds of rows — while only the viewer content had changed.
+  // The deps are exactly the values a path switch leaves untouched (tab.id is
+  // the tab's identity; a switch rewrites only path/title), so the memo holds.
+  const openFile = useCallback((absolute: string): void => {
     if (inPlace) {
       ctx.get('betterSidebar')?.updateTab(tab.id, { path: absolute, title: baseName(absolute) })
     } else {
       openSidebarFile(ctx, store, scope.sessionId, absolute)
     }
-  }
+  }, [ctx, inPlace, scope.sessionId, store, tab.id])
 
   /** The context menu's explicit "new tab" escape (per-path dedupe). */
-  const openFileNewTab = (absolute: string): void => {
+  const openFileNewTab = useCallback((absolute: string): void => {
     openSidebarFile(ctx, store, scope.sessionId, absolute)
-  }
+  }, [ctx, scope.sessionId, store])
 
   /**
    * The context menu's "open to the side": a fresh editor tab (uid id — the
    * `'editor:' + path` convention would clash with the id safety net on a
    * second side-open of the same file) in a rightward split of THIS pane.
    */
-  const openFileSide = (absolute: string): void => {
+  const openFileSide = useCallback((absolute: string): void => {
     store.reduce((state) => {
       const key = treeOf(state, tab.id)
       const pane = leafWithTab(state[key], tab.id) ?? firstLeaf(state[key])
@@ -189,14 +197,14 @@ export function EditorHost(props: {
       const { node, leafId } = insertLeafAt(state[key], pane.id, 'row', fresh, false)
       return { ...state, [key]: node, activePane: leafId }
     })
-  }
+  }, [store, tab.id])
 
   /** The context menu's "open with" action: reveal the path in the OS file
    *  manager, or hand the target's URL (a local `file` URL, or the SSH-remote
    *  form for VSCode-family editors in remote mode) to the host's external
    *  opener. Failures are logged only — a missing handler is the OS's
    *  dialog, not a sidebar error. */
-  const openWith = (targetId: string, absolute: string): void => {
+  const openWith = useCallback((targetId: string, absolute: string): void => {
     const target = openWithTargets.find(item => item.id === targetId)
     if (target === undefined) return
     if (target.kind === 'reveal') {
@@ -210,11 +218,11 @@ export function EditorHost(props: {
     void api.openExternal({ action: 'url', url }).catch(
       (error: unknown) => { console.error('open external failed', error) },
     )
-  }
+  }, [openWithConfig, openWithTargets])
 
   /** Toggle one target's pinned state. The write is serialized (see
    *  plugin-settings.ts) and the menu re-renders when the store prefs land. */
-  const toggleOpenWithPin = (targetId: string): void => {
+  const toggleOpenWithPin = useCallback((targetId: string): void => {
     updatePluginSettings(store, 'editor', (blob) => {
       const config = parseOpenWithConfig(blob.openWith)
       const pinned = config.pinned.includes(targetId)
@@ -222,7 +230,7 @@ export function EditorHost(props: {
         : [...config.pinned, targetId]
       return { ...blob, openWith: { ...config, pinned } }
     })
-  }
+  }, [store])
 
   // The viewer's toolbar, hoisted into THIS header: the text editor reports
   // its state and registers its commands (both null/absent for viewers
@@ -306,6 +314,7 @@ export function EditorHost(props: {
             truncated: action.truncated,
             mediaUrl: action.mediaUrl,
             customData: action.customData,
+            mtimeMs: action.mtimeMs,
           })
           return
         case 'customLoad':
@@ -326,6 +335,7 @@ export function EditorHost(props: {
               content: result.kind === 'text' ? result.content : '',
               truncated: result.truncated,
               head: result.kind === 'binary' ? result.head : undefined,
+              mtimeMs: result.mtimeMs,
             }, (head) => ctx.get('betterSidebar')?.matchFileViewer(path, head), mediaUrlOf)
             apply(outcome)
           }).catch((error: unknown) => {
@@ -351,6 +361,55 @@ export function EditorHost(props: {
     }
     prevSaveState.current = current
   }, [toolbar?.saveState, toolbar?.mode])
+
+  // ── External modification of the open file ───────────────────────────────
+  // The broker answers with DIRTY DIRECTORIES, not files, so the editor keeps
+  // the host's mtime from its own read as the baseline and asks for a stat of
+  // the open path every round (the batch folds them all into one request).
+  // That stamp is the whole point: without it there is no way to tell an
+  // outside edit from the window in which our own save is still landing.
+  const [changedOnDisk, setChangedOnDisk] = useState(false)
+  /** The mtime of the bytes currently rendered (undefined without a baseline). */
+  const loadedMtime = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    loadedMtime.current = load.status === 'ready' ? load.mtimeMs : undefined
+    // A reload has just made what is on screen current again, so any pending
+    // notice is stale the moment new content lands.
+    if (load.status === 'ready') setChangedOnDisk(false)
+  }, [load])
+  /** Read through a ref so the subscription below is not rebuilt per keystroke. */
+  const draftDirty = useRef(false)
+  useEffect(() => { draftDirty.current = toolbar?.dirty === true }, [toolbar?.dirty])
+  // A saved (or untouched) draft makes the notice moot — the bytes on disk are
+  // the ones in the editor.
+  useEffect(() => { if (!draftDirty.current) setChangedOnDisk(false) }, [toolbar?.dirty, toolbar?.saveState])
+
+  const openFileStatPaths = useCallback(
+    () => (path === '' || isDir || scope.cwd === undefined ? [] : [path]),
+    [path, isDir, scope.cwd],
+  )
+  useEffect(() => {
+    if (scope.cwd === undefined || openFileStatPaths().length === 0) return
+    return subscribeTreeWatch({ sessionId: scope.sessionId, cwd: scope.cwd }, {
+      // The tree panel owns the directory subscriptions; this one only rides
+      // along for the stat probe.
+      dirs: () => [],
+      statPaths: openFileStatPaths,
+      onLevels: () => {},
+      onStats: (rows) => {
+        const row = rows.find(item => item.path === path)
+        if (row === undefined) return
+        const action = decideExternalChange(loadedMtime.current, row.mtimeMs, draftDirty.current)
+        if (action === 'reload') {
+          setReloadSeq(sequence => sequence + 1)
+          return
+        }
+        if (action === 'notify') {
+          setChangedOnDisk(true)
+        }
+      },
+    })
+  }, [path, scope.sessionId, scope.cwd, openFileStatPaths])
 
   const treeOpen = treeOpenOf(tab)
   /** Persist the panel flag on the tab (survives reloads with the layout). */
@@ -422,6 +481,20 @@ export function EditorHost(props: {
           </div>
         )}
         {toolbar?.dirty === true && <span className={css.dirtyDot} title={t('unsaved')} />}
+        {changedOnDisk && (
+          <span className={css.editorChangedOnDisk} role="status">
+            <span className={css.editorChangedOnDiskText}>{t('fileChangedOnDisk')}</span>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={t('refresh')}
+              title={t('refresh')}
+              onClick={refreshFile}
+            >
+              <IconRefreshOutline14 size={12} />
+            </button>
+          </span>
+        )}
         {toolbar?.editable === true && (
           <button
             type="button"

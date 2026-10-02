@@ -378,4 +378,11 @@ export const hi: Record<string, string> = {
   pluginDocsPanelDesc: 'DSH साइडबार में ग्लोबल डॉक्स: किसी भी वर्कस्पेस से अपने Markdown नोट्स पढ़ें — फ़ाइल सूची, रूपरेखा, Chrome / VS Code में खोलें, और कॉपी बटन; docs डायरेक्टरी कॉन्फ़िगर करने योग्य (डिफ़ॉल्ट ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'DeepSeek Harness के लिए एजेंट ब्राउज़र: 32 ego_* टूल असली Chromium चलाते हैं; साइडबार में नेटिव «ego browser» टैब एजेंट के हर विज़िट किए गए पेज को लाइव दिखाता है — आप क्लिक, ड्रैग और टाइप करके नियंत्रण ले सकते हैं। better-sidebar मौजूद होने पर टैब स्वतः रजिस्टर होता है, अन्यथा फ्लोटिंग बबल के रूप में दिखता है',
   pluginBilingualReaderDesc: 'DSH साइडबार में PDF पढ़ें: मूल PDF प्रदर्शन, टेक्स्ट चुनकर LLM से अनुवाद करें, संदर्भ के साथ और मुख्य संवाद से पूरी तरह अलग',
+  fileChangedOnDisk: 'डिस्क पर यह फ़ाइल बदल गई — आपका ड्राफ़्ट सुरक्षित रखा गया',
+  laneModified: 'संशोधित',
+  laneDeleted: 'हटाया गया',
+  viewerOffice: 'Office दस्तावेज़',
+  viewerCsv: 'तालिकाएँ (CSV)',
+  viewerAudio: 'ऑडियो',
+  viewerVideo: 'वीडियो',
 }

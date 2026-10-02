@@ -1453,6 +1453,28 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   flex: none;
 }
 
+/*
+ * "This file changed on disk" notice. It only ever appears while a draft is
+ * live — a clean file reloads itself silently — so it is tuned to read as an
+ * inline hint next to the unsaved dot rather than as an error strip.
+ */
+.editorChangedOnDisk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-primary);
+  font: var(--dsw-font-xxs-12);
+  white-space: nowrap;
+}
+
+.editorChangedOnDiskText {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .editorPlaceholder {
   flex: 1;
   display: flex;

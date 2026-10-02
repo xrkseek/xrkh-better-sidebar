@@ -211,15 +211,37 @@ export function supportedLanguageKeys(): readonly string[] {
   return Object.keys(FACTORIES)
 }
 
+/**
+ * Built language supports, memoised per key.
+ *
+ * Both the `StreamLanguage.define` calls and the Lezer-backed factories build
+ * a fresh parser object every invocation. Opening one file therefore paid a
+ * language-parser construction that has nothing to do with the document, and
+ * re-opening a second `.ts` file paid it again. The support objects are
+ * immutable and shareable across EditorViews (that is how CodeMirror reuses
+ * them for mixed documents), so one instance per key is enough — this turns
+ * a per-open cost into a per-language-lifetime one.
+ */
+const built = new Map<string, Language | LanguageSupport>()
+
 /** The CodeMirror language support for a path, or null for plain text. */
 export function languageForPath(path: string): Language | LanguageSupport | null {
   const key = languageKeyForExt(extOf(path))
   if (key === null) return null
+  const cached = built.get(key)
+  if (cached !== undefined) return cached
   try {
-    return FACTORIES[key]!()
+    const support = FACTORIES[key]!()
+    built.set(key, support)
+    return support
   } catch (error) {
     // A broken factory degrades to plain text, never crashes the editor.
     console.warn(`[xrkh-better-sidebar] language factory "${key}" failed:`, error)
     return null
   }
+}
+
+/** Test seam: forget the memoised language supports. */
+export function resetLanguageCache(): void {
+  built.clear()
 }

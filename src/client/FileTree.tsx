@@ -20,7 +20,7 @@
  * (VSCode semantics — a drop on a file row targets its parent directory),
  * and `busy` gates new drags while one upload is in flight.
  */
-import { useCallback, useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
@@ -34,6 +34,7 @@ import { FenceErrorNotice } from './FenceErrorNotice.tsx'
 import { IconUploadOutline16, IconVscode16 } from './icons.tsx'
 import type { OpenWithTarget } from './open-with.ts'
 import { relativeTo } from './paths.ts'
+import { reconcileLevel, subscribeTreeWatch, type TreeWatchLevel } from './tree-watch.ts'
 import { t } from './locales.ts'
 import type { SidebarStore } from './state.ts'
 import { uploadItemsFromDrop, uploadItemsFromFiles, type UploadItem } from './upload.ts'
@@ -250,6 +251,49 @@ export function FileTree(props: {
     dataRef.current = { ...dataRef.current, [path]: level }
     setData(dataRef.current)
   }, [])
+
+  // ── Incremental refresh (tree-watch.ts) ──────────────────────────────────
+  // The host watches exactly the levels below and reports which changed; a
+  // level whose rows are identical is dropped before it reaches setData, so
+  // an idle tree re-renders nothing at all. A fresh listing also repairs the
+  // placeholder written by loadDir and clears a stale error row.
+  const watchedDirs = useCallback(() => Object.keys(dataRef.current), [])
+
+  /**
+   * One round's levels, committed as a SINGLE state write.
+   *
+   * Batching matters: `storeLevel` rebuilds the cache object and re-renders
+   * the whole expanded tree per call, so committing a round level-by-level
+   * would re-reconcile every row once per dirty directory — exactly the cost
+   * this path exists to avoid.
+   */
+  const applyFreshLevels = useCallback((levels: readonly TreeWatchLevel[]) => {
+    const pending: Record<string, LevelData> = {}
+    let changed = false
+    for (const level of levels) {
+      const merged = reconcileLevel(dataRef.current[level.path], level.entries)
+      if (merged === undefined) continue
+      pending[level.path] = { entries: merged }
+      changed = true
+    }
+    if (!changed) return
+    dataRef.current = { ...dataRef.current, ...pending }
+    setData(dataRef.current)
+  }, [])
+
+  useEffect(() => {
+    if (cwd === undefined) return
+    const scope = { sessionId, cwd }
+    return subscribeTreeWatch(scope, {
+      dirs: watchedDirs,
+      onLevels: applyFreshLevels,
+    })
+  }, [sessionId, cwd, watchedDirs, applyFreshLevels])
+
+  // `expanded` / `revealed` are consulted once per rendered row; a Set keeps
+  // that lookup O(1) on deep trees (the array scan was quadratic in rows).
+  const expandedSet = useMemo(() => new Set(expanded), [expanded])
+  const revealedSet = useMemo(() => new Set(revealed), [revealed])
 
   const loadDir = useCallback((dir: string) => {
     if (dataRef.current[dir] !== undefined) return
@@ -471,7 +515,7 @@ export function FileTree(props: {
     const entries = level.entries ?? []
     return entries.map(entry => {
       if (entry.isDir) {
-        const isOpen = expanded.includes(entry.path)
+        const isOpen = expandedSet.has(entry.path)
         return (
           <div key={entry.path}>
             <div
@@ -480,9 +524,9 @@ export function FileTree(props: {
               className={clsx(
                 css.explorerRow, css.explorerDir, entry.hidden && css.explorerHidden,
                 dropTarget === entry.path && css.explorerRowDropTarget,
-                revealed.includes(entry.path) && css.explorerRowRevealed,
+                revealedSet.has(entry.path) && css.explorerRowRevealed,
               )}
-              data-dsh-revealed={revealed.includes(entry.path) ? 'true' : undefined}
+              data-dsh-revealed={revealedSet.has(entry.path) ? 'true' : undefined}
               style={{ paddingLeft: depth * 22 + 6 }}
               onClick={() => { onToggle(entry.path) }}
               onKeyDown={(event) => {
@@ -512,9 +556,9 @@ export function FileTree(props: {
           className={clsx(
             css.explorerRow, entry.hidden && css.explorerHidden, entry.broken && css.explorerBroken,
             dropTarget === parentOf(entry.path) && css.explorerRowDropTarget,
-            revealed.includes(entry.path) && css.explorerRowRevealed,
+            revealedSet.has(entry.path) && css.explorerRowRevealed,
           )}
-          data-dsh-revealed={revealed.includes(entry.path) ? 'true' : undefined}
+          data-dsh-revealed={revealedSet.has(entry.path) ? 'true' : undefined}
           style={{ paddingLeft: depth * 22 + 6 }}
           title={entry.broken ? `${entry.path} — ${t('brokenSymlink')}` : entry.path}
           onClick={() => { onOpenFile(entry.path) }}

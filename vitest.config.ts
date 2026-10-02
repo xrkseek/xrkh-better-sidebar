@@ -13,6 +13,16 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
+  // The plugin and the harness root each carry their own physical react copy
+  // (same 18.3.1, different directory under .pnpm). `packages/client/
+  // ui-primitives` resolves to the ROOT copy while the components under test
+  // resolve to the PLUGIN copy, so a component that crosses that boundary
+  // reads hooks from a different React than the one that mounted it: every UI
+  // spec then dies with "Invalid hook call" / "Cannot read properties of null
+  // (reading 'useRef')" regardless of what it asserts. One copy per run.
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   test: {
     server: {
       deps: {

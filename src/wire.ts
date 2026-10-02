@@ -97,3 +97,47 @@ export function requireString(payload: unknown, key: string): string {
   }
   return value
 }
+
+/**
+ * A bounded array of non-empty strings, else bad-request.
+ *
+ * The bound is a HOST-side resource budget, not a nicety: the batch routes
+ * fan out to one `opendir` / one watch handle per element, so an unbounded
+ * array would let a single request walk the workspace.
+ *
+ * @param payload - the parsed request body.
+ * @param key - the member to narrow.
+ * @param limit - maximum element count (exceeding it is bad-request).
+ * @returns the member as a string array (the caller's own array, not a copy).
+ */
+export function requireStringArray(payload: unknown, key: string, limit: number): string[] {
+  const value = (payload as Record<string, unknown> | null)?.[key]
+  if (!Array.isArray(value) || value.length > limit || value.some(item => typeof item !== 'string' || item === '')) {
+    throw new SidebarError('bad-request', `missing or invalid "${key}"`)
+  }
+  return value as string[]
+}
+
+/**
+ * Like {@link requireStringArray} but optional: an absent member (or null)
+ * yields an empty array, so a caller can pass a genuinely optional list.
+ */
+export function optionalStringArray(payload: unknown, key: string, limit: number): string[] {
+  const value = (payload as Record<string, unknown> | null)?.[key]
+  if (value === undefined || value === null) return []
+  return requireStringArray(payload, key, limit)
+}
+
+/**
+ * A finite non-negative number, else bad-request; an absent member yields
+ * `fallback`. A NaN/Infinity `since` cursor would silently make every watch
+ * round look like a fresh subscribe, so the guard is strict on purpose.
+ */
+export function optionalNumber(payload: unknown, key: string, fallback: number): number {
+  const value = (payload as Record<string, unknown> | null)?.[key]
+  if (value === undefined || value === null) return fallback
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new SidebarError('bad-request', `missing or invalid "${key}"`)
+  }
+  return value
+}

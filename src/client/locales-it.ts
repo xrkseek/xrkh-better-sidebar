@@ -369,4 +369,11 @@ export const it: Record<string, string> = {
   pluginDocsPanelDesc: 'Documenti globali nella barra laterale di DSH: legga le sue note Markdown da qualsiasi spazio di lavoro — una lista di file, una struttura, apertura in Chrome / VS Code e pulsanti di copia; la directory dei documenti è configurabile (predefinita ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'Il browser agente per DeepSeek Harness: 32 strumenti ego_* pilotano un vero Chromium; una scheda nativa «ego browser» nella barra laterale mostra in tempo reale ogni pagina visitata dall’agente — puoi cliccare, trascinare e digitare per prendere il controllo. Registra la scheda automaticamente se better-sidebar è presente, altrimenti una bolla flottante',
   pluginBilingualReaderDesc: 'Leggi PDF nella barra laterale DSH: visualizzazione PDF nativa, seleziona il testo per tradurlo con l’LLM, con contesto e completamente isolato dalla conversazione principale',
+  fileChangedOnDisk: 'Questo file è cambiato su disco — la bozza è stata mantenuta',
+  laneModified: 'Modificato',
+  laneDeleted: 'Eliminato',
+  viewerOffice: 'Documenti Office',
+  viewerCsv: 'Tabelle (CSV)',
+  viewerAudio: 'Audio',
+  viewerVideo: 'Video',
 }

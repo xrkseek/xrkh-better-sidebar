@@ -21,6 +21,14 @@ export interface FsReadOutcome {
   truncated: boolean
   /** base64 of the first bytes (present on binary reads; sniffing material). */
   head?: string
+  /**
+   * Last-modified time of the file as the HOST saw it (absent for the media
+   * routes, which never read bytes). The editor keeps it as the baseline for
+   * "changed on disk" detection: the watcher broker only says a file's
+   * directory is dirty, so without this stamp there is no way to tell an
+   * external edit from the window in which our own save is landing.
+   */
+  mtimeMs?: number
 }
 
 /** What the editor host should do next. */
@@ -28,11 +36,39 @@ export type EditorLoadAction =
   /** No renderer: show the download UI. */
   | { kind: 'binary' }
   /** Render `viewer`'s component with the carried payload. */
-  | { kind: 'render'; viewer: FileViewerDescriptor; content?: string; truncated?: boolean; mediaUrl?: string; customData?: unknown }
+  | { kind: 'render'; viewer: FileViewerDescriptor; content?: string; truncated?: boolean; mediaUrl?: string; customData?: unknown; mtimeMs?: number }
   /** Fetch the file through the host (fsRead strategy). */
   | { kind: 'fetchFsRead'; viewer: FileViewerDescriptor }
   /** Call the viewer's load() and render with its return value. */
   | { kind: 'customLoad'; viewer: FileViewerDescriptor }
+
+/**
+ * What one watch round's stat says about the open file.
+ *
+ * The explorer broker reports dirty DIRECTORIES, so "did the file I have
+ * open change?" is answered by comparing the mtime the load recorded against
+ * the mtime the round stat observed. The three cases are deliberately
+ * distinct:
+ * - `ignore`: nothing to do, or no baseline to compare against. A viewer that
+ *   never reads bytes (an image, a PDF) has no baseline, and treating "no
+ *   stamp" as "changed" would remount the editor on every poll.
+ * - `reload`: the file moved on and the editor holds nothing the user wrote —
+ *   reload silently so the view is true.
+ * - `notify`: a draft is live. The reload would remount the editor instance
+ *   and drop the keystrokes, so the user is told instead.
+ */
+export type ExternalChangeAction = 'ignore' | 'reload' | 'notify'
+
+/** Decide what a stat round means for the open file. */
+export function decideExternalChange(
+  baseline: number | undefined,
+  observed: number | undefined,
+  draftDirty: boolean,
+): ExternalChangeAction {
+  if (baseline === undefined || observed === undefined) return 'ignore'
+  if (observed === baseline) return 'ignore'
+  return draftDirty ? 'notify' : 'reload'
+}
 
 /** Decode the host's base64 head bytes into the sniffing buffer. */
 export function decodeHead(headBase64: string): Uint8Array {
@@ -79,7 +115,7 @@ export function planFsReadOutcome(
   mediaUrlOf: () => string,
 ): EditorLoadAction {
   if (!result.binary) {
-    return { kind: 'render', viewer, content: result.content, truncated: result.truncated }
+    return { kind: 'render', viewer, content: result.content, truncated: result.truncated, mtimeMs: result.mtimeMs }
   }
   const claimed = result.head === undefined ? undefined : rematch(decodeHead(result.head))
   if (claimed !== undefined && claimed.fetchStrategy === 'custom') {

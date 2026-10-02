@@ -378,4 +378,11 @@ export const th: Record<string, string> = {
   pluginDocsPanelDesc: 'เอกสารส่วนกลางในแถบด้านข้าง DSH: อ่านบันทึก Markdown ของคุณเองจากพื้นที่ทำงานใดๆ — รายการไฟล์, เค้าโครง, เปิดใน Chrome / VS Code และปุ่มคัดลอก; ไดเรกทอรีเอกสารสามารถกำหนดค่าได้ (ค่าเริ่มต้น ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'เบราว์เซอร์เอเจนต์สำหรับ DeepSeek Harness: เครื่องมือ ego_* 32 ตัวขับเคลื่อน Chromium จริง แท็บ «ego browser» เนทีฟในแถบด้านข้างแสดงทุกหน้าที่เอเจนต์เยี่ยมชมแบบสด — คลิก ลาก และพิมพ์เพื่อเข้าไปควบคุมแทนได้ ลงทะเบียนแท็บอัตโนมัติเมื่อมี better-sidebar มิฉะนั้นจะใช้บับเบิลลอย',
   pluginBilingualReaderDesc: 'อ่าน PDF ในแถบด้านข้าง DSH: แสดง PDF ต้นฉบับ เลือกข้อความเพื่อแปลด้วย LLM พร้อมบริบทและแยกจากการสนทนาหลักโดยสิ้นเชิง',
+  fileChangedOnDisk: 'ไฟล์นี้ถูกแก้ไขบนดิสก์ — ฉบับร่างของคุณถูกเก็บไว้',
+  laneModified: 'แก้ไข',
+  laneDeleted: 'ลบ',
+  viewerOffice: 'เอกสาร Office',
+  viewerCsv: 'ตาราง (CSV)',
+  viewerAudio: 'เสียง',
+  viewerVideo: 'วิดีโอ',
 }

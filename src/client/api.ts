@@ -89,11 +89,39 @@ export interface GitLogEntry {
   refs: string
 }
 
-/** Text read result. */
-export interface FsTextResult { kind: 'text'; content: string; truncated: boolean }
+/** Text read result. `mtimeMs` is the host's stat timestamp of the read, so a
+ *  later watch round can tell "changed on disk" from "re-opened". */
+export interface FsTextResult { kind: 'text'; content: string; truncated: boolean; mtimeMs?: number }
 /** Binary read result (no content; images load through the media route).
  *  `head` carries the first bytes (base64) for viewer detect sniffing. */
-export interface FsBinaryResult { kind: 'binary'; size: number; truncated: boolean; head: string }
+export interface FsBinaryResult { kind: 'binary'; size: number; truncated: boolean; head: string; mtimeMs?: number }
+
+/** One level re-listed by `fs.tree.batch` (host shape). */
+export interface FsBatchListing {
+  path: string
+  entries?: FsEntry[]
+  truncated?: boolean
+  /** Set when this level could not be listed (vanished / no permission). */
+  error?: string
+}
+
+/** One `fs.tree.batch` stat probe (the external-modification check). */
+export interface FsStatInfo {
+  path: string
+  mtimeMs: number
+  size: number
+}
+
+/** The `fs.watch.sync` response: which watched levels changed since `since`. */
+export interface FsWatchSyncResult {
+  changed: string[]
+  seq: number
+  /** The cursor fell out of the host replay window, so `changed` is the whole
+   *  subscription and the client re-reads it anyway. */
+  missed: boolean
+  /** Levels the host could not watch (the client falls back to slow polling). */
+  unwatched: string[]
+}
 
 /**
  * One jobs.output response: the output the MODEL has read so far for the
@@ -221,6 +249,38 @@ export const api = {
     call<{ sessionId: string; cwd: string; root: string; parent: string | null }>('session.cwd', scopePayload(scope, {}), signal),
   fsTree: (scope: SessionScope, path: string, signal?: AbortSignal) =>
     call<{ path: string; entries: FsEntry[]; truncated: boolean }>('fs.tree', scopePayload(scope, { path }), signal),
+  /** Reconcile the host's directory watchers with the levels the client shows
+   *  and read back the ones that changed since `since` (the explorer's
+   *  incremental refresh cursor — see tree-watch.ts).
+   *
+   *  `subscriber` identifies this client surface to the host's reference
+   *  counting: one shared poller per session passes a stable id, so a pane
+   *  closing its tree releases exactly its own handles. */
+  fsWatchSync: (
+    scope: SessionScope,
+    dirs: readonly string[],
+    since: number,
+    subscriber: string,
+    signal?: AbortSignal,
+  ) =>
+    call<FsWatchSyncResult>(
+      'fs.watch.sync',
+      scopePayload(scope, { dirs: [...dirs], since, subscriber }),
+      signal,
+    ),
+  /** Re-list several levels in one round trip plus bounded stat probes for the
+   *  files the editors have open. */
+  fsTreeBatch: (
+    scope: SessionScope,
+    paths: readonly string[],
+    statPaths: readonly string[] = [],
+    signal?: AbortSignal,
+  ) =>
+    call<{ listings: FsBatchListing[]; stats: FsStatInfo[] }>(
+      'fs.tree.batch',
+      scopePayload(scope, { paths: [...paths], statPaths: [...statPaths] }),
+      signal,
+    ),
   /** Global recursive file-name search rooted at the session cwd (the editor
    *  side panel's search box); matches are cwd-relative '/'-separated paths. */
   fsSearch: (scope: SessionScope, query: string, signal?: AbortSignal) =>

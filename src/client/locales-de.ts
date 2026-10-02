@@ -364,4 +364,11 @@ export const de: Record<string, string> = {
   pluginDocsPanelDesc: '„Globale Dokumente“ in der DSH-Seitenleiste: eigene Markdown-Notizen aus jedem Arbeitsbereich lesen – Dateiliste, Gliederung, Öffnen in Chrome / VS Code und Kopieren-Buttons; das Dokumentenverzeichnis ist konfigurierbar (Standard ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'Der Agent-Browser für DeepSeek Harness: 32 ego_*-Tools steuern ein echtes Chromium; ein nativer „ego-Browser“-Tab in der Seitenleiste zeigt live jede Seite, die der Agent besucht – Klicken, Ziehen und Tippen zum Übernehmen. Registriert den Tab automatisch, wenn better-sidebar vorhanden ist, sonst eine schwebende Blase',
   pluginBilingualReaderDesc: 'PDFs im DSH-Seitenbereich lesen: native PDF-Anzeige, Text auswählen und mit dem LLM übersetzen — mit Kontext, vollständig vom Hauptgespräch isoliert',
+  fileChangedOnDisk: 'Diese Datei wurde auf der Festplatte geändert — Ihr Entwurf blieb erhalten',
+  laneModified: 'Geändert',
+  laneDeleted: 'Gelöscht',
+  viewerOffice: 'Office-Dokumente',
+  viewerCsv: 'Tabellen (CSV)',
+  viewerAudio: 'Audio',
+  viewerVideo: 'Video',
 }

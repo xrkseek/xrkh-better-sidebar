@@ -3,7 +3,7 @@
  * editor host runs (planFirstMatch / planFsReadOutcome / decodeHead).
  */
 import { describe, expect, it } from 'vitest'
-import { decodeHead, planFirstMatch, planFsReadOutcome } from '../src/client/editor-load.ts'
+import { decodeHead, decideExternalChange, planFirstMatch, planFsReadOutcome } from '../src/client/editor-load.ts'
 import type { FileViewerDescriptor } from '../src/client/service.ts'
 
 const viewer = (over: Partial<FileViewerDescriptor>): FileViewerDescriptor => ({
@@ -96,5 +96,40 @@ describe('decodeHead', () => {
   it('decodes base64 to the exact bytes', () => {
     const head = decodeHead('AP//AA==')
     expect(Array.from(head)).toEqual([0x00, 0xff, 0xff, 0x00])
+  })
+})
+
+describe('decideExternalChange', () => {
+  it('carries the host read timestamp into the render action (the reload baseline)', () => {
+    // Without this stamp the editor has nothing to compare a later stat
+    // against, so external modification becomes undetectable.
+    const action = planFsReadOutcome(
+      viewer({}),
+      { binary: false, content: 'x', truncated: false, mtimeMs: 42 },
+      () => undefined,
+      () => '/m',
+    )
+    expect(action.kind === 'render' && action.mtimeMs).toBe(42)
+  })
+
+  it('ignores an unchanged mtime', () => {
+    expect(decideExternalChange(100, 100, false)).toBe('ignore')
+  })
+
+  it('ignores a missing baseline — an image or PDF viewer has no stamp to compare', () => {
+    // Treating "no baseline" as "changed" would remount the editor on every
+    // watch round, forever.
+    expect(decideExternalChange(undefined, 200, false)).toBe('ignore')
+    expect(decideExternalChange(100, undefined, false)).toBe('ignore')
+  })
+
+  it('reloads a clean file that changed underneath the editor', () => {
+    expect(decideExternalChange(100, 200, false)).toBe('reload')
+  })
+
+  it('notifies instead of reloading while a draft is live', () => {
+    // The reload remounts the editor instance, which is where the keystrokes
+    // live; overwriting them silently is the one outcome that is never ok.
+    expect(decideExternalChange(100, 200, true)).toBe('notify')
   })
 })

@@ -376,4 +376,11 @@ export const id: Record<string, string> = {
   pluginDocsPanelDesc: 'Dokumen global di sidebar DSH: baca catatan Markdown Anda sendiri dari ruang kerja apa pun — daftar berkas, kerangka, buka di Chrome / VS Code, dan tombol salin; direktori docs dapat dikonfigurasi (default ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'Browser agen untuk DeepSeek Harness: 32 alat ego_* menggerakkan Chromium sungguhan; tab «ego browser» native di bilah samping menampilkan langsung setiap halaman yang dikunjungi agen — Anda bisa mengklik, menyeret, dan mengetik untuk mengambil alih. Tab terdaftar otomatis jika better-sidebar terpasang; jika tidak, jatuh ke gelembung mengambang',
   pluginBilingualReaderDesc: 'Baca PDF di sidebar DSH: tampilan PDF asli, pilih teks untuk diterjemahkan dengan LLM, dengan konteks dan sepenuhnya terisolasi dari percakapan utama',
+  fileChangedOnDisk: 'File ini berubah di disk — draf Anda disimpan',
+  laneModified: 'Diubah',
+  laneDeleted: 'Dihapus',
+  viewerOffice: 'Dokumen Office',
+  viewerCsv: 'Tabel (CSV)',
+  viewerAudio: 'Audio',
+  viewerVideo: 'Video',
 }

@@ -15,7 +15,7 @@
  * drop over the file window uploads here and never reaches DSH's chat
  * intake.
  */
-import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { memo, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 import clsx from 'clsx'
 import { IconFolderOpen16, IconRefreshOutline16 } from '@xrkseek/client-ui-primitives'
 import { api } from './api.ts'
@@ -42,7 +42,9 @@ interface UploadSession {
   controller: AbortController
 }
 
-export function TreePanel(props: {
+/** TreePanel props. Named so the memo wrapper below can keep its shape in one
+ *  place (`memo` needs a stable component identity to be worth anything). */
+export interface TreePanelProps {
   sessionId: string
   cwd: string | undefined
   /** The sidebar store (passed through to the tree's fence-refusal notice). */
@@ -66,7 +68,17 @@ export function TreePanel(props: {
   /** Full-window presentation: the panel fills its host instead of docking
    *  at a fixed width. */
   full?: boolean
-}) {
+}
+
+/**
+ * The panel is memoised on purpose. Its host (`EditorHost`) re-renders on
+ * every file switch — in merged mode a tree click rewrites the editor tab in
+ * place — and this panel owns hundreds of tree rows. Callers hand it only
+ * stable values (session/cwd strings, the state's expansion arrays, and
+ * `useCallback`-stable callbacks), so a file click now reconciles the viewer
+ * alone instead of the whole explorer subtree.
+ */
+export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
   const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, full } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ matches: string[]; truncated: boolean } | null>(null)
@@ -276,4 +288,4 @@ export function TreePanel(props: {
       )}
     </div>
   )
-}
+})

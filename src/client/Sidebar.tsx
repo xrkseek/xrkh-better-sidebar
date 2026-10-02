@@ -1370,6 +1370,16 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     appendPathMention(ctx, sessionId, relativeTo(cwd ?? '', path), kind)
   }, [ctx, sessionId, cwd])
 
+  /**
+   * The explorer's expand/collapse toggle. Hoisted to a stable callback (it
+   * used to be an inline arrow inside renderTab): the docked tree panel is
+   * memoised, and an inline prop forced it to re-reconcile every row on each
+   * store notification.
+   */
+  const toggleDir = useCallback((path: string): void => {
+    store.reduce(state => toggleExpanded(state, path))
+  }, [store])
+
   if (state === undefined || sessionId === undefined) {
     // Keep the unavailable controls focusable: touch users have no hover, so
     // focus is the only way the existing Tooltip can explain what is missing.
@@ -1477,7 +1487,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         cwd={home?.cwd ?? cwd}
         expanded={state.expanded}
         revealed={state.revealed ?? []}
-        onToggleDir={(path) => { store.reduce(s => toggleExpanded(s, path)) }}
+        onToggleDir={toggleDir}
         onReferenceFile={referenceInChat}
         ctx={ctx}
         store={store}

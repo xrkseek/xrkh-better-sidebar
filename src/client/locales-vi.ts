@@ -378,4 +378,11 @@ export const vi: Record<string, string> = {
   pluginDocsPanelDesc: '«Tài liệu toàn cục» trong thanh bên DSH: ghi chú Markdown toàn cục, đọc từ bất kỳ workspace nào — danh sách chọn để đọc, outline hover để nhảy, mở ngoài trong Chrome / VS Code, sao chép code, thư mục cấu hình được (mặc định ~/.dsh/docs)',
   pluginEgoBrowserDesc: 'Trình duyệt agent cho DeepSeek Harness: 32 công cụ ego_* điều khiển Chromium thật; tab «ego browser» gốc trong thanh bên hiển thị trực tiếp mọi trang agent truy cập — bạn có thể bấm, kéo và gõ để tiếp quản. Tự động đăng ký tab khi có better-sidebar, nếu không thì rơi về bong bóng nổi',
   pluginBilingualReaderDesc: 'Đọc PDF trong thanh bên DSH: hiển thị PDF gốc, chọn văn bản để dịch bằng LLM, dùng ngữ cảnh và hoàn toàn tách biệt khỏi cuộc trò chuyện chính',
+  fileChangedOnDisk: 'Tệp này đã thay đổi trên đĩa — bản nháp của bạn được giữ nguyên',
+  laneModified: 'Đã sửa',
+  laneDeleted: 'Đã xóa',
+  viewerOffice: 'Tài liệu Office',
+  viewerCsv: 'Bảng (CSV)',
+  viewerAudio: 'Âm thanh',
+  viewerVideo: 'Video',
 }

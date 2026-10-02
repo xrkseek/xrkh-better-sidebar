@@ -36,6 +36,7 @@ import {
 } from './config.ts'
 import { parentOf, requireAbsolute, listDirectory, rootLabel } from './fs-tree.ts'
 import { writeWorkspaceUpload } from './fs-operations.ts'
+import { DirectoryWatchRegistry } from './fs-watch.ts'
 import { ensureWorkspacePath, ensureWorkspaceWritePath } from './path-security.ts'
 import { searchFiles } from './fs-search.ts'
 import { decodeHtmlUrl } from './html-route.ts'
@@ -57,7 +58,18 @@ import { registerTools } from './tools.ts'
 import { AgentOpenRegistry, registerOpenTool, type AgentOpenRequest } from './agent-opens.ts'
 import { buildJobsApi, type SidebarJobsRoutes } from './jobs-routes.ts'
 import { buildSubagentLiveApi, type SidebarSubagentLiveRoutes } from './subagent-live-route.ts'
-import { readJsonBody, requireString, SidebarError, writeError, writeJson, writeOk } from './wire.ts'
+import {
+  optionalNumber,
+  optionalStringArray,
+  readJsonBody,
+  requireString,
+  requireStringArray,
+  SidebarError,
+  writeError,
+  writeJson,
+  writeOk,
+} from './wire.ts'
+import { mapBounded } from './map-bounded.ts'
 
 export { Config }
 export type { SidebarConfig, ResolvedSidebarConfig }
@@ -182,6 +194,7 @@ async function readText(path: string, readLimit: number): Promise<{
   truncated: boolean
   binary: boolean
   size: number
+  mtimeMs: number
   head?: string
 }> {
   const info = await stat(path).catch((error: unknown) => {
@@ -208,6 +221,7 @@ async function readText(path: string, readLimit: number): Promise<{
       truncated,
       binary,
       size,
+      mtimeMs: info.mtimeMs,
       head,
     }
   } finally {
@@ -294,6 +308,25 @@ function parseLoopbackAllowlist(allowlist: string): (host: string, port: string)
   }
 }
 
+/**
+ * Bound on one `fs.watch.sync` / `fs.tree.batch` path array — one watch
+ * handle per directory, so the cap protects the host descriptor budget.
+ */
+const WATCH_DIR_LIMIT = 512
+
+/** Bound on the per-round stat probe (open editors across every sidebar pane). */
+const WATCH_STAT_LIMIT = 64
+
+/** Concurrent directory listings inside one batch (an opendir storm would
+  otherwise serialise behind the slowest level). */
+const TREE_BATCH_CONCURRENCY = 8
+
+/** Message text of an unknown thrown value (the batch routes report a
+ *  vanished level per path instead of failing the whole refresh round). */
+function messageOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 function buildApi(
   ctx: Context,
   ptyManager: PtyManager | null,
@@ -301,6 +334,7 @@ function buildApi(
   resolved: ResolvedSidebarConfig,
   terminalShell: string,
   getSettings: () => SidebarSettingsFace | undefined,
+  watchRegistry: DirectoryWatchRegistry,
 ): Record<string, ApiMethod> {
   const cwdOf = async (payload: unknown): Promise<{ sessionId: string; cwd: string }> => {
     const sessionId = requireString(payload, 'sessionId')
@@ -337,6 +371,99 @@ function buildApi(
       const target = record.path === undefined ? cwd : await ensureWorkspacePath(cwd, requireString(payload, 'path'), fenceEnabledOf(getSettings))
       return listDirectory(target, resolved.listLimit)
     },
+    // Incremental explorer refresh. The client sends the exact levels it is
+    // showing; the registry answers with only the levels whose contents
+    // changed since its cursor, so an idle tree costs one tiny JSON round
+    // trip instead of one re-listing per expanded directory.
+    //
+    // Three details carry the safety here. Keys are namespaced by session
+    // (one registry serves every session, so two sessions on the same folder
+    // must not share a subscription). Subscriptions are reference-counted per
+    // `subscriber`, so one window collapsing a tree never closes the handle
+    // another window still shows. And a directory the workspace fence refuses
+    // comes back as `unwatched` rather than throwing: the client degrades
+    // that level to a slow full listing instead of its whole refresh round
+    // dying on a path the user cannot see anyway.
+    'fs.watch.sync': async (payload) => {
+      const { sessionId, cwd } = await cwdOf(payload)
+      const fence = fenceEnabledOf(getSettings)
+      const requested = requireStringArray(payload, 'dirs', WATCH_DIR_LIMIT)
+      const since = optionalNumber(payload, 'since', 0)
+      const record = payload as { subscriber?: unknown } | null
+      const subscriber = typeof record?.subscriber === 'string' ? record.subscriber : ''
+      const resolvedDirs = await mapBounded(requested, TREE_BATCH_CONCURRENCY, async (dir) => {
+        try {
+          return await ensureWorkspacePath(cwd, dir, fence)
+        } catch {
+          return undefined
+        }
+      })
+      const keys: string[] = []
+      const pathOfKey = new Map<string, string>()
+      const unwatchable: string[] = []
+      for (const [index, dir] of requested.entries()) {
+        const target = resolvedDirs[index]
+        if (target === undefined) {
+          unwatchable.push(dir)
+          continue
+        }
+        const key = `${sessionId}\0${target}`
+        keys.push(key)
+        pathOfKey.set(key, dir)
+      }
+      const result = watchRegistry.sync(subscriber, keys, since)
+      return {
+        // Answer in the caller's own path form (a symlinked workspace root
+        // makes the resolved path differ from what the client sent, and the
+        // client keys its level cache by what it asked for).
+        changed: result.changed.flatMap(key => pathOfKey.get(key) ?? []),
+        seq: result.seq,
+        missed: result.missed,
+        unwatched: result.unwatched.flatMap(key => pathOfKey.get(key) ?? []).concat(unwatchable),
+      }
+    },
+    // Batch re-listing for the levels `fs.watch.sync` reported dirty, plus a
+    // bounded stat probe for open files (the external-modification check).
+    // One request per refresh round keeps the poll loop at a single RTT.
+    'fs.tree.batch': async (payload) => {
+      const { cwd } = await cwdOf(payload)
+      const fence = fenceEnabledOf(getSettings)
+      const paths = requireStringArray(payload, 'paths', WATCH_DIR_LIMIT)
+      const listings = await mapBounded(paths, TREE_BATCH_CONCURRENCY, async (raw) => {
+        try {
+          const target = await ensureWorkspacePath(cwd, raw, fence)
+          const listing = await listDirectory(target, resolved.listLimit)
+          // Answer in the caller's own path form, matching the error branch
+          // below. The client keys its level cache by what it asked for, so a
+          // realpath echo (a symlinked workspace root, a case-normalised
+          // Windows path) would leave that level permanently unmatched — the
+          // tree would silently stop refreshing exactly where it matters.
+          // `entries` keep the host-resolved form: those become the KEYS of
+          // deeper levels, and the host resolves them again next round.
+          return { path: raw, entries: listing.entries, truncated: listing.truncated }
+        } catch (error) {
+          // A level that vanished or lost permission must not fail the whole
+          // refresh round: report it per-path and let the client decide.
+          return { path: raw, error: messageOf(error) }
+        }
+      })
+      const stats = await mapBounded(
+        optionalStringArray(payload, 'statPaths', WATCH_STAT_LIMIT),
+        TREE_BATCH_CONCURRENCY,
+        async (raw) => {
+          try {
+            const target = await ensureWorkspacePath(cwd, raw, fence)
+            const info = await stat(target)
+            // Echoed in the caller's form for the same reason as above: the
+            // editor matches its open path against this string.
+            return { path: raw, mtimeMs: info.mtimeMs, size: info.size }
+          } catch {
+            return null
+          }
+        },
+      )
+      return { listings, stats: stats.filter((row): row is { path: string; mtimeMs: number; size: number } => row !== null) }
+    },
     'fs.search': async (payload) => {
       // The editor side panel's global name search: rooted at the session
       // cwd (not caller-targetable — the walk is unbounded by design and
@@ -353,9 +480,11 @@ function buildApi(
       // cwd; thread it so the path resolves inside the authorized workspace.
       const selected = selectedRepoOf(payload)
       const path = await ensureWorkspacePath(cwd, await resolveGitPath(cwd, requireString(payload, 'path'), selected), fenceEnabledOf(getSettings))
-      const { content, truncated, binary, size, head } = await readText(path, resolved.readLimit)
-      if (binary) return { kind: 'binary', size, truncated, head }
-      return { kind: 'text', content, truncated }
+      const { content, truncated, binary, size, mtimeMs, head } = await readText(path, resolved.readLimit)
+      // mtimeMs/size let the editor tell "the same file re-opened" from
+      // "the file changed underneath me" without a second stat round trip.
+      if (binary) return { kind: 'binary', size, mtimeMs, truncated, head }
+      return { kind: 'text', content, truncated, mtimeMs }
     },
     'fs.write': async (payload) => {
       const { cwd } = await cwdOf(payload)
@@ -821,7 +950,11 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
   })
 
   // ── JSON API ────────────────────────────────────────────────────────────
-  const api = buildApi(ctx, ptyManager, agentPtyRegistry, resolved, terminalShell, () => settingsFace)
+  // Directory watchers behind `fs.watch.sync` (the explorer's incremental
+  // refresh). One registry per plugin load, closed in the teardown effect
+  // below so a reload never leaks handles.
+  const watchRegistry = new DirectoryWatchRegistry()
+  const api = buildApi(ctx, ptyManager, agentPtyRegistry, resolved, terminalShell, () => settingsFace, watchRegistry)
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
     path: '/sidebar/api',
@@ -1077,6 +1210,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     ptyManager?.disposeAll()
     agentPtyRegistry?.disposeAll()
     agentOpenRegistry.dispose()
+    watchRegistry.dispose()
     wss.close()
     agentListWss.close()
     agentOpenWss.close()
