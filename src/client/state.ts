@@ -57,9 +57,27 @@ export function editorHomeTitle(): string {
   return t('files')
 }
 
-/** Tab bar / float title: home tabs track locale; others keep their stored title. */
+/** Leaf name of a path (either separator); empty path → empty string. */
+function pathLeafName(path: string): string {
+  const trimmed = path.replace(/[\\/]+$/, '')
+  if (trimmed === '') return ''
+  const at = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  return at === -1 ? trimmed : trimmed.slice(at + 1)
+}
+
+/**
+ * Tab bar / float title: pathless editor = localized「文件」home; an editor
+ * that is showing a file always uses the path leaf (never the home label).
+ * Chat `openTab({ type: 'editor', path })` used to mint with descriptor
+ * title「文件」and leave that string on the tab.
+ */
 export function tabDisplayTitle(tab: SidebarTab): string {
-  return isEditorHomeTab(tab) ? editorHomeTitle() : tab.title
+  if (isEditorHomeTab(tab)) return editorHomeTitle()
+  if (tab.type === 'editor' && tab.path !== undefined && tab.path !== '') {
+    const leaf = pathLeafName(tab.path)
+    if (leaf !== '') return leaf
+  }
+  return tab.title
 }
 
 /** A tab group. */
@@ -804,12 +822,17 @@ export function setBottomHeight(state: SidebarState, height: number): SidebarSta
   return { ...state, bottomHeight: Math.min(max, Math.max(BOTTOM_MIN, Math.round(height))) }
 }
 
-/** Toggle a directory in the explorer expansion set. */
+/** Toggle a directory in the explorer expansion set.
+ *  Clears a stale "Show in folder" reveal: expanding/collapsing is a manual
+ *  navigation, and leaving `revealed` set made FileTree re-smooth-scroll to
+ *  the tinted row on every load/watch `data` update (felt like endless scroll). */
 export function toggleExpanded(state: SidebarState, path: string): SidebarState {
   const expanded = state.expanded.includes(path)
     ? state.expanded.filter(item => item !== path)
     : [...state.expanded, path]
-  return { ...state, expanded }
+  const next: SidebarState = { ...state, expanded }
+  if ((state.revealed ?? []).length === 0) return next
+  return { ...next, revealed: [] }
 }
 
 /**

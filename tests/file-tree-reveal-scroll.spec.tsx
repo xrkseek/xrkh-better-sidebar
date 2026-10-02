@@ -94,11 +94,19 @@ describe('FileTree reveal scrolling (show in folder)', () => {
     // Body: top 100, 300 tall, scrolled 40; row lands at 400, 20 tall →
     // target = 40 + (400 + 10) − (100 + 150) = 200.
     const tree = await mountTree({ top: 40, client: 300, height: 1000 })
+    // Mount the file row, pin its geometry, then (re)apply the reveal so the
+    // scroll runs against known layout — not against a prior once-per-key hit.
     await tree.rerender(['/tmp/a.ts'], 0)
     tree.layoutRow(400, 20)
+    tree.scrollTo.mockClear()
+    await tree.rerender([], 0)
     await tree.rerender(['/tmp/a.ts'], 1)
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(tree.scrollTo.mock.calls.map(call => call[0])).toContainEqual({ top: 200, behavior: 'smooth' })
+    // Data churn with the same reveal must not keep smooth-scrolling.
+    tree.scrollTo.mockClear()
+    await tree.rerender(['/tmp/a.ts'], 2)
+    expect(tree.scrollTo).not.toHaveBeenCalled()
     tree.unmount()
   })
 
@@ -107,6 +115,8 @@ describe('FileTree reveal scrolling (show in folder)', () => {
     const tree = await mountTree({ top: 0, client: 300, height: 5000 })
     await tree.rerender(['/tmp/a.ts'], 0)
     tree.layoutRow(9000, 20)
+    tree.scrollTo.mockClear()
+    await tree.rerender([], 0)
     await tree.rerender(['/tmp/a.ts'], 1)
     expect(tree.scrollTo.mock.calls.map(call => call[0]?.top)).toContainEqual(4700)
     tree.unmount()

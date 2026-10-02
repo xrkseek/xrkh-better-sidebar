@@ -443,6 +443,20 @@ function baseNameOf(path: string): string {
 }
 
 /**
+ * Display title for a newly minted tab. Pathless editor stays the
+ * descriptor「文件」home; `openTab({ type: 'editor', path })` (chat wake
+ * without a title) must use the file leaf, not the home label.
+ */
+function tabTitleFromSeed(seed: OpenTabSeed, descriptor: TabDescriptor): string {
+  if (seed.title !== undefined && seed.title !== '') return seed.title
+  if (seed.type === 'editor' && seed.path !== undefined && seed.path !== '') {
+    const leaf = baseNameOf(seed.path)
+    if (leaf !== '') return leaf
+  }
+  return typeof descriptor.title === 'function' ? descriptor.title() : descriptor.title
+}
+
+/**
  * Find the tab type that claims an intercepted external-link URL (v0.13.0+).
  * Walks the descriptors in REGISTRATION order and returns the first one
  * that declares `urlTarget` and matches `url`; a throwing predicate is
@@ -473,7 +487,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
  * The plugin version this service instance reports. Keep in lockstep with
  * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.18.30'
+export const SIDEBAR_SERVICE_VERSION = '0.18.32'
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features
@@ -552,11 +566,17 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
     if (viewers.has(descriptor.id)) {
       throw new Error(`[${PACKAGE_ID}] file viewer "${descriptor.id}" already registered`)
     }
-    viewers.set(descriptor.id, descriptor)
+    // Missing `exts` (runtime-only omission from external plugins) becomes
+    // the catch-all `[]` so matchFileViewer treats it like an explicit one.
+    const normalized: FileViewerDescriptor = {
+      ...descriptor,
+      exts: descriptor.exts ?? [],
+    }
+    viewers.set(normalized.id, normalized)
     notify()
     return () => {
-      if (viewers.get(descriptor.id) === descriptor) {
-        viewers.delete(descriptor.id)
+      if (viewers.get(normalized.id) === normalized) {
+        viewers.delete(normalized.id)
         notify()
       }
     }
@@ -639,9 +659,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
         tab = {
           id: seed.id ?? seed.type,
           type: seed.type,
-          // A caller-provided title wins (the editor shows the file name);
-          // otherwise the descriptor's (possibly i18n) title is the default.
-          title: seed.title ?? (typeof descriptor.title === 'function' ? descriptor.title() : descriptor.title),
+          title: tabTitleFromSeed(seed, descriptor),
           ...(seed.path !== undefined ? { path: seed.path } : {}),
           ...(seed.diff !== undefined ? { diff: seed.diff } : {}),
           ...(seed.meta !== undefined ? { meta: seed.meta } : {}),
@@ -693,6 +711,21 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
           ? candidates.find(candidate => candidate.type === tab.type && dedupeKey(candidate) === key)
           : candidates.find(candidate => candidate.id === tab.id)
         activated ??= tab
+        // Chat wakes `openTab({ type: 'editor', path })` then intercepts
+        // again with a basename title. Focusing the same path must retitle
+        // a stale「文件」tab, not leave the home label on file content.
+        if (tab.type === 'editor' && tab.path !== undefined && tab.path !== '' && activated.title !== tab.title) {
+          landed = patchTab(landed, activated.id, { title: tab.title, path: tab.path })
+          const patched = allLeaves(landed.splits).concat(allLeaves(landed.bottomSplits)).flatMap(leaf => leaf.tabs)
+            .concat(landed.floats.map(f => f.tab))
+            .find(candidate => candidate.id === activated!.id)
+          if (patched !== undefined) activated = patched
+        }
+        // A floating instance is already in sight — do not expand panels.
+        const focused = activated
+        if (focused !== undefined && landed.floats.some(f => f.tab.id === focused.id)) {
+          return landed
+        }
       }
       // Any open for the active session must land in sight: when the panel
       // hosting the landing pane is collapsed, expand it. On narrow

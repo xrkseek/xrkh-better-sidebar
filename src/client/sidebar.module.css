@@ -1014,11 +1014,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 }
 
 /* The hover-revealed @-reference button at the row's far right (and the
-   transient "copied" label that replaces it after a copy). Hidden rows
-   keep the name at full width; hovering or focusing the row reveals it. */
+   transient "copied" label that replaces it after a copy). Hidden at rest so
+   the name keeps the row; hovering or focusing the row reveals it. */
 .explorerRef {
   flex: none;
-  display: none;
+  display: inline-flex;
   align-items: center;
   height: 20px;
   padding: 0 8px;
@@ -1028,16 +1028,19 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-tertiary);
   font: var(--dsw-font-xxxs-strong-11);
   cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.explorerRow:hover .explorerRef,
+.explorerRow:focus-within .explorerRef {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .explorerRef:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
-}
-
-.explorerRow:hover .explorerRef,
-.explorerRow:focus-within .explorerRef {
-  display: inline-flex;
 }
 
 .explorerCopied {
@@ -1315,9 +1318,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   font: var(--dsw-font-xxs-12);
 }
 
-.editorPathInput:focus {
+.editorPathInput:focus-visible {
   outline: none;
   border-color: var(--dsw-alias-border-l2);
+  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
 /* The tree-panel toggle in the header: active = panel open (the selected
@@ -1405,9 +1409,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   font: var(--dsw-font-xxs-12);
 }
 
-.editorSearchInput:focus {
+.editorSearchInput:focus-visible {
   outline: none;
   border-color: var(--dsw-alias-border-l2);
+  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
 .editorSearchHint {
@@ -1662,9 +1667,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   font: var(--dsw-font-xxs-12);
 }
 
-.browserInput:focus {
+.browserInput:focus-visible {
   outline: none;
   border-color: var(--dsw-alias-border-l2);
+  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
 .browserMessage {
@@ -2361,9 +2367,10 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorModeButton:focus-visible,
 .editorDownloadLink:focus-visible,
 .editorPptxButton:focus-visible,
-.editorDocxZoomRange:focus-visible {
-  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
-  outline-offset: -1px;
+.editorDocxZoomRange:focus-visible,
+.openWithPin:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
 /* Reduced motion: no slides, fades or color transitions. */
@@ -2442,6 +2449,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 /* The pushpin toggle on an "open with" submenu row: brand ink once the
    target is pinned to the menu's top level. */
 .openWithPin {
+  position: relative;
   flex: none;
   display: inline-flex;
   align-items: center;
@@ -2451,6 +2459,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   border-radius: 6px;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
+}
+
+/* Dense menu: expand hit target without growing the visible pin. */
+.openWithPin::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
 }
 
 .openWithPin:hover {

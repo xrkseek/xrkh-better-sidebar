@@ -331,6 +331,36 @@ describe('service.openTab dedupe', () => {
     expect(editors[0]!.id).toBe(seedId)
   })
 
+  it('editor open with a path titles the tab as the file leaf, not Files', () => {
+    const store = createSidebarStore()
+    const service = createBetterSidebarService(store)
+    service.registerTab({
+      id: 'editor',
+      title: 'Files',
+      dedupeKey: (tab) => tab.path ?? '',
+      component: () => null,
+    })
+    store.setSession('s1')
+    // Chat wake: `{ type: 'editor', path }` and no title — descriptor「文件」must not stick.
+    service.openTab({ type: 'editor', path: '/w/ai-frontend-candidates.tsv' })
+    const opened = allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .find(t => t.path === '/w/ai-frontend-candidates.tsv')
+    expect(opened?.title).toBe('ai-frontend-candidates.tsv')
+    const staleId = opened!.id
+    service.updateTab(staleId, { title: 'Files' })
+    expect(allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .find(t => t.id === staleId)?.title).toBe('Files')
+    service.openTab({
+      type: 'editor',
+      title: 'ai-frontend-candidates.tsv',
+      path: '/w/ai-frontend-candidates.tsv',
+    })
+    expect(allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .find(t => t.id === staleId)?.title).toBe('ai-frontend-candidates.tsv')
+    expect(allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
+      .filter(t => t.path === '/w/ai-frontend-candidates.tsv')).toHaveLength(1)
+  })
+
   it('dedupeKey that returns undefined still focuses the pathless cohort', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)
@@ -654,19 +684,20 @@ describe('service.openTab auto-expand', () => {
     expect(store.getSnapshot().state!.panelOpen).toBe(true)
   })
 
-  it('a wide-viewport path open landing in the bottom tree expands the bottom panel instead', () => {
+  it('a wide-viewport editor path open expands the side panel even when activePane is bottom', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)
     service.registerTab({ id: 'editor', title: 'Editor', component: () => null })
     store.setSession('s1')
-    // The last-touched pane lives in the bottom tree and BOTH panels are
-    // collapsed: the open must surface the bottom panel, not the right one.
+    // Editor / file tabs always land on the side workbench (never bottom).
+    // activePane may sit in the bottom tree, but the open still surfaces the
+    // right panel where the editor tab actually lands.
     store.reduce(s => ({ ...s, activePane: (s.bottomSplits as { id: string }).id, panelOpen: false, bottomOpen: false }))
     service.openTab({ type: 'editor', title: 'main.ts', path: '/p/main.ts' })
     const state = store.getSnapshot().state!
-    expect(state.bottomOpen).toBe(true)
-    expect(state.panelOpen).toBe(false)
-    expect(allLeaves(state.bottomSplits).flatMap(l => l.tabs).some(t => t.type === 'editor')).toBe(true)
+    expect(state.panelOpen).toBe(true)
+    expect(state.bottomOpen).toBe(false)
+    expect(allLeaves(state.splits).flatMap(l => l.tabs).some(t => t.type === 'editor' && t.path === '/p/main.ts')).toBe(true)
   })
 
   it('expands the collapsed panel for a type-only open on a wide viewport', () => {

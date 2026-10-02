@@ -333,18 +333,26 @@ export function FileTree(props: {
 
   // Bring a "Show in folder" reveal into view: the ancestors expand above
   // (revealPaths), but the row may not be scrolled into sight — a reveal on
-  // a long tree should surface the highlighted file. Re-runs when the tree
-  // data or reveal set changes (the row appears after its level loads).
-  // Scrolls ONLY this tree's body: scrollIntoView would scroll every
-  // scrollable ancestor, and the clipping panel host
-  // ([data-dsh-panel-host]) is still programmatically scrollable — a deep
-  // reveal shifted the whole panel, tab bar included, out of the viewport.
+  // a long tree should surface the highlighted file. Scrolls ONLY this tree's
+  // body (scrollIntoView would scroll every scrollable ancestor).
+  //
+  // Scroll ONCE per reveal set, the first time the tinted row is in the DOM.
+  // Depending on `data` without this guard re-fired on every tree-watch poll /
+  // child-level load while `revealed` stayed set — expanding folders felt like
+  // the panel kept scrolling down toward the old highlight.
+  const lastRevealScrollKey = useRef('')
   useEffect(() => {
-    if (revealed.length === 0) return
+    if (revealed.length === 0) {
+      lastRevealScrollKey.current = ''
+      return
+    }
+    const key = revealed.join('\0')
     const body = bodyRef.current
     if (body === null) return
     const row = body.querySelector<HTMLElement>('[data-dsh-revealed]')
     if (row === null) return
+    if (lastRevealScrollKey.current === key) return
+    lastRevealScrollKey.current = key
     const bodyTop = body.getBoundingClientRect().top
     const rowRect = row.getBoundingClientRect()
     const target = body.scrollTop + (rowRect.top + rowRect.height / 2) - (bodyTop + body.clientHeight / 2)

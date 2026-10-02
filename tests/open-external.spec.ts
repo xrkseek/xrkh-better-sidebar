@@ -13,10 +13,17 @@ describe('revealCommand', () => {
     expect(revealCommand('/a/b.txt', 'darwin')).toEqual({ command: 'open', args: ['-R', '/a/b.txt'] })
   })
 
-  it('win32: passes /select,<path> as one shell-free Explorer argument', () => {
+  it('win32: ShellExecute start + /select,<path> (backslashes, visible window)', () => {
     expect(revealCommand('C:\\work\\two words\\a.txt', 'win32')).toEqual({
-      command: 'explorer.exe',
-      args: ['/select,C:\\work\\two words\\a.txt'],
+      command: 'cmd.exe',
+      args: ['/c', 'start', '', 'explorer.exe', '/select,C:\\work\\two words\\a.txt'],
+      windowsHide: false,
+    })
+    // Forward slashes become backslashes so Explorer does not eat segments.
+    expect(revealCommand('C:/work/a.txt', 'win32')).toEqual({
+      command: 'cmd.exe',
+      args: ['/c', 'start', '', 'explorer.exe', '/select,C:\\work\\a.txt'],
+      windowsHide: false,
     })
   })
 

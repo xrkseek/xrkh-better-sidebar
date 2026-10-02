@@ -3,11 +3,12 @@
  * not have a real size yet (xterm crashes when opened in a zero-size
  * container — the WKWebView bottom-panel blank-terminal bug, issue #25).
  * The polling must open exactly once, only once the host reports a real
- * size, stop when the host leaves the document, and cancel cleanly.
+ * size across two consecutive frames (mid CSS height-slide flicker), stop
+ * when the host leaves the document, and cancel cleanly.
  */
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { openWhenSized } from '../src/client/open-when-sized.ts'
+import { OPEN_STABLE_FRAMES, openWhenSized } from '../src/client/open-when-sized.ts'
 
 /** A manually-stepped raf/caf pair so the polling is deterministic. */
 function makeScheduler(): {
@@ -45,12 +46,20 @@ function makeHost(width: number, height: number): {
   return { el, setSize }
 }
 
+/** Advance until open fires, or `OPEN_STABLE_FRAMES` sized ticks. */
+function tickUntilOpen(tick: () => void, count = OPEN_STABLE_FRAMES): void {
+  for (let i = 0; i < count; i += 1) tick()
+}
+
 describe('openWhenSized', () => {
-  it('opens on the first tick when the host already has a size, then stops', () => {
+  it('opens after two sized ticks when the host already has a size, then stops', () => {
     const { raf, caf, tick, pending } = makeScheduler()
     const host = makeHost(320, 200)
     let opened = 0
     const cancel = openWhenSized(host.el, () => { opened += 1 }, raf, caf)
+    tick()
+    expect(opened).toBe(0)
+    expect(pending()).toBe(1)
     tick()
     expect(opened).toBe(1)
     expect(pending()).toBe(0)
@@ -70,11 +79,30 @@ describe('openWhenSized', () => {
     expect(opened).toBe(0)
     expect(pending()).toBe(1)
     host.setSize(320, 200)
-    tick()
+    tickUntilOpen(tick)
     expect(opened).toBe(1)
     expect(pending()).toBe(0)
     tick()
     expect(opened).toBe(1)
+    cancel()
+  })
+
+  it('resets the stable-frame count if size drops mid-wait', () => {
+    const { raf, caf, tick, pending } = makeScheduler()
+    const host = makeHost(0, 0)
+    let opened = 0
+    const cancel = openWhenSized(host.el, () => { opened += 1 }, raf, caf)
+    host.setSize(320, 200)
+    tick()
+    expect(opened).toBe(0)
+    // Mid CSS height slide: one sized frame then collapse — must not open.
+    host.setSize(320, 0)
+    tick()
+    expect(opened).toBe(0)
+    host.setSize(320, 200)
+    tickUntilOpen(tick)
+    expect(opened).toBe(1)
+    expect(pending()).toBe(0)
     cancel()
   })
 
@@ -86,7 +114,7 @@ describe('openWhenSized', () => {
     tick()
     expect(opened).toBe(0)
     host.setSize(320, 120)
-    tick()
+    tickUntilOpen(tick)
     expect(opened).toBe(1)
     cancel()
   })
@@ -100,7 +128,7 @@ describe('openWhenSized', () => {
     cancel()
     expect(pending()).toBe(0)
     host.setSize(320, 200)
-    tick()
+    tickUntilOpen(tick)
     expect(opened).toBe(0)
     // Idempotent: cancelling again is a no-op.
     cancel()
@@ -118,7 +146,7 @@ describe('openWhenSized', () => {
     expect(pending()).toBe(0)
     // Even if the host somehow got a size after detaching, nothing opens.
     host.setSize(320, 200)
-    tick()
+    tickUntilOpen(tick)
     expect(opened).toBe(0)
     cancel()
   })
@@ -131,6 +159,7 @@ describe('openWhenSized', () => {
       calls += 1
       throw new Error('boom')
     }, raf, caf)
+    tick()
     expect(() => tick()).toThrow('boom')
     expect(calls).toBe(1)
     cancel()

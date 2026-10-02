@@ -8,6 +8,9 @@
  * and spawn the platform opener with an argv array (no shell interpolation).
  * The command builders are pure — the platform is injectable — so every
  * per-platform branch is unit-testable without spawning anything.
+ *
+ * On XRK-Harness product Host, `/sidebar` `open.external` is owned by Face
+ * (`revealNativePath`); this module remains for Cordis profile mounts.
  */
 import { spawn } from 'node:child_process'
 import { parentOf, requireAbsolute } from './fs-tree.ts'
@@ -20,6 +23,16 @@ export type OpenExternalAction = 'reveal' | 'url'
 export interface ExternalCommand {
   command: string
   args: string[]
+  /** When false, the spawned process may map a GUI window (Win Explorer). */
+  windowsHide?: boolean
+}
+
+/**
+ * Win32 path for Explorer argv. Forward slashes must become `\`: Explorer
+ * treats `/seg` after `/select,` as another switch, so reveal silently no-ops.
+ */
+export function windowsExplorerPath(target: string): string {
+  return target.trim().replace(/\//g, '\\')
 }
 
 /** Reveal/select a path in the OS file manager. On Linux there is no common
@@ -28,10 +41,20 @@ export function revealCommand(path: string, platform: NodeJS.Platform = process.
   switch (platform) {
     case 'darwin':
       return { command: 'open', args: ['-R', path] }
-    // Explorer expects `/select,<path>` as one argument. Keep the spawn
-    // shell-free: a command shell would reinterpret valid path characters.
-    case 'win32':
-      return { command: 'explorer.exe', args: [`/select,${path}`] }
+    // Bare `explorer.exe /select,…` CreateProcess is a silent no-op when
+    // Explorer is already the desktop shell (same class of bug as opening a
+    // folder with explorer). Route through `cmd /c start` (ShellExecute);
+    // windowsHide must be false or the folder window stays unmapped.
+    // `/select,<path>` stays one argv token — no space after the comma.
+    // Forward slashes → backslashes so Explorer does not eat path segments.
+    case 'win32': {
+      const winPath = windowsExplorerPath(path)
+      return {
+        command: 'cmd.exe',
+        args: ['/c', 'start', '', 'explorer.exe', `/select,${winPath}`],
+        windowsHide: false,
+      }
+    }
     default: {
       const parent = parentOf(path)
       return { command: 'xdg-open', args: [parent ?? path] }
@@ -82,7 +105,13 @@ export function launchExternal(action: OpenExternalAction, value: string): { sta
   const spec = action === 'reveal'
     ? revealCommand(requireAbsolute(value), platform)
     : urlCommand(validateExternalUrl(value), platform)
-  const child = spawn(spec.command, spec.args, { detached: true, stdio: 'ignore' })
+  const child = spawn(spec.command, spec.args, {
+    detached: true,
+    stdio: 'ignore',
+    // Node default is false; win32 reveal sets false explicitly so the
+    // Explorer window can map (CREATE_NO_WINDOW leaves it unmapped).
+    ...(spec.windowsHide !== undefined ? { windowsHide: spec.windowsHide } : {}),
+  })
   child.on('error', () => { /* opener missing/denied: handled by the OS */ })
   child.unref()
   return { started: true }

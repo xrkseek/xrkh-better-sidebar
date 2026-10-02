@@ -15,6 +15,11 @@ describe('sidebar state', () => {
     const file: SidebarTab = { id: 'f', type: 'editor', title: 'a.ts', path: 'a.ts' }
     expect(tabDisplayTitle(home)).toBe(editorHomeTitle())
     expect(tabDisplayTitle(file)).toBe('a.ts')
+    // Path on a home-titled tab (chat wake used to store「文件」) → leaf.
+    const stale: SidebarTab = {
+      id: 's', type: 'editor', title: editorHomeTitle(), path: '/w/ai-frontend-candidates.tsv',
+    }
+    expect(tabDisplayTitle(stale)).toBe('ai-frontend-candidates.tsv')
   })
 
   const state = (): SidebarState => makeDefaultState()
@@ -330,6 +335,14 @@ describe('sidebar state', () => {
     const tabId = leaf.tabs[0]!.id
     const after = activateTab(s, leaf.id, tabId)
     expect((after.splits as { active: string | null }).active).toBe(tabId)
+  })
+
+  it('toggleExpanded clears a stale Show-in-folder reveal', () => {
+    let s = revealPaths(state(), '/p', ['/p/src/a.ts'])
+    expect(s.revealed).toEqual(['/p/src/a.ts'])
+    s = toggleExpanded(s, '/p/other')
+    expect(s.revealed).toEqual([])
+    expect(s.expanded).toContain('/p/other')
   })
 
   it('patchTab updates the title and path of one open tab (browser persistence)', () => {
@@ -891,9 +904,9 @@ describe('v0.12.0 store additions', () => {
         expect(timers.size).toBe(2)
         for (const [, fn] of [...timers]) fn()
         // Each persist also syncs the shared cross-session width key (PR #36).
-        expect(writes.filter(key => key !== 'dsh-sidebar:v1:width'))
-          .toEqual(['dsh-sidebar:v1:a', 'dsh-sidebar:v1:b'])
-        expect(writes).toContain('dsh-sidebar:v1:width')
+        expect(writes.filter(key => key !== 'xrkh-sidebar:v1:width'))
+          .toEqual(['xrkh-sidebar:v1:a', 'xrkh-sidebar:v1:b'])
+        expect(writes).toContain('xrkh-sidebar:v1:width')
       } finally {
         delete g.window
         delete g.localStorage

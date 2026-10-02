@@ -325,8 +325,22 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     })
     const observer = new ResizeObserver(() => {
       try {
+        if (!opened) return
         fit.fit()
         sendResize()
+        // Bottom-panel expand opens the host mid CSS height slide: xterm can
+        // leave a dead paint grid (0 rows / collapsed .xterm-screen) that
+        // fit alone does not revive — the user had to drag the right panel
+        // to force another layout. Remount once the host has a real box.
+        if (
+          host.clientWidth >= 2
+          && host.clientHeight >= 2
+          && terminalPaintBroken(host, term)
+          && !wakeRemountedRef.current
+        ) {
+          wakeRemountedRef.current = true
+          setRemountToken(token => token + 1)
+        }
       } catch {
         // The terminal may be mid-dispose; ignore.
       }

@@ -800,12 +800,39 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     }
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('pageshow', onWake)
+    // Expanding the bottom panel: re-locate + re-measure after the height /
+    // transform slide settles. Opening mid-transition used to leave the
+    // panel at stale edges or `visibility:hidden` (centerMeasured still
+    // false) until a right-panel width drag forced ResizeObserver / the
+    // html-style MutationObserver — felt like a blank crash.
+    let expandFrame = 0
+    const bottomEl = bottomRef.current
+    const onBottomTransitionEnd = (event: TransitionEvent): void => {
+      if (event.target !== bottomEl) return
+      if (event.propertyName !== 'height' && event.propertyName !== 'transform') return
+      if (disposed) return
+      locate()
+      measureCenter()
+    }
+    if (state?.bottomOpen === true && bottomEl !== null) {
+      bottomEl.addEventListener('transitionend', onBottomTransitionEnd)
+      expandFrame = requestAnimationFrame(() => {
+        expandFrame = requestAnimationFrame(() => {
+          expandFrame = 0
+          if (disposed) return
+          locate()
+          measureCenter()
+        })
+      })
+    }
     return () => {
       disposed = true
       if (locateFrame !== null) cancelAnimationFrame(locateFrame)
+      if (expandFrame !== 0) cancelAnimationFrame(expandFrame)
       window.clearInterval(retry)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('pageshow', onWake)
+      bottomEl?.removeEventListener('transitionend', onBottomTransitionEnd)
       observer?.disconnect()
       watcher.disconnect()
       htmlStyleWatcher.disconnect()
