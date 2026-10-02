@@ -10,7 +10,7 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.29
+xrkh plugin add xrkh-better-sidebar@0.18.30
 xrkh restart
 ```
 
@@ -18,7 +18,9 @@ xrkh restart
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
-## 0.18.29
+## 0.18.30
+
+（相对未落地的 0.18.29：同批修复。npm 上 0.18.29 卡在 staged 未公开，以本号为准。）
 
 - 修复对话尾部文件行整个 slot 渲染崩溃（`Cannot read properties of undefined (reading 'modified')`）。**0.18.27 回归**：三条 lane 改造时把组件 prop 从宿主契约名 `matched` 改成了 `lanes`；ui-slots chain 始终把 selector 返回值注入为 `matched`（`ChainEntryProps`），同槽的 `@xrkseek/client-ui-deliverables` 也按 `matched` 读。改名后组件拿到 `undefined`
 - 组件侧：只认 `matched`；用 `isFileLanes` 校验形状；缺失/坏形状时从宿主一并展开的 owner 字段重算 lanes，不再直接读 `.modified`

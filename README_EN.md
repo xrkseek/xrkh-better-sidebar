@@ -10,7 +10,7 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.29
+xrkh plugin add xrkh-better-sidebar@0.18.30
 xrkh restart
 ```
 
@@ -18,7 +18,9 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
 
-## 0.18.29
+## 0.18.30
+
+(Same fix as the unpublished 0.18.29 draft; npm left 0.18.29 staged/unpublished — use this version.)
 
 - Fix turn-tail slot crash (`Cannot read properties of undefined (reading 'modified')`). **0.18.27 regression**: the three-lane refactor renamed the component prop from the host contract name `matched` to `lanes`; ui-slots chain always injects the selector result as `matched` (`ChainEntryProps`), and `@xrkseek/client-ui-deliverables` reads `matched` too
 - Component: accept only `matched`; validate with `isFileLanes`; if missing/bad shape, re-derive lanes from owner fields the host also spreads onto the seat — never read `.modified` on undefined
