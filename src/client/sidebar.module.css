@@ -2302,6 +2302,15 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-primary);
 }
 
+/* A deleted path has no file left to open: inert chip, struck through. */
+.producedChipGone,
+.producedChipGone:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
 .producedChip span {
   overflow: hidden;
   text-overflow: ellipsis;

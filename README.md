@@ -10,13 +10,19 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.26
+xrkh plugin add xrkh-better-sidebar@0.18.27
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.27
+
+- 对话尾部文件行：按「本次改动 / 本次删除 / 本次产出」三条 lane 渲染（此前只有一条「本次产出」，改动与删除被丢弃）
+- 修复根因：接管 `conversation.chat.turnTail` 时只挑 `path`、丢掉 Turn 数据里的 `op`，等于把内核已有的 lane 压平；删除的 chip 置灰划线、不可点（文件已不存在）
+- 无 `op` 的旧会话回落：`workspace/changes` 行数启发式（0 增有删 → 删除，0 删有增 → 产出，其余 → 改动）
 
 ## 0.18.26
 

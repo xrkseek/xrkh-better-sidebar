@@ -10,13 +10,19 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.26
+xrkh plugin add xrkh-better-sidebar@0.18.27
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.18.27
+
+- Conversation tail file rows: render three lanes (modified / deleted / created); before, one flat "Produced" row swallowed edits and deletions
+- Root cause: the `conversation.chat.turnTail` takeover kept only `path` and dropped the Turn data's `op`, flattening the host's existing lanes; deleted chips render struck through and inert (the file is gone)
+- Sessions without `op` fall back to the `workspace/changes` line-count heuristic (0 added + deletes → deleted, 0 deleted + adds → created, else modified)
 
 ## 0.18.26
 

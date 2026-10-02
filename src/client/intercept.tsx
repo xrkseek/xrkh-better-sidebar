@@ -1,16 +1,16 @@
 /**
- * Interception of the chat's produced-files row: the turn-tail chain entry
- * that replaces ui-deliverables' row when the closing turn produced files.
- * The takeover looks identical (same chip row); the chips open the file in
- * the sidebar instead of the host OS. Priority -1 runs before the default-0
- * deliverables entry; when nothing was produced the selector returns null
- * and the original row renders unchanged.
+ * Interception of the chat's file-lane rows: the turn-tail chain entry that
+ * replaces ui-deliverables' rows when the closing turn produced files.
+ * All three lanes (modified / deleted / created) render, like the host rows
+ * they shadow; the chips open the file in the sidebar instead of the host
+ * OS. Priority -1 runs before the default-0 deliverables entry; when nothing
+ * was produced the selector returns null and the original rows render.
  */
 import { IconCodeOutline16 } from '@xrkseek/client-ui-primitives'
 import type { Context } from '../context-types.ts'
 import { firstLeaf, revealPaths, togglePanel, type SidebarStore } from './state.ts'
 import { t } from './locales.ts'
-import { resolveSidebarPath, selectProducedFiles } from './produced-files.ts'
+import { resolveSidebarPath, selectProducedLanes, type FileLanes } from './produced-files.ts'
 import { wrapOpenPath } from './openpath-intercept.ts'
 import css from './sidebar.module.css'
 
@@ -26,9 +26,9 @@ export function openSidebarFile(ctx: Context, store: SidebarStore, sessionId: st
 }
 
 /**
- * The produced files the turn-tail selector last matched for the visible
- * session. The "Show in folder" gesture carries no file path of its own
- * (`'.'`), so the reveal highlights exactly these rows when available.
+ * The lanes the turn-tail selector last matched for the visible session.
+ * The "Show in folder" gesture carries no file path of its own (`'.'`), so
+ * the reveal highlights exactly these rows when available.
  */
 let lastProduced: readonly string[] = []
 
@@ -69,47 +69,90 @@ export function revealInExplorer(
   ctx.get('betterSidebar')?.openTab({ type: 'editor', title: t('files') })
 }
 
-/** The intercepted produced-files row (visual twin of the deliverables chips). */
+/** At most six chips compete for one lane row; every other path stays counted. */
+const SHOWN_LIMIT = 6
+
+/**
+ * The intercepted file-lane rows (visual twin of the deliverables chips):
+ * one row per lane, in the host's order — modified, deleted, created.
+ * Deleted chips are inert: the file is gone, so there is nothing to open.
+ */
 export function SidebarProducedFiles(props: {
-  matched: readonly string[]
+  lanes: FileLanes
   openInSidebar: (path: string) => void
   /** Reveal the produced files in the explorer ("Show in folder" twin). */
   onShowInFolder: (files: readonly string[]) => void
 }) {
-  const { matched, openInSidebar, onShowInFolder } = props
-  const shown = matched.slice(0, 6)
-  const hidden = matched.length - shown.length
+  const { lanes, openInSidebar, onShowInFolder } = props
+  const rows = [
+    { key: 'modified', label: t('laneModified'), paths: lanes.modified },
+    { key: 'deleted', label: t('laneDeleted'), paths: lanes.deleted },
+    { key: 'created', label: t('produced'), paths: lanes.created },
+  ].filter(row => row.paths.length > 0)
+  const hiddenTotal = rows.reduce(
+    (sum, row) => sum + Math.max(0, row.paths.length - SHOWN_LIMIT),
+    0,
+  )
+  const reveal = (): void => {
+    onShowInFolder(rows.flatMap(row => row.paths))
+  }
   return (
-    <div className={css.producedRow}>
-      <span className={css.producedLabel}>{t('produced')}</span>
-      {shown.map(path => {
-        const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-        const name = at === -1 ? path : path.slice(at + 1)
+    <>
+      {rows.map((row, index) => {
+        const shown = row.paths.slice(0, SHOWN_LIMIT)
+        const hidden = row.paths.length - shown.length
+        const isLast = index === rows.length - 1
         return (
-          <button
-            key={path}
-            type="button"
-            className={css.producedChip}
-            title={path}
-            onClick={() => { openInSidebar(path) }}
-          >
-            <IconCodeOutline16 size={12} />
-            <span>{name}</span>
-          </button>
+          <div key={row.key} className={css.producedRow} data-file-lane={row.key}>
+            <span className={css.producedLabel}>{row.label}</span>
+            {shown.map(path => {
+              const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+              const name = at === -1 ? path : path.slice(at + 1)
+              return (
+                <button
+                  key={path}
+                  type="button"
+                  className={`${css.producedChip} ${row.key === 'deleted' ? css.producedChipGone : ''}`}
+                  title={path}
+                  disabled={row.key === 'deleted'}
+                  onClick={() => { openInSidebar(path) }}
+                >
+                  <IconCodeOutline16 size={12} />
+                  <span>{name}</span>
+                </button>
+              )
+            })}
+            {hidden > 0 && (
+              <>
+                <span className={css.producedMore}>+{hidden}</span>
+                {isLast && (
+                  <button
+                    type="button"
+                    className={css.producedMore}
+                    style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                    onClick={() => { reveal() }}
+                  >
+                    {t('showInFolder')}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         )
       })}
-      {hidden > 0 && <span className={css.producedMore}>+{hidden}</span>}
-      {hidden > 0 && (
-        <button
-          type="button"
-          className={css.producedMore}
-          style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
-          onClick={() => { onShowInFolder(matched) }}
-        >
-          {t('showInFolder')}
-        </button>
+      {hiddenTotal === 0 && rows.length > 0 && (
+        <div className={css.producedRow}>
+          <button
+            type="button"
+            className={css.producedMore}
+            style={{ cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+            onClick={() => { reveal() }}
+          >
+            {t('showInFolder')}
+          </button>
+        </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -137,9 +180,9 @@ export function registerTurnTailInterception(ctx: Context, store: SidebarStore):
     select: (owner) => {
       if (store.getSuspended()) return null
       if (store.getPrefs().tabsEnabled['editor'] === false) return null
-      const matched = selectProducedFiles(owner)
-      if (matched !== null) lastProduced = matched
-      return matched
+      const lanes = selectProducedLanes(owner)
+      if (lanes !== null) lastProduced = [...lanes.created, ...lanes.modified, ...lanes.deleted]
+      return lanes
     },
     priority: -1,
     registrant: 'xrkh-better-sidebar',

@@ -65,7 +65,7 @@ const producedOwner = (paths: string[]): unknown => ({
   nodes: [
     { kind: 'assistant', seq: 1, turn: 1 },
     ...paths.map(path => ({
-      kind: 'tool-result', isError: false, callView: { card: 'diff', locations: [{ path }] },
+      kind: 'tool-result', isError: false, callView: { card: 'generic', kind: 'edit', locations: [{ path }] },
     })),
     { kind: 'assistant', seq: 2, turn: 1 },
   ],
@@ -148,15 +148,31 @@ describe('turn-tail interception registration (issue #15)', () => {
     const restore = registerTurnTailInterception(clientCtx(fake.slots), store)
     const select = fake.registered[0]!.options.select as (owner: unknown) => unknown
 
-    // Enabled (default): a produced turn claims the chain; an empty one declines.
-    expect(select(producedOwner(['a.ts', 'b.ts']))).toEqual(['a.ts', 'b.ts'])
+    // Enabled (default): a produced turn claims the chain with all three lanes;
+    // an empty one declines.
+    expect(select(producedOwner(['a.ts', 'b.ts']))).toEqual({
+      created: [],
+      modified: ['a.ts', 'b.ts'],
+      deleted: [],
+    })
     expect(select(emptyOwner())).toBeNull()
     // The engine Turn data path (the real owner currency: { turn, seq,
-    // openFile }) claims through the deliverables record too.
+    // openFile }) claims through the deliverables record too — edits and
+    // deletions stay in their own lane instead of collapsing into "produced".
     expect(select({
-      turn: { data: { get: (key: string) => key === 'deliverables' ? { produced: [{ seq: 1, path: 'a.ts' }] } : undefined } },
+      turn: {
+        data: {
+          get: (key: string) => key === 'deliverables'
+            ? { produced: [
+              { seq: 1, path: 'a.ts', op: 'create' },
+              { seq: 1, path: 'b.ts', op: 'modify' },
+              { seq: 1, path: 'c.ts', op: 'delete' },
+            ] }
+            : undefined,
+        },
+      },
       seq: 1,
-    })).toEqual(['a.ts'])
+    })).toEqual({ created: ['a.ts'], modified: ['b.ts'], deleted: ['c.ts'] })
 
     // Editor tab disabled: even a produced turn falls back to the default
     // deliverables row (chips that cannot open must not be offered).
