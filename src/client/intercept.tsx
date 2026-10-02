@@ -5,12 +5,24 @@
  * they shadow; the chips open the file in the sidebar instead of the host
  * OS. Priority -1 runs before the default-0 deliverables entry; when nothing
  * was produced the selector returns null and the original rows render.
+ *
+ * Conflict with host ChangedFiles: claiming the chain hides the whole
+ * deliverables entry (changed-files card + chips). When the turn also
+ * announced a workspace/changes card, decline so deliverables keeps the
+ * review card; chip opens still ride `workspaces.openPath` interception.
  */
 import { IconCodeOutline16 } from '@xrkseek/client-ui-primitives'
 import type { Context } from '../context-types.ts'
 import { firstLeaf, revealPaths, togglePanel, type SidebarStore } from './state.ts'
 import { t } from './locales.ts'
-import { resolveSidebarPath, selectProducedLanes, type FileLanes } from './produced-files.ts'
+import {
+  isFileLanes,
+  lanesEmpty,
+  resolveSidebarPath,
+  selectProducedLanes,
+  turnHasChangesCard,
+  type FileLanes,
+} from './produced-files.ts'
 import { wrapOpenPath } from './openpath-intercept.ts'
 import css from './sidebar.module.css'
 
@@ -76,14 +88,20 @@ const SHOWN_LIMIT = 6
  * The intercepted file-lane rows (visual twin of the deliverables chips):
  * one row per lane, in the host's order — modified, deleted, created.
  * Deleted chips are inert: the file is gone, so there is nothing to open.
+ *
+ * Host chain seats inject the selector result as `matched` (`ChainEntryProps`).
+ * Never rename that prop. Invalid/missing `matched` re-derives from owner
+ * fields the host also spreads onto the seat (same as DeliverablesTail).
  */
 export function SidebarProducedFiles(props: {
-  lanes: FileLanes
+  matched?: FileLanes | null
   openInSidebar: (path: string) => void
   /** Reveal the produced files in the explorer ("Show in folder" twin). */
   onShowInFolder: (files: readonly string[]) => void
 }) {
-  const { lanes, openInSidebar, onShowInFolder } = props
+  const { openInSidebar, onShowInFolder } = props
+  const lanes = isFileLanes(props.matched) ? props.matched : selectProducedLanes(props)
+  if (lanes === null || lanesEmpty(lanes)) return null
   const rows = [
     { key: 'modified', label: t('laneModified'), paths: lanes.modified },
     { key: 'deleted', label: t('laneDeleted'), paths: lanes.deleted },
@@ -177,9 +195,15 @@ export function registerTurnTailInterception(ctx: Context, store: SidebarStore):
     // card settings: the produced-files row falls back to the default
     // deliverables behavior instead of offering chips that cannot open. Also
     // while the sidebar is externally disabled (aionui-panel chosen).
+    // Decline when the host also has a changes card — claiming the chain
+    // would hide ChangedFiles and leave only chips (or a crash face).
     select: (owner) => {
       if (store.getSuspended()) return null
       if (store.getPrefs().tabsEnabled['editor'] === false) return null
+      // Decline when host already owns a changes card for this closing seq —
+      // claiming the chain would hide ChangedFiles (chips still open via
+      // workspaces.openPath interception).
+      if (turnHasChangesCard(owner)) return null
       const lanes = selectProducedLanes(owner)
       if (lanes !== null) lastProduced = [...lanes.created, ...lanes.modified, ...lanes.deleted]
       return lanes

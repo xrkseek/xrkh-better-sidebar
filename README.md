@@ -10,13 +10,21 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.18.28
+xrkh plugin add xrkh-better-sidebar@0.18.29
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.18.29
+
+- 修复对话尾部文件行整个 slot 渲染崩溃（`Cannot read properties of undefined (reading 'modified')`）。**0.18.27 回归**：三条 lane 改造时把组件 prop 从宿主契约名 `matched` 改成了 `lanes`；ui-slots chain 始终把 selector 返回值注入为 `matched`（`ChainEntryProps`），同槽的 `@xrkseek/client-ui-deliverables` 也按 `matched` 读。改名后组件拿到 `undefined`
+- 组件侧：只认 `matched`；用 `isFileLanes` 校验形状；缺失/坏形状时从宿主一并展开的 owner 字段重算 lanes，不再直接读 `.modified`
+- 与宿主 Diff 卡共存：本轮已有 `workspace/changes` 卡时（按 closing `seq`，对齐宿主 `changesForClosing`）主动放弃 takeover，避免盖住 ChangedFiles；文件打开仍走 `workspaces.openPath` 拦截
+- 测例钉住「select 输出 → 宿主 prop 名 `matched` → 组件消费」整条边界（此前只断言注册元数据，改错名字也会绿灯）
+- 文件树：活动页心跳 1.2s→4s、隐藏 6s→12s；保存后 `nudgeTreeWatch` 立即拉一轮，少无感狂刷
 
 ## 0.18.28
 

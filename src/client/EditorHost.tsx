@@ -37,7 +37,7 @@ import { openSidebarFile } from './intercept.tsx'
 import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTargets } from './open-with.ts'
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
-import { subscribeTreeWatch } from './tree-watch.ts'
+import { nudgeTreeWatch, subscribeTreeWatch } from './tree-watch.ts'
 import { t } from './locales.ts'
 import { relativeTo } from './paths.ts'
 import { resolveSidebarPath } from './produced-files.ts'
@@ -353,14 +353,21 @@ export function EditorHost(props: {
   // 'saved' (never a lingering 'saved' state) triggers exactly one reload, so
   // a preview-mode Ctrl+S shows the fresh content immediately. Edit mode is
   // left alone — reloading would remount the editor and drop the caret.
+  // Also nudge the explorer poller so the tree picks up rename/mtime without
+  // waiting for the idle 4s heartbeat.
   const prevSaveState = useRef<EditorToolbarState['saveState'] | undefined>(undefined)
   useEffect(() => {
     const current = toolbar?.saveState
-    if (prevSaveState.current !== 'saved' && current === 'saved' && toolbar?.mode === 'preview') {
-      setReloadSeq(sequence => sequence + 1)
+    if (prevSaveState.current !== 'saved' && current === 'saved') {
+      if (scope.cwd !== undefined) {
+        nudgeTreeWatch({ sessionId: scope.sessionId, cwd: scope.cwd })
+      }
+      if (toolbar?.mode === 'preview') {
+        setReloadSeq(sequence => sequence + 1)
+      }
     }
     prevSaveState.current = current
-  }, [toolbar?.saveState, toolbar?.mode])
+  }, [toolbar?.saveState, toolbar?.mode, scope.sessionId, scope.cwd])
 
   // ── External modification of the open file ───────────────────────────────
   // The broker answers with DIRTY DIRECTORIES, not files, so the editor keeps

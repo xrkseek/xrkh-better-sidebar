@@ -12,12 +12,30 @@
  */
 import { describe, expect, it, vi } from 'vitest'
 import { createSidebarStore } from '../src/client/state.ts'
-import { registerTurnTailInterception } from '../src/client/intercept.tsx'
+import { registerTurnTailInterception, SidebarProducedFiles } from '../src/client/intercept.tsx'
 import type { Context } from '../src/context-types.ts'
 
 interface RegisteredSlot {
   options: Record<string, unknown>
   component: unknown
+}
+
+/** The lane rows a returned element tree renders, by their data attribute. */
+function collectLaneKeys(node: unknown, out: string[] = []): string[] {
+  if (Array.isArray(node)) {
+    for (const child of node) collectLaneKeys(child, out)
+    return out
+  }
+  if (node === null || typeof node !== 'object') return out
+  const props = (node as { props?: Record<string, unknown> }).props
+  if (props === undefined) return out
+  const key = props['data-file-lane']
+  if (typeof key === 'string') out.push(key)
+  const children = props.children
+  for (const child of Array.isArray(children) ? children : [children]) {
+    collectLaneKeys(child, out)
+  }
+  return out
 }
 
 /**
@@ -211,6 +229,127 @@ describe('turn-tail interception registration (issue #15)', () => {
       type: 'editor',
     }))
 
+    restore()
+  })
+
+  it('reads the lanes the host injects under the `matched` prop', () => {
+    // The host hands a chain entry its selector result as `matched`
+    // (`ChainEntryProps = { matched: M }`) — whatever the selector happened to
+    // return it under. 0.18.27 renamed this prop to `lanes` to echo the
+    // selector's own shape; no host ever injected that name, so the component
+    // read `undefined` and took the whole slot down with "Cannot read
+    // properties of undefined (reading 'modified')". Every spec below feeds
+    // props the way the host does, so the name cannot drift again unnoticed.
+    const tree = SidebarProducedFiles({
+      matched: { created: ['new.ts'], modified: ['edit.ts'], deleted: ['gone.ts'] },
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+    })
+    expect(collectLaneKeys(tree)).toEqual(['modified', 'deleted', 'created'])
+  })
+
+  it('declines the takeover when the host already has a changes card', () => {
+    const fake = fakeSlots(true)
+    const store = createSidebarStore()
+    const restore = registerTurnTailInterception(clientCtx(fake.slots), store)
+    const select = fake.registered[0]!.options.select as (owner: unknown) => unknown
+    expect(select({
+      turn: {
+        data: {
+          get: (key: string) => key === 'deliverables'
+            ? {
+              changes: {
+                seq: 1,
+                turnId: 't1',
+                cwd: '/w',
+                files: [{ path: 'a.ts', display: 'a.ts', added: 1, deleted: 0 }],
+                total: 1,
+                added: 1,
+                deleted: 0,
+              },
+              produced: [{ seq: 1, path: 'a.ts', op: 'create' }],
+            }
+            : undefined,
+        },
+      },
+      seq: 1,
+    })).toBeNull()
+    // Future-seq changes must not block this closing seq (host changesForClosing).
+    expect(select({
+      turn: {
+        data: {
+          get: (key: string) => key === 'deliverables'
+            ? {
+              changes: {
+                seq: 9,
+                turnId: 't9',
+                cwd: '/w',
+                files: [{ path: 'later.ts', display: 'later.ts', added: 1, deleted: 0 }],
+                total: 1,
+                added: 1,
+                deleted: 0,
+              },
+              produced: [{ seq: 1, path: 'a.ts', op: 'create' }],
+            }
+            : undefined,
+        },
+      },
+      seq: 1,
+    })).toEqual({ created: ['a.ts'], modified: [], deleted: [] })
+    restore()
+  })
+
+  it('survives a missing matched prop by re-deriving lanes from the owner', () => {
+    // Host normally injects `matched`; a stale/HMR seat can omit it. Reading
+    // `.modified` on undefined used to crash the whole turnTail chain.
+    const tree = SidebarProducedFiles({
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+      turn: {
+        data: {
+          get: (key: string) => key === 'deliverables'
+            ? { produced: [{ seq: 1, path: 'a.ts', op: 'create' }] }
+            : undefined,
+        },
+      },
+      seq: 1,
+    } as never)
+    expect(collectLaneKeys(tree)).toEqual(['created'])
+  })
+
+  it('renders nothing when matched is null/undefined and the owner has no lanes', () => {
+    expect(SidebarProducedFiles({
+      matched: null,
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+    })).toBeNull()
+    expect(SidebarProducedFiles({
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+    })).toBeNull()
+    // Wrong shape must not throw on `.modified`.
+    expect(SidebarProducedFiles({
+      matched: { lanes: { modified: ['x'] } } as never,
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+    })).toBeNull()
+  })
+
+  it('accepts its own selector output through the host prop shape', () => {
+    const fake = fakeSlots(true)
+    const store = createSidebarStore()
+    const restore = registerTurnTailInterception(clientCtx(fake.slots), store)
+    const { options, component } = fake.registered[0]!
+    const lanes = (options.select as (owner: unknown) => unknown)(producedOwner(['a.ts', 'b.ts']))
+
+    // The whole contract end to end: selector output -> host prop name ->
+    // component. A rename on either side of that boundary throws here, which
+    // the registration-only specs above could never have caught.
+    expect(() => (component as (props: unknown) => unknown)({
+      matched: lanes,
+      openInSidebar: vi.fn(),
+      onShowInFolder: vi.fn(),
+    })).not.toThrow()
     restore()
   })
 })

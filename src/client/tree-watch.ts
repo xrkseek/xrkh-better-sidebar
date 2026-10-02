@@ -40,17 +40,19 @@ export interface TreeWatchHandlers {
   onStats?(stats: readonly FsStatInfo[]): void
 }
 
-/** Fresh cadence while the page is in front. */
-const ACTIVE_INTERVAL_MS = 1_200
+/** Fresh cadence while the page is in front.
+ *  Prefer watch events + {@link nudgeTreeWatch} after editor saves; this
+ *  interval is only the idle heartbeat (was 1.2s and felt like silent churn). */
+const ACTIVE_INTERVAL_MS = 4_000
 
 /** Relaxed cadence while hidden (a background tab refreshes lazily). */
-const HIDDEN_INTERVAL_MS = 6_000
+const HIDDEN_INTERVAL_MS = 12_000
 
 /** Cadence after a failed round (host restarting, fence refusal). */
-const ERROR_INTERVAL_MS = 4_000
+const ERROR_INTERVAL_MS = 6_000
 
 /** Full-subscription re-read cadence, in rounds — the lost-event backstop. */
-const FALLBACK_EVERY_ROUNDS = 20
+const FALLBACK_EVERY_ROUNDS = 40
 
 /**
  * The same backstop while the host reports unwatchable levels.
@@ -60,7 +62,7 @@ const FALLBACK_EVERY_ROUNDS = 20
  * they have, and still slow enough that an unwatchable tree costs a handful of
  * `opendir` calls rather than one per tick.
  */
-const DEGRADED_SWEEP_ROUNDS = 5
+const DEGRADED_SWEEP_ROUNDS = 8
 
 /** One subscriber inside a channel. */
 interface Subscription {
@@ -246,6 +248,18 @@ export function subscribeTreeWatch(scope: SessionScope, handlers: TreeWatchHandl
     stopTimer(current)
     channels.delete(key)
   }
+}
+
+/**
+ * Pull the next watch round forward now (editor save, explicit refresh).
+ * Coalesces with an in-flight round: if busy, the finally-path already
+ * schedules the next tick; we only restart the idle timer.
+ */
+export function nudgeTreeWatch(scope: SessionScope): void {
+  const channel = channels.get(channelKey(scope))
+  if (channel === undefined || channel.subscriptions.size === 0) return
+  if (channel.busy) return
+  schedule(channel, 0)
 }
 
 /** Test seam: drop every channel and timer. */

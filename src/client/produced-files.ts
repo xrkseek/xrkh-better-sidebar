@@ -36,6 +36,33 @@ export function lanesEmpty(lanes: FileLanes): boolean {
   return lanes.created.length === 0 && lanes.modified.length === 0 && lanes.deleted.length === 0
 }
 
+/** Narrow unknown slot `matched` to three-lane shape (host `ChainEntryProps`). */
+export function isFileLanes(value: unknown): value is FileLanes {
+  if (value === null || typeof value !== 'object') return false
+  const record = value as { created?: unknown; modified?: unknown; deleted?: unknown }
+  return Array.isArray(record.created)
+    && Array.isArray(record.modified)
+    && Array.isArray(record.deleted)
+}
+
+/**
+ * Host deliverables already has a workspace/changes card for this closing seq.
+ * Mirrors ui-deliverables `changesForClosing`: ignore future-seq announcements
+ * and empty file lists.
+ */
+export function turnHasChangesCard(owner: unknown): boolean {
+  const record = owner as {
+    turn?: { data?: { get?: (key: string) => unknown } }
+    seq?: unknown
+  } | null
+  if (record === null || typeof record !== 'object') return false
+  const seq = typeof record.seq === 'number' ? record.seq : Number.POSITIVE_INFINITY
+  const data = record.turn?.data?.get?.('deliverables') as DeliverablesTurnDataLike | null | undefined
+  if (data === null || typeof data !== 'object' || data.changes === undefined) return false
+  if (typeof data.changes.seq === 'number' && data.changes.seq > seq) return false
+  return Array.isArray(data.changes.files) && data.changes.files.length > 0
+}
+
 function normalizePath(path: string): string {
   return path.replace(/\\/g, '/')
 }
