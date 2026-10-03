@@ -39,7 +39,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { writeClipboard } from '@xrkseek/client-ui-primitives'
 import '@xterm/xterm/css/xterm.css'
 import { t } from './locales.ts'
-import { openWhenSized } from './open-when-sized.ts'
+import { MIN_OPEN_SIZE, openWhenSized } from './open-when-sized.ts'
 import { api, type SessionScope, type TerminalDepsStatus } from './api.ts'
 import { agentUuidOf, isAgentTabId, type SidebarStore } from './state.ts'
 import { isDarkScheme, subscribeColorScheme, effectiveTokenValue, tokenValue } from './theme.ts'
@@ -323,18 +323,57 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
     const inputSub = term.onData((data) => {
       if (link !== null && linkOpen) link.send(data)
     })
+    let opened = false
+    let wakeFrame = 0
+    let lastHostArea = 0
+
+    /** Soft fit/refresh; hard remount once if the paint grid stays dead. */
+    const revivePaint = (): void => {
+      if (closed || !opened || term.element === undefined) return
+      try {
+        if (host.clientWidth < MIN_OPEN_SIZE || host.clientHeight < MIN_OPEN_SIZE) return
+        fit.fit()
+        sendResize()
+        if (terminalPaintBroken(host, term)) {
+          if (wakeRemountedRef.current) return
+          wakeRemountedRef.current = true
+          setRemountToken(token => token + 1)
+          return
+        }
+        term.refresh(0, Math.max(0, term.rows - 1))
+        // Nudge Chromium to recomposite the screen layer after GPU sleep /
+        // off-screen open during the bottom-panel slide.
+        const screen = term.element.querySelector('.xterm-screen')
+        if (screen instanceof HTMLElement) {
+          const prev = screen.style.transform
+          screen.style.transform = 'translateZ(0)'
+          void screen.offsetWidth
+          screen.style.transform = prev
+        }
+      } catch {
+        if (wakeRemountedRef.current) return
+        wakeRemountedRef.current = true
+        setRemountToken(token => token + 1)
+      }
+    }
+
     const observer = new ResizeObserver(() => {
       try {
         if (!opened) return
+        const area = host.clientWidth * host.clientHeight
+        // Growing out of a collapsed box (expand slide / unhide) clears the
+        // one-shot remount latch so a dead grid can remount again.
+        if (area >= MIN_OPEN_SIZE * MIN_OPEN_SIZE && lastHostArea < MIN_OPEN_SIZE * MIN_OPEN_SIZE) {
+          wakeRemountedRef.current = false
+        }
+        lastHostArea = area
         fit.fit()
         sendResize()
-        // Bottom-panel expand opens the host mid CSS height slide: xterm can
-        // leave a dead paint grid (0 rows / collapsed .xterm-screen) that
-        // fit alone does not revive — the user had to drag the right panel
-        // to force another layout. Remount once the host has a real box.
+        // Bottom-panel expand can leave a dead paint grid that fit alone
+        // does not revive — remount once the host has a real box.
         if (
-          host.clientWidth >= 2
-          && host.clientHeight >= 2
+          host.clientWidth >= MIN_OPEN_SIZE
+          && host.clientHeight >= MIN_OPEN_SIZE
           && terminalPaintBroken(host, term)
           && !wakeRemountedRef.current
         ) {
@@ -349,11 +388,6 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
 
     // After OS sleep/wake the xterm canvas often goes blank (GPU compositor
     // reset) while the host size is unchanged — ResizeObserver stays quiet.
-    // Soft path: double-rAF (wait for post-wake layout) → fit + refresh +
-    // layer nudge. Hard path: if the grid is still dead while the host has
-    // a real box, bump remountToken so the effect rebuilds open+pty.
-    let opened = false
-    let wakeFrame = 0
     const recoverAfterWake = (): void => {
       if (document.visibilityState === 'hidden') {
         wakeRemountedRef.current = false
@@ -364,31 +398,7 @@ export function TerminalView(props: { scope: SessionScope; tabId: string; store:
       wakeFrame = requestAnimationFrame(() => {
         wakeFrame = requestAnimationFrame(() => {
           wakeFrame = 0
-          if (closed || !opened || term.element === undefined) return
-          try {
-            if (host.clientWidth < 2 || host.clientHeight < 2) return
-            fit.fit()
-            sendResize()
-            if (terminalPaintBroken(host, term)) {
-              if (wakeRemountedRef.current) return
-              wakeRemountedRef.current = true
-              setRemountToken(token => token + 1)
-              return
-            }
-            term.refresh(0, Math.max(0, term.rows - 1))
-            // Nudge Chromium to recomposite the screen layer after GPU sleep.
-            const screen = term.element.querySelector('.xterm-screen')
-            if (screen instanceof HTMLElement) {
-              const prev = screen.style.transform
-              screen.style.transform = 'translateZ(0)'
-              void screen.offsetWidth
-              screen.style.transform = prev
-            }
-          } catch {
-            if (wakeRemountedRef.current) return
-            wakeRemountedRef.current = true
-            setRemountToken(token => token + 1)
-          }
+          revivePaint()
         })
       })
     }

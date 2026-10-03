@@ -1,16 +1,11 @@
 /**
- * openWhenSized tests: the deferred one-shot open guard for hosts that may
- * not have a real size yet (xterm crashes when opened in a zero-size
- * container — the WKWebView bottom-panel blank-terminal bug, issue #25).
- * The polling must open exactly once, only once the host reports a real
- * size across two consecutive frames (mid CSS height-slide flicker), stop
- * when the host leaves the document, and cancel cleanly.
+ * openWhenSized tests: deferred one-shot open for zero-size hosts
+ * (xterm / WKWebView bottom-panel issue #25).
  */
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { OPEN_STABLE_FRAMES, openWhenSized } from '../src/client/open-when-sized.ts'
+import { MIN_OPEN_SIZE, OPEN_STABLE_FRAMES, openWhenSized } from '../src/client/open-when-sized.ts'
 
-/** A manually-stepped raf/caf pair so the polling is deterministic. */
 function makeScheduler(): {
   raf: (cb: FrameRequestCallback) => number
   caf: (id: number) => void
@@ -31,7 +26,6 @@ function makeScheduler(): {
   }
 }
 
-/** A host whose reported size can be changed between ticks. */
 function makeHost(width: number, height: number): {
   el: HTMLElement
   setSize: (w: number, h: number) => void
@@ -46,7 +40,6 @@ function makeHost(width: number, height: number): {
   return { el, setSize }
 }
 
-/** Advance until open fires, or `OPEN_STABLE_FRAMES` sized ticks. */
 function tickUntilOpen(tick: () => void, count = OPEN_STABLE_FRAMES): void {
   for (let i = 0; i < count; i += 1) tick()
 }
@@ -87,6 +80,19 @@ describe('openWhenSized', () => {
     cancel()
   })
 
+  it('defers while the host is only a mid-slide few-px tall', () => {
+    const { raf, caf, tick } = makeScheduler()
+    const host = makeHost(320, MIN_OPEN_SIZE - 1)
+    let opened = 0
+    const cancel = openWhenSized(host.el, () => { opened += 1 }, raf, caf)
+    tickUntilOpen(tick)
+    expect(opened).toBe(0)
+    host.setSize(320, MIN_OPEN_SIZE)
+    tickUntilOpen(tick)
+    expect(opened).toBe(1)
+    cancel()
+  })
+
   it('resets the stable-frame count if size drops mid-wait', () => {
     const { raf, caf, tick, pending } = makeScheduler()
     const host = makeHost(0, 0)
@@ -95,7 +101,6 @@ describe('openWhenSized', () => {
     host.setSize(320, 200)
     tick()
     expect(opened).toBe(0)
-    // Mid CSS height slide: one sized frame then collapse — must not open.
     host.setSize(320, 0)
     tick()
     expect(opened).toBe(0)
@@ -130,7 +135,6 @@ describe('openWhenSized', () => {
     host.setSize(320, 200)
     tickUntilOpen(tick)
     expect(opened).toBe(0)
-    // Idempotent: cancelling again is a no-op.
     cancel()
   })
 
@@ -144,7 +148,6 @@ describe('openWhenSized', () => {
     tick()
     expect(opened).toBe(0)
     expect(pending()).toBe(0)
-    // Even if the host somehow got a size after detaching, nothing opens.
     host.setSize(320, 200)
     tickUntilOpen(tick)
     expect(opened).toBe(0)

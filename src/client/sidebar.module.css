@@ -221,6 +221,22 @@
 .bottomPanel {
   position: absolute;
   bottom: 0;
+  /* Span the center column only — same seams as the toggle cluster.
+     `--xrkh-center-left` / `--xrkh-center-right` are written from the
+     center column's live box (ResizeObserver). Until the first measure,
+     fall back to workbench + Overview inset on the right (never
+     `left:0; right:100vw`, which collapses width to 0 and looks like a
+     blank bottom strip until a width drag remeasures). The right panel
+     never hits this class of bug because it sizes with `width`, not
+     opposing left+right insets. */
+  left: var(--xrkh-center-left, 0px);
+  right: var(
+    --xrkh-center-right,
+    calc(
+      var(--xrk-layout-inset-details, 0px)
+      + var(--xrkh-workbench-width, var(--dsh-sidebar-width, 0px))
+    )
+  );
   z-index: 40;
   display: flex;
   flex-direction: column;
@@ -233,7 +249,9 @@
   /* Expand/collapse slides the panel; height drags animate the height. */
   transition:
     transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
-    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
+    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    left var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
+    right var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 /* Collapsed: slid off-screen, interactive nothing, hidden after the slide. */
@@ -267,6 +285,9 @@ body[data-xrkh-sidebar-dragging] .panel,
 body[data-xrkh-sidebar-dragging] .bottomPanel,
 body[data-dsh-sidebar-dragging] .panel,
 body[data-dsh-sidebar-dragging] .bottomPanel {
+  /* Width/height drags rewrite center-edge CSS vars every frame — ease would
+     detach the bottom panel from the live center column. */
+  transition: none;
   will-change: transform;
 }
 

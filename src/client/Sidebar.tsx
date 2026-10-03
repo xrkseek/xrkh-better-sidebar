@@ -638,72 +638,41 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     [state, pinnedVirtualTabs, activePinnedTabId],
   )
 
-  // The app shell's center column: the bottom panel spans ONLY that column
-  // ("squeezes the agent output area") — it starts at the app sidebar's
-  // right edge and ends at the details column's left edge (the details
-  // column sits between the center and the right panel). Measured directly
-  // from the AppFrame's center column DOM (the parent of the
-  // [data-slot="conversation"] wrapper — layout.css's center column) so the
-  // bottom panel tracks the column's real
-  // horizontal edges — including the animated margin-right push while the
-  // right panel opens/closes; a frame that never appears keeps the initial
-  // zero-size fallback (the panel renders at 0 width until measured).
-  // The rect lives in a REF (not state): the open/close transition resizes
-  // the center column EVERY frame for its duration, and reacting per frame
-  // with setState re-renders the whole Sidebar (every mounted tab) at
-  // animation cadence — the visible toggle jank (#315). measureCenter
-  // writes the bottom panel's edges directly (same DOM-write pattern as
-  // applyDrag), so the panel still tracks the column per frame with zero
-  // React work; `centerMeasured` flips ONCE to gate the hidden→visible
-  // first-paint fallback.
-  const centerRectRef = useRef({ left: 0, right: 0 })
-  const [centerMeasured, setCenterMeasured] = useState(false)
-  // Refs keep the measure step stable across renders and let it skip work
-  // mid-drag: during a width/corner drag the layout push resizes the center
-  // column every frame, and reacting (setCenterRect → re-render) would
-  // re-introduce the drag lag this shell deliberately avoids. applyDrag
-  // writes the bottom panel's edges directly, so measurement pauses then.
+  // Bottom panel horizontal edges ride CSS vars on <html> (see `.bottomPanel`).
+  // ResizeObserver on the center column updates them every layout frame
+  // without React re-renders (#315). Until the first measure, CSS falls back
+  // to workbench width + Overview inset — never the old inline
+  // `left:0; right:100vw` zero-width blank.
   const centerColRef = useRef<HTMLElement | null>(null)
   const draggingRef = useRef(false)
   const measureCenter = useCallback((): void => {
-    if (draggingRef.current) return
     const col = centerColRef.current
     if (col === null) return
     if (!col.isConnected) {
-      // The observed column was detached (HMR re-render swapped the node
-      // in place): its rect is stale garbage. Drop the ref — the locate
-      // chain re-runs on the next mutation/interval tick and picks up the
-      // new column node (issue #248).
+      // Detached after HMR swap — locate re-runs on the next tick (#248).
       centerColRef.current = null
       return
     }
     const rect = col.getBoundingClientRect()
-    // Ref + direct DOM write (see the centerRectRef comment): the bottom
-    // panel keeps tracking the center column per frame during the right
-    // panel's open/close animation without re-rendering the shell. The
-    // one-shot measured flip renders the panel visible once (a stale
-    // {0,0} fallback would flash full-width).
-    centerRectRef.current = { left: rect.left, right: rect.right }
+    if (!(rect.right > rect.left)) return
+    const root = document.documentElement
+    root.style.setProperty('--xrkh-center-left', `${Math.round(rect.left)}px`)
+    root.style.setProperty('--xrkh-center-right', `${Math.round(window.innerWidth - rect.right)}px`)
+    // Drop legacy inline edges so CSS vars win (older builds wrote left/right
+    // on the panel node; those beat stylesheet vars).
     const bottom = bottomRef.current
     if (bottom !== null) {
-      bottom.style.setProperty('left', `${rect.left}px`)
-      bottom.style.setProperty('right', `${window.innerWidth - rect.right}px`)
+      bottom.style.removeProperty('left')
+      bottom.style.removeProperty('right')
+      bottom.style.removeProperty('visibility')
     }
-    setCenterMeasured(prev => (prev ? prev : true))
   }, [])
   useEffect(() => {
     let disposed = false
     let observer: ResizeObserver | undefined
-    // Locate the AppFrame's center column. DSH 0.1.x wraps slot hosts in
-    // [data-slot] containers: the conversation slot wrapper
-    // ([data-slot="conversation"]) sits directly inside the center column,
-    // so its parent IS that column — no hashed-class or positional
-    // dependency (layout.css uses the same anchor). The shell swaps the
-    // boot page for the AppFrame only AFTER boot settles, so the first
-    // query may miss it. Never give up: watch #root's subtree (the swap and
-    // HMR re-renders mutate it) and re-run this locator — querying once and
-    // bailing would strand the panel at the zero-size fallback forever
-    // (observed: a 1px sliver at the viewport's left edge).
+    // Locate the AppFrame's center column via [data-slot="conversation"]
+    // parent (same anchor as layout.css). Boot may miss it once — watch
+    // #root and retry; never strand the edges on the CSS fallback alone.
     const locate = (): void => {
       if (disposed) return
       const col = document.querySelector('#root [data-slot="conversation"]')
@@ -717,12 +686,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         return
       }
       if (centerColRef.current !== col) {
-        // A NEW column node (boot swap, HMR re-render, or a previous locate
-        // that found nothing): attach the ResizeObserver to THIS node and
-        // measure it once. Same-node size changes are the ResizeObserver's
-        // job — no forced measurement here, because a forced
-        // getBoundingClientRect per mutation would reflow the shell at
-        // mutation cadence.
         centerColRef.current = col
         observer?.disconnect()
         observer = new ResizeObserver(measureCenter)
@@ -731,17 +694,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       }
     }
     locate()
-    // rAF-debounce the mutation watchers: #root's subtree changes at chat
-    // cadence (streaming turns), and locate() itself must stay cheap.
     let locateFrame: number | null = null
     const scheduleLocate = (): void => {
       if (locateFrame !== null) return
-      // Mid-drag every frame writes --dsh-sidebar-* on <html>'s style
-      // attribute, which is the mutation this watcher observes — relocating
-      // per drag frame is pointless (the center column node cannot change
-      // while the pointer is captured) and adds a querySelector to every
-      // frame's budget (#315). The 1.5s retry below still covers any node
-      // swap that somehow lands mid-drag.
+      // Mid-drag html style mutations are noise — column node cannot swap.
       if (draggingRef.current) return
       locateFrame = requestAnimationFrame(() => {
         locateFrame = null
@@ -751,27 +707,11 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     const watcher = new MutationObserver(scheduleLocate)
     const root = document.getElementById('root')
     if (root !== null) watcher.observe(root, { childList: true, subtree: true })
-    // The layout push writes --dsh-sidebar-* on <html>. A HMR re-activation
-    // clears those variables on teardown and re-writes them on setup — and
-    // that is also the moment the shell may have re-created the center
-    // column under a REUSED #root child (React swaps nodes in place, so
-    // #root's childList never changes and the watcher above never fires).
-    // Watching <html>'s style attribute catches that re-sync: the push
-    // rewrite re-locates and re-measures, so the bottom panel recovers
-    // instead of staying hidden on a stale {0,0} center rect.
+    // HMR / layout-push rewrites --xrkh-workbench-* on <html>; re-locate
+    // when the center column node was swapped in place under a stable #root.
     const htmlStyleWatcher = new MutationObserver(scheduleLocate)
     htmlStyleWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] })
-    // Last-resort safety net (issue #248): no watcher is guaranteed to fire
-    // for every HMR teardown/setup interleaving (e.g. the style attribute
-    // may end up byte-identical, and the col may be swapped before the
-    // subtree watcher attaches). A slow unconditional re-locate makes the
-    // panel converge on the real column within a couple of seconds no
-    // matter what sequence the shell used. locate() is cheap when nothing
-    // changed (one querySelector + an identity compare; no forced layout).
     const retry = window.setInterval(locate, 1500)
-    // After OS sleep/wake the center column's viewport rect can go stale
-    // without a ResizeObserver fire (same CSS box, new screen metrics).
-    // Remeasure when the document becomes visible again.
     const onWake = (): void => {
       if (document.visibilityState !== 'visible') return
       centerColRef.current = null
@@ -780,22 +720,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     }
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('pageshow', onWake)
-    // Expanding the bottom panel: re-locate + re-measure after the height /
-    // transform slide settles. Opening mid-transition used to leave the
-    // panel at stale edges or `visibility:hidden` (centerMeasured still
-    // false) until a right-panel width drag forced ResizeObserver / the
-    // html-style MutationObserver — felt like a blank crash.
+    // Bottom expand: remeasure after the slide starts (RO also tracks the
+    // center column while height/margin animate).
     let expandFrame = 0
-    const bottomEl = bottomRef.current
-    const onBottomTransitionEnd = (event: TransitionEvent): void => {
-      if (event.target !== bottomEl) return
-      if (event.propertyName !== 'height' && event.propertyName !== 'transform') return
-      if (disposed) return
-      locate()
-      measureCenter()
-    }
-    if (state?.bottomOpen === true && bottomEl !== null) {
-      bottomEl.addEventListener('transitionend', onBottomTransitionEnd)
+    if (state?.bottomOpen === true) {
       expandFrame = requestAnimationFrame(() => {
         expandFrame = requestAnimationFrame(() => {
           expandFrame = 0
@@ -812,16 +740,11 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       window.clearInterval(retry)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('pageshow', onWake)
-      bottomEl?.removeEventListener('transitionend', onBottomTransitionEnd)
       observer?.disconnect()
       watcher.disconnect()
       htmlStyleWatcher.disconnect()
       centerColRef.current = null
     }
-    // Opening the bottom panel re-runs the whole locate/measure chain: a
-    // panel opened before the center column was ever found must not stay
-    // invisible forever (the HMR recovery path depends on the observers
-    // above, this is the belt-and-braces retry for the open moment itself).
   }, [measureCenter, state?.bottomOpen])
 
   /**
@@ -1004,19 +927,13 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   const lastDragSize = useRef<{ width: number; height: number } | null>(null)
 
   /** Apply a drag size to the DOM without touching React state or the store.
-   *  The bottom panel's right edge tracks the right panel's left edge HERE
-   *  too — React state only updates on release, so the inline right must be
-   *  written directly or the bottom panel would lag the sidebar mid-drag.
-   *  The layout push rides the shared writer (writeGeometry). */
+   *  Layout push (writeGeometry) resizes the center column; its ResizeObserver
+   *  refreshes `--xrkh-center-*` so the bottom panel tracks without an inline
+   *  right write (those used to fight React re-renders and the CSS vars). */
   const applyDrag = (width: number, height: number): void => {
     lastDragSize.current = { width, height }
     panelRef.current?.style.setProperty('width', `${width}px`)
     bottomRef.current?.style.setProperty('height', `${height}px`)
-    // centerRect.right is the center column's right edge at the committed
-    // width (innerWidth - state.width - detailsWidth), so this equals
-    // `width + detailsWidth` — derived from the measured column, keeping the
-    // drag write-only (no React re-render mid-drag).
-    bottomRef.current?.style.setProperty('right', `${(window.innerWidth - centerRectRef.current.right) + (width - (state?.width ?? 0))}px`)
     const bottomPush = !narrow && state?.bottomOpen === true ? height + effectiveKeyboardInset : 0
     writeGeometry(width, bottomPush)
   }
@@ -1055,12 +972,8 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
    * synchronously, then commit the SAME clamped values to the store. A fast
    * release cancels the rAF before it ran — without the flush the DOM would
    * sit at the pre-drag size until React re-renders with the committed
-   * value, and a value that never made it into a move handler would never
-   * be applied at all. The measurement pause ends here too: the center
-   * column is re-measured BEFORE the committed re-render lands, so the
-   * bottom panel's React-rendered right edge already reflects the new
-   * width (otherwise the re-render would re-apply the stale rect — the
-   * bottom panel visibly jumps for one frame).
+   * value. Remeasure center edges before the store commit so `--xrkh-center-*`
+   * matches the released width in the same turn.
    */
   const commitDrag = (
     width: number,
@@ -1198,10 +1111,13 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // mounted makes the push invisible to mid-flush style recals.
   useEffect(() => {
     return () => {
-      document.documentElement.style.removeProperty('--xrkh-workbench-width')
-      document.documentElement.style.removeProperty('--xrkh-workbench-height')
-      document.documentElement.style.removeProperty('--dsh-sidebar-width')
-      document.documentElement.style.removeProperty('--dsh-sidebar-height')
+      const root = document.documentElement
+      root.style.removeProperty('--xrkh-workbench-width')
+      root.style.removeProperty('--xrkh-workbench-height')
+      root.style.removeProperty('--dsh-sidebar-width')
+      root.style.removeProperty('--dsh-sidebar-height')
+      root.style.removeProperty('--xrkh-center-left')
+      root.style.removeProperty('--xrkh-center-right')
     }
   }, [])
   useEffect(() => {
@@ -1679,13 +1595,8 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         down like the right panel. On NARROW viewports it does not exist —
         the bottom workbench lives inside the drawer (MobileWorkbench).
       */}
-      {/* The bottom panel only becomes VISIBLE once the center column is
-          measured: before that, `centerRect` is the {0,0} fallback and
-          `right` computes to the full viewport width — the panel (and its
-          overflow content) would flash full-width for a frame until the
-          first measurement lands. Rendering stays unconditional so the
-          mount/render chain (auto-terminal etc.) is never gated on
-          geometry. */}
+      {/* Edges come from CSS vars (--xrkh-center-*); only height / OSK /
+          seam hairline stay inline. */}
       {!narrow && (
       <div
         ref={bottomRef}
@@ -1694,25 +1605,13 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         data-dsh-bottom-panel
         style={{
           height: bottomPanelHeight,
-          left: centerRectRef.current.left,
           // Keep the panel above the on-screen keyboard when the visual
           // viewport shrinks (narrow/touch only — desktop ignores vv inset).
           bottom: effectiveKeyboardInset > 0 ? `${effectiveKeyboardInset}px` : undefined,
-          // Direct from the center column's measured right edge: the bottom
-          // panel spans ONLY the center column, ending exactly at the
-          // details column's left edge (the details column sits between the
-          // center and the right panel, and the right panel's margin-right
-          // push is already baked into centerRect.right).
-          right: window.innerWidth - centerRectRef.current.right,
-          // The seam against the open right panel needs its own hairline
-          // (the right panel's border-left alone is covered by this panel's
-          // fill — without it the corner looks cut off).
+          // Seam against the open right panel (its border-left alone is
+          // covered by this panel's fill).
           borderRight: state.panelOpen ? '1px solid var(--dsw-alias-border-l2)' : undefined,
-          // Unmeasured center column → keep the panel invisible (zero-size
-          // geometry would flash full-width overflow instead).
-          visibility: centerMeasured ? undefined : 'hidden',
         }}
-       
         data-dragging={(draggingBottom || draggingCorner) || undefined}
       >
         <div

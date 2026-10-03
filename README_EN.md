@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.19.4
+xrkh plugin add xrkh-better-sidebar@0.19.5
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.19.5
+
+- Fix occasional blank bottom panel (only appeared after resizing the side workbench): unmeasured center column collapsed `left+right` to zero width; edges now use `--xrkh-center-*`, with a workbench + Overview-inset fallback until measured
 
 ## 0.19.4
 

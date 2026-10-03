@@ -10,13 +10,17 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.19.4
+xrkh plugin add xrkh-better-sidebar@0.19.5
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.19.5
+
+- 修复底栏偶发空白（拖侧栏才出现）：未测到中心列时 `left+right` 回退成零宽；改走 `--xrkh-center-*`，未测到前右侧回退为 workbench + Overview inset
 
 ## 0.19.4
 

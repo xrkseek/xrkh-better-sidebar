@@ -9,22 +9,19 @@
  * slide is in flight; any `display:none`-hidden ancestor does the same.
  *
  * A single frame with a 1–few px box mid CSS height transition is also
- * unsafe — xterm can "open" then leave a dead paint grid until something
- * else forces a fit (dragging the right workbench was the common recovery).
- * Wait for {@link MIN_OPEN_SIZE} on both axes across two consecutive frames
- * before calling `open`.
+ * unsafe — wait for {@link MIN_OPEN_SIZE} on both axes across two
+ * consecutive frames before calling `open`.
  *
  * The caller's `open` callback (open + fit + resize) is invoked exactly
  * once. While the host stays undersized the polling continues every frame;
- * it stops when the host leaves the document (`isConnected`), so a pending
- * open never fires after unmount. The returned cancel function drops a
- * pending frame immediately (idempotent).
+ * it stops when the host leaves the document (`isConnected`). The returned
+ * cancel function drops a pending frame immediately (idempotent).
  *
  * `raf`/`caf` are injectable so tests can drive the polling deterministically.
  */
 
-/** Match terminal-paint / sendResize: sub-2px boxes are not a usable grid. */
-export const MIN_OPEN_SIZE = 2
+/** Minimum usable host box (mid-slide flickers often land under ~32px). */
+export const MIN_OPEN_SIZE = 32
 
 /**
  * Consecutive sized frames required before `open`. One frame alone is often
