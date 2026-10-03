@@ -292,26 +292,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     viewportHeight: layoutViewportHeight,
   }).height
 
-  // The collapsed toggle cluster reclaims the top-right corner, so the Host
-  // session header's right-aligned utilities must yield. layout.css keys off
-  // these body attributes to push the header's right padding out past the
-  // cluster. Only the CLOSED panel needs it — an open panel already squeezes
-  // `#root` left, moving the header clear. Dual-stamp XRKH + legacy DSH attrs.
-  const collapsed = state === undefined || !state.panelOpen
-  useEffect(() => {
-    if (collapsed) {
-      document.body.setAttribute('data-xrkh-sidebar-collapsed', '')
-      document.body.setAttribute('data-dsh-sidebar-collapsed', '')
-    } else {
-      document.body.removeAttribute('data-xrkh-sidebar-collapsed')
-      document.body.removeAttribute('data-dsh-sidebar-collapsed')
-    }
-    return () => {
-      document.body.removeAttribute('data-xrkh-sidebar-collapsed')
-      document.body.removeAttribute('data-dsh-sidebar-collapsed')
-    }
-  }, [collapsed])
-
   // Title-bar / shell compatibility (the "位置兼容模式" scheme):
   //   auto    — CONSERVATIVE: only the standard Window Controls Overlay
   //             geometry contributes (the real caption-overlay height,
@@ -1536,10 +1516,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   return (
     <div data-dsh-panel-host {...osFileDragShield}>
       {/*
-        Persistent toggle cluster: bottom glyph LEFT of the side glyph.
-        Vertically fixed to the conversation title-row band; horizontally
-        rides Host `--xrk-layout-inset-details` + `--xrkh-workbench-width`
-        so Overview and the workbench both keep it in the main column seam.
+        Workbench toggles on the main-column seam (details inset + workbench width).
       */}
       <div className={css.toggleCluster} data-dsh-toggle-cluster>
         {/*

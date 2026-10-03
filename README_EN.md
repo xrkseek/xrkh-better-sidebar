@@ -10,13 +10,18 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.19.2
+xrkh plugin add xrkh-better-sidebar@0.19.3
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.19.3
+
+- Fix workbench toggle cluster lag while dragging Host **Overview**: track `details inset + workbench width` on the main-column seam; disable `right` easing during drag
+- Remove unused `data-*-sidebar-collapsed` body stamps and the fixed viewport-corner path
 
 ## 0.19.2
 

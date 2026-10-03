@@ -10,13 +10,18 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.19.2
+xrkh plugin add xrkh-better-sidebar@0.19.3
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.19.3
+
+- 修复拖动 Host **概况** 时工作台 toggle 集群不跟手：跟 `details inset + workbench width` 停在主列右缘；拖拽中关闭 `right` 缓动
+- 删除已无消费者的 `data-*-sidebar-collapsed` body 标记与钉死视口右上角的冗余路径
 
 ## 0.19.2
 

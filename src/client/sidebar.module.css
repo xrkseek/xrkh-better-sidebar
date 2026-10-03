@@ -58,23 +58,17 @@
   left: 0;
 }
 
-/* The persistent expand/collapse cluster: two rail controls (bottom glyph
-   LEFT of the right-panel glyph). Lives in the main (conversation) band —
-   never on top of Overview or the workbench. Horizontally:
-     right = 10px + Host details inset + workbench width
-   so Overview and the floating workbench both push the cluster left to the
-   conversation seam. Absolute within the panel host (inset: 0 = viewport).
-   Host-internal z-index 45 (above panels' 40); host global layer is 25. */
+/* Workbench affordance (controls the right/bottom panels — not Overview).
+   Sits on the main column's top-right seam:
+     right = 10px + Overview inset + workbench width
+   so dragging Overview / opening the side panel moves it with the conversation
+   edge instead of covering Overview chrome. Host-internal z-index 45. */
 .toggleCluster {
   position: absolute;
   top: calc(
     14px + env(safe-area-inset-top) +
     var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
   );
-  /* Always yield Overview (`--xrk-layout-inset-details`) AND the workbench
-     strip. Workbench alone is not enough: it sits outside #root, to the
-     right of the details column — omitting details parks the toggles on
-     the Overview chrome. */
   right: calc(
     10px
     + var(--xrk-layout-inset-details, 0px)
@@ -86,13 +80,15 @@
   align-items: center;
   gap: 4px;
   pointer-events: auto;
-  /* Same curve as #root workbench push (layout.css) and AppFrame tracks. */
   transition: right var(--xrkh-sidebar-motion-duration, var(--ds-transition-duration-slow, 380ms))
     var(--xrkh-sidebar-motion-ease, var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)));
 }
 
+/* Pointer-follow: Overview column drag (`[data-dsh-frame][data-dragging]`) or
+   workbench width drag — never ease while the inset/width vars are streaming. */
 :global(body[data-xrkh-sidebar-dragging]) .toggleCluster,
-:global(body[data-dsh-sidebar-dragging]) .toggleCluster {
+:global(body[data-dsh-sidebar-dragging]) .toggleCluster,
+:global(body:has([data-dsh-frame][data-dragging])) .toggleCluster {
   transition: none;
 }
 
@@ -2386,12 +2382,6 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
    switches (which panels render, the migration) are JS-driven via
    useNarrowViewport; this block only adapts the pure style details. */
 @media (max-width: 767px) {
-  /* Narrow drawer does not layout-push (width 0), so the cluster stays at
-     the viewport corner inside the sheet — reserve tab-strip space. */
-  .panel:not(.panelHidden) .tabBar {
-    padding-right: 40px;
-  }
-
   /* Narrower tabs: a phone-width drawer fits more open tabs before the
      strip scrolls. */
   .tab {

@@ -62,18 +62,19 @@
   transition: margin-bottom var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
-/* Reserve space so the toggle cluster does not cover session-header
-   actions when the cluster sits in the conversation band. Ease with the
-   same motion as Overview / workbench push so padding tracks the cluster. */
+/* Cluster sits in the conversation title band — reserve header actions. */
 body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
   padding-right: 78px;
   transition: padding-right var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
-/* Overview open: cluster already yields `--xrk-layout-inset-details`, so the
-   conversation header only needs the control footprint (not a second strip). */
-html[data-xrk-layout-details] body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
-  padding-right: 72px;
+body:has([data-dsh-frame][data-dragging]):has([data-dsh-toggle-cluster])
+  [data-slot="conversation.session.header"] > header,
+body[data-xrkh-sidebar-dragging]:has([data-dsh-toggle-cluster])
+  [data-slot="conversation.session.header"] > header,
+body[data-dsh-sidebar-dragging]:has([data-dsh-toggle-cluster])
+  [data-slot="conversation.session.header"] > header {
+  transition: none;
 }
 
 body[data-xrkh-sidebar-dragging] #root,
@@ -107,7 +108,8 @@ body[data-dsh-sidebar-dragging] #root :has(> [data-slot="conversation"]) {
 @media (prefers-reduced-motion: reduce) {
   #root,
   #root [data-dsh-frame] > [data-pane="conversation"],
-  #root :has(> [data-slot="conversation"]) {
+  #root :has(> [data-slot="conversation"]),
+  body:has([data-dsh-toggle-cluster]) [data-slot="conversation.session.header"] > header {
     transition: none;
   }
 }
