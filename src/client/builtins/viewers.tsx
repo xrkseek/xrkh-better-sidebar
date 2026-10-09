@@ -12,23 +12,25 @@
  */
 import { IconCodeOutline16, IconDownloadOutline16 } from '@xrkseek/client-ui-primitives'
 import { lazyChunkComponent } from '../lazy-chunk.tsx'
+import { ImagePreview } from '../ImagePreview.tsx'
 import { PdfView } from '../PdfView.tsx'
-import { BinaryDownload } from '../binary-download.tsx'
 import {
   AudioPreview,
   CsvPreview,
   VideoPreview,
 } from '../media-previews.tsx'
+import { BinaryDownload } from '../binary-download.tsx'
 import {
   IconImageOutline16,
   IconMarkdownOutline16,
+  IconOfficeOutline16,
   IconPdfOutline16,
   IconHtmlOutline16,
 } from '../icons.tsx'
+import { OfficePreview } from '../OfficePreview.tsx'
 import type { ComponentType } from 'react'
 import type { FileViewerDescriptor, FileViewerProps } from '../service.ts'
 import { t } from '../locales.ts'
-import css from '../sidebar.module.css'
 
 /**
  * Lazy wrapper over the chunk-resident viewer component. The `pick`
@@ -46,11 +48,9 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       title: () => t('viewerImage'),
       icon: (size: number) => <IconImageOutline16 size={size} />,
       exts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif'],
-      fetchStrategy: 'mediaUrl',
-      component: ({ mediaUrl: url, title }) => (
-        <div className={css.editorImageWrap}>
-          <img className={css.editorImage} src={url} alt={title} />
-        </div>
+      fetchStrategy: 'none',
+      component: ({ scope, path, title }) => (
+        <ImagePreview scope={scope} path={path} title={title} />
       ),
     },
     {
@@ -93,8 +93,19 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'office',
       title: () => t('viewerOffice'),
+      icon: (size: number) => <IconOfficeOutline16 size={size} />,
+      // OOXML renders in place; the legacy binary formats (doc/xls/ppt, ODF,
+      // rtf) have no client-side parser and stay on the download pane.
+      exts: ['docx', 'xlsx', 'pptx'],
+      priority: 10,
+      fetchStrategy: 'none',
+      component: ({ scope, path }) => <OfficePreview scope={scope} path={path} />,
+    },
+    {
+      id: 'office-legacy',
+      title: () => t('viewerOffice'),
       icon: (size: number) => <IconDownloadOutline16 size={size} />,
-      exts: ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'rtf'],
+      exts: ['doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'rtf'],
       priority: 10,
       fetchStrategy: 'binary-download',
       component: ({ scope, path }) => <BinaryDownload scope={scope} path={path} />,

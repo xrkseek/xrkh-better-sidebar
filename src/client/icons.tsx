@@ -120,6 +120,17 @@ export const IconHtmlOutline16 = ({ size = 16, className }: IconProps) => (
   </svg>
 )
 
+/** Office document viewer glyph: a document frame whose folded corner is
+ *  paired with three ruled text rows — reads as "a formatted document" without
+ *  borrowing Microsoft's brand marks. */
+export const IconOfficeOutline16 = ({ size = 16, className }: IconProps) => (
+  <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3.5 1.5h6.5L13.5 5v9.5h-10z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="M9.5 1.5V5h4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    <path d="M5.5 8h5M5.5 10.5h5M5.5 13h3" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
+  </svg>
+)
+
 /** Browser tab glyph: a globe with meridians. */
 export const IconGlobeOutline16 = ({ size = 16, className }: IconProps) => (
   <svg width={size} height={size} className={className} viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">

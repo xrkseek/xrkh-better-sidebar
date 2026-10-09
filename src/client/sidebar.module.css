@@ -1806,6 +1806,347 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-primary);
 }
 
+/* ── Office preview (pptx / docx / xlsx) ─────────────────────────────────
+   The three panes share one shell so the download affordance, error state and
+   scroll behaviour read as one family rather than three bespoke screens. The
+   slide page is a fixed 16:9 card (the universal presentation ratio) so paging
+   between slides does not resize the pane under the cursor. */
+.officeShell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.officeError {
+  padding: 24px 16px;
+  text-align: center;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.officeActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding-bottom: 24px;
+}
+
+/* ── pptx ────────────────────────────────────────────────────────────── */
+.officePptx {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.officePptxStage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.officeSlide {
+  width: min(100%, 860px);
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+  overflow: hidden;
+}
+
+.officeSlideNumber {
+  padding: 8px 14px 0;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.officeSlideBody {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The first paragraph of a slide is its title; give it display weight so a
+   deck scanned as a list still reads as a deck. */
+.officeSlideTitle {
+  font: var(--dsw-font-l-strong-18);
+  color: var(--dsw-alias-label-primary);
+}
+
+.officeSlideText {
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.officeSlideEmpty {
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.officeSlideImages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.officeSlideImage {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+/* EMF/WMF are vector metafiles no browser can rasterise: the file name reads
+   better than a broken-image glyph. */
+.officeImageFallback {
+  padding: 6px 10px;
+  border: 1px dashed var(--dsw-alias-border-l2);
+  border-radius: 4px;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.officePager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.officePagerLabel {
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.officeNotes {
+  padding: 8px 14px;
+  border-top: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.officeNotesLabel {
+  display: block;
+  margin-bottom: 4px;
+  font: var(--dsw-font-xxxs-strong-11);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+/* ── docx ────────────────────────────────────────────────────────────── */
+.officeDocx {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 20px 16px 32px;
+}
+
+.officePage {
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 28px 32px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.officeHeading {
+  margin: 18px 0 8px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* Level 1 is the document title; deeper levels step down rather than jumping. */
+.officeHeading[data-level='1'] { font-size: 22px; }
+.officeHeading[data-level='2'] { font-size: 18px; }
+.officeHeading[data-level='3'] { font-size: 16px; }
+.officeHeading[data-level='4'],
+.officeHeading[data-level='5'],
+.officeHeading[data-level='6'] { font-size: 14px; }
+
+.officeParagraph {
+  margin: 0 0 8px;
+  font: var(--dsw-font-s-14);
+  line-height: 1.65;
+  color: var(--dsw-alias-label-primary);
+}
+
+.officeListItem {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 4px;
+  padding-left: 8px;
+}
+
+.officeListMarker {
+  flex: none;
+  min-width: 16px;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.officeListText {
+  font: var(--dsw-font-s-14);
+  line-height: 1.65;
+  color: var(--dsw-alias-label-primary);
+}
+
+/* ── xlsx ────────────────────────────────────────────────────────────── */
+.officeXlsx {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.officeSheetTabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 8px 0;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+  overflow-x: auto;
+}
+
+.officeSheetTab {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.officeSheetTab:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+.officeSheetTabActive {
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.officeGridWrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.officeGrid {
+  border-collapse: collapse;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-primary);
+}
+
+.officeGridCell,
+.officeGridHead {
+  border: 1px solid var(--dsw-alias-border-l1);
+  padding: 4px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sticky so the header row stays readable while a long sheet scrolls under it. */
+.officeGridHead {
+  position: sticky;
+  top: 0;
+  background: var(--dsw-alias-bg-layer-2);
+  font: var(--dsw-font-xxxs-strong-11);
+  color: var(--dsw-alias-label-secondary);
+}
+/* ── Image preview ─────────────────────────────────────────────────────────
+   A zoomable stage. The chrome mirrors the PDF view's toolbar row so the two
+   media viewers read as one family; the stage itself is the pan/scroll box.
+   Zoom rides a CSS transform (not width/height) so panning stays off the
+   layout path — a 4x-scaled image never reflows its ancestors. */
+.editorImageView {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.editorImageToolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.editorImageToggleActive {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.editorImageZoomLabel {
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The scroll box the image is centred in. `touch-action: none` hands the
+   gesture to our pointer handlers — without it a trackpad drag scrolls the
+   stage instead of panning the image. */
+.editorImageStage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  touch-action: none;
+}
+
+.editorImageStage:focus-visible {
+  outline: 2px solid var(--dsw-alias-interactive-bg-hover-accent);
+  outline-offset: -2px;
+}
+
+.editorImageStagePannable {
+  cursor: grab;
+}
+
+.editorImageStagePannable:active {
+  cursor: grabbing;
+}
+
+/* The image is sized by its transform, so it must keep its intrinsic
+   dimensions; the flex centring plus transform-origin at the middle keeps
+   "fit" and "100%" visually anchored. */
+.editorImage {
+  max-width: none;
+  max-height: none;
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+}
+
+/* Legacy single-stage wrapper kept for surfaces that still reference it. */
 .editorImageWrap {
   flex: 1;
   min-height: 0;
@@ -1814,12 +2155,6 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   justify-content: center;
   overflow: auto;
   padding: 12px;
-}
-
-.editorImage {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
 }
 
 .editorMd {

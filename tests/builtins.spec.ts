@@ -187,7 +187,7 @@ describe('built-in file viewer registrations', () => {
   it('registers built-in file viewers including office / csv / audio / video', () => {
     const { service } = setup()
     expect(service.getFileViewers().map(v => v.id).sort()).toEqual(
-      ['audio', 'binary-download', 'code', 'csv', 'html', 'image', 'markdown', 'office', 'pdf', 'video'],
+      ['audio', 'binary-download', 'code', 'csv', 'html', 'image', 'markdown', 'office', 'office-legacy', 'pdf', 'video'],
     )
   })
 
@@ -225,14 +225,25 @@ describe('built-in file viewer registrations', () => {
     expect(toggles[1]?.desc).toBeDefined()
   })
 
-  it('office viewer claims OOXML and legacy office by extension', () => {
+  /** OOXML (.docx/.xlsx/.pptx) gets the in-app `office` preview; the legacy
+   *  binary formats (doc/xls/ppt, ODF, rtf) have no client parser and stay
+   *  on the download pane under their own `office-legacy` id. They must be
+   *  SEPARATE descriptors so a settings toggle can disable the heavy preview
+   *  without also disabling the download escape. */
+  it('office viewer claims OOXML in-app, legacy office falls back to download', () => {
     const { service } = setup()
-    expect(service.matchFileViewer('old.doc')?.id).toBe('office')
-    expect(service.matchFileViewer('old.xls')?.id).toBe('office')
-    expect(service.matchFileViewer('old.ppt')?.id).toBe('office')
     expect(service.matchFileViewer('book.docx', new Uint8Array([0x50, 0x4b, 0x03, 0x04]))?.id).toBe('office')
     expect(service.matchFileViewer('sheet.xlsx')?.id).toBe('office')
     expect(service.matchFileViewer('deck.pptx')?.id).toBe('office')
+    expect(service.matchFileViewer('old.doc')?.id).toBe('office-legacy')
+    expect(service.matchFileViewer('old.xls')?.id).toBe('office-legacy')
+    expect(service.matchFileViewer('old.ppt')?.id).toBe('office-legacy')
+  })
+
+  it('the in-app office viewer reads bytes itself (no host fetch strategy)', () => {
+    const { service } = setup()
+    const office = service.getFileViewers().find(v => v.id === 'office')
+    expect(office?.fetchStrategy).toBe('none')
   })
 
   it('binary-download NUL detect claims unknown-extension binaries over code', () => {
