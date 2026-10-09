@@ -13,4 +13,12 @@ describe('formatPathMention', () => {
     expect(formatPathMention('docs/a note.md', 'file')).toBe('@"docs/a note.md"')
     expect(formatPathMention('my folder', 'directory')).toBe('@"my folder/"')
   })
+
+  it('quotes extensionless root files, leaving anything with shape bare', () => {
+    expect(formatPathMention('Dockerfile', 'file')).toBe('@"Dockerfile"')
+    expect(formatPathMention('Makefile', 'file')).toBe('@"Makefile"')
+    expect(formatPathMention('README.md', 'file')).toBe('@README.md')
+    expect(formatPathMention('src/Dockerfile', 'file')).toBe('@src/Dockerfile')
+    expect(formatPathMention('.gitignore', 'file')).toBe('@".gitignore"')
+  })
 })

@@ -13,7 +13,8 @@ export type PathMentionKind = 'file' | 'directory'
 /**
  * Format a workspace-relative path as composer `@` mention text.
  * Directories always end with `/` (plain-text folder grammar); paths with
- * whitespace use the quoted `@"…"` form.
+ * whitespace use the quoted `@"…"` form, as do extensionless root files —
+ * the composer reads a quoted path as an explicit reference.
  */
 export function formatPathMention(relativePath: string, kind: PathMentionKind): string {
   let path = relativePath.replace(/\\/g, '/').replace(/^\.\//, '')
@@ -23,7 +24,17 @@ export function formatPathMention(relativePath: string, kind: PathMentionKind): 
   } else if (path === '' || path === '.') {
     path = '.'
   }
-  return /\s/.test(path) ? `@"${path}"` : `@${path}`
+  if (/\s/.test(path)) return `@"${path}"`
+  // `Dockerfile`, `Makefile`, `LICENSE`: nothing in a bare `@name` tells the
+  // composer this is a path, so it stays prose. Quoting states the intent.
+  // A leading dot is a hidden-file marker, not an extension: `.gitignore`
+  // has no shape for the composer either, so it quotes like `Dockerfile`.
+  const dot = path.lastIndexOf('.')
+  const shaped = dot > 0 && /\.[A-Za-z0-9][\w.-]*$/.test(path)
+  if (kind === 'file' && path !== '.' && !path.includes('/') && !shaped) {
+    return `@"${path}"`
+  }
+  return `@${path}`
 }
 
 /**
