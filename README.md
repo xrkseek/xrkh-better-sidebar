@@ -10,13 +10,79 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.19.5
+xrkh plugin add xrkh-better-sidebar@0.20.0
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.0
+
+### Office 文档预览（.docx / .xlsx / .pptx）
+
+首次真正支持打开 Office 文档，而不只是「下载」按钮。
+
+- **零新依赖**：新增 `src/client/office/` 纯逻辑模块——用浏览器原生
+  `DecompressionStream('deflate-raw')` 实现 ZIP 读取（`zip.ts`），用原生
+  `DOMParser` 做 XML 取值（`xml.ts`），再分别解析 pptx / docx / xlsx 的
+  OOXML。不引入任何第三方包，不依赖 LibreOffice，离线可用。
+- **保真度的诚实边界**：这是**结构化预览**，不是像素级还原——
+  - pptx：按 `presentation.xml` 的真实页序逐页展示文字、图片、演讲者备注，
+    支持左右键翻页。
+  - docx：标题分级、段落、列表项。
+  - xlsx：多工作表切换、表格网格（每表上限 200 行 × 60 列，代码里有注释说明）。
+
+  前端**高保真**还原幻灯片/文档排版目前没有可用的开源方案：同类标杆
+  `vue-office`（5.7k star）的 pptx 预览是基于其自研闭源库（README 注明
+  「源码单独付费」），docx 用 `docx-preview`、excel 用 `exceljs`。所以我们选择
+  结构化而非画布级还原——宁可少承诺，不假装。`.doc/.xls/.ppt`（旧二进制）、ODF、
+  `.rtf` 没有客户端解析器，继续走下载兜底。
+
+- **ZIP 读取健壮性**：支持 ZIP64（EOCD 哨兵 + locator + per-entry extra field）、
+  store 与 deflate 两种压缩方法、UTF-8 文件名；截断/损坏/加密/超大条目会抛
+  带明确 message 的错误而不是静默返回空。单条目解压上限 512MB（zip bomb 防护）。
+- 修复一个真实 bug：ZIP 解压原先走 `Blob.stream()` + `Response.arrayBuffer()`，
+  在 jsdom 环境无 `Blob.stream()` 会直接炸；改为手动 `ReadableStream` + reader
+  循环，兼容面更广（浏览器 / jsdom / 部分 polyfill 环境都能跑）。
+
+### 图片预览缩放
+
+- 图片预览支持 **Ctrl/⌘ + 滚轮** 以光标为中心缩放，拖拽平移，双击在「适应」
+  和 2x 之间切换，工具栏有「适应 / 100% / 下载」与实时百分比；`+` `-` `0` 快捷键。
+- 修复：React 17+ 把 `wheel` 注册为 passive listener，合成 `onWheel` 的
+  `preventDefault()` 无效——Ctrl+滚轮会连带把整个应用页面一起缩放。改用原生
+  `{ passive: false }` 监听抑制页面级缩放。
+- 缩放走 CSS `transform`（不触发布局），平移有 3px 阈值判定，避免误点击把图拖走。
+
+### 文件树「在文件夹中显示」可见反馈
+
+- 修复「点了没反应」：右键菜单能正常弹出（实测过），但 reveal/open 的失败
+  被 catch 成 `console.error`，界面上零反馈。Host 侧 Windows 走
+  `explorer.exe /select` 时也可能静默失败。现在失败会以可点击关闭的 notice
+  显示在树上，不再静默吞掉。
+
+### 文件树文件操作（新建 / 重命名 / 删除）
+
+- Host 早已提供 `fs.mkdir` / `fs.delete`，但客户端此前完全没接——右键菜单里
+  根本没有这些项，只能看不能管。本轮接上并补齐 UI：
+  - 目录右键：新建文件 / 新建文件夹；文件右键：重命名 / 删除（删除为危险项，
+    带名称确认）。
+  - 取消 prompt 或留空名是 no-op，不会误创建 `dir/`；重命名同名也是 no-op。
+  - 所有失败（权限 / 越界 / 占用）走同一条可见 notice，不静默。
+  - `fs.rename` 用「读字节 → 写入新路径 → 删源」实现，复用已有路由承载的
+    workspace fence，不为这一个功能给 Host 加新动词。
+
+### 其它
+
+- 新增 `IconOfficeOutline16` 文件预览图标；office viewer 拆成 `office`（OOXML
+  应用内预览）与 `office-legacy`（旧格式下载兜底）两个 descriptor，设置页可分别开关。
+- i18n：20 个语言字典补齐本轮全部新键（image* / office* / openExternalFailed /
+  newFolder / rename / delete 等）。
+- 新增/更新测试：图片缩放 10 例、Office 组件 8 例、文件操作 10 例、OOXML 解析
+  34 例（含真实 LibreOffice/pptx 文件验证，缺 fixture 时自动跳过）。全量测试
+  未引入任何回归（基线红/绿保持一致）。
 
 ## 0.19.5
 
