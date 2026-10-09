@@ -27,6 +27,18 @@ describe('Sidebar layout-push integration', () => {
     expect(source).not.toContain('height: bottomPanelHeight + effectiveKeyboardInset')
   })
 
+  // The push must be written synchronously before paint: expand/collapse
+  // flips the panel class at commit time, so a passive effect would start the
+  // conversation's margin transition one frame late and paint the sliding
+  // panel over the still-unsqueezed main content (double-image flicker).
+  it('writes the layout push before paint (useLayoutEffect)', () => {
+    // Bound the match to the hook name alone: the file also has passive
+    // effects that merely CALL layoutPushSize (drag abort paths), which are
+    // not the layout push itself.
+    expect(source).toMatch(/useLayoutEffect\(\(\) => \{[\s\S]{0,600}?writeGeometry\(width, bottomPush\)/)
+    expect(source).not.toMatch(/(?<!Layout)useEffect\(\(\) => \{[\s\S]{0,600}?writeGeometry\(width, bottomPush\)/)
+  })
+
   it('ignores desktop visualViewport keyboard inset after sleep/wake', () => {
     expect(source).toContain('effectiveKeyboardInset = narrow ? keyboardInset : 0')
     expect(source).toContain("document.addEventListener('visibilitychange', onWake)")

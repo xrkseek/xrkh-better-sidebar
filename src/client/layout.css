@@ -25,12 +25,13 @@
  * center grid item via its stable data attribute ([data-pane="conversation"]
  * on the centerCol inside [data-dsh-frame]), not a positional path: the
  * frame's child order also contains an overlay layer and drag handles
- * (verified against a live DSH 0.1.x page), so nth-child is brittle. A
- * stretched grid item shrinks by its margins, so the conversation content
- * (output + input bar) lifts without touching the sidebars.
+ * (verified against a live DSH 0.1.x page), so nth-child is brittle. The
+ * column yields the panel height through its own bottom padding, so the
+ * conversation content (output + input bar) lifts without touching the
+ * sidebars.
  *
  * The sizes ride CSS variables updated by the Sidebar shell (0 while
- * collapsed); expand/collapse animates both the margins and the panel
+ * collapsed); expand/collapse animates both the insets and the panel
  * slides on the same theme duration. Drags disable the transition so the
  * layout tracks the pointer.
  */
@@ -48,10 +49,16 @@
    `[data-pane="conversation"]`, while rc.8-era shells put a
    `[data-slot="conversation"]` child inside it — both selectors resolve to
    the SAME element on live pages (verified), and keeping both future-proofs
-   the rule against a host rename without touching shell-specific markup. */
+   the rule against a host rename without touching shell-specific markup.
+
+   Deliberately NO margin-bottom: the shell yields the bottom panel through
+   the column's own padding (`.centerCol { padding-bottom: var(--xrk-layout-inset-bottom, var(--xrkh-workbench-height, 0px)) }`
+   in ui-layout's AppFrame, which mirrors this plugin's `--xrkh-workbench-height`
+   into that inset). Adding the same margin here charged the panel's height
+   TWICE — the composer lifted a full extra panel height and a blank band
+   opened between it and the panel. Animate the property the shell moves. */
 #root [data-dsh-frame] > [data-pane="conversation"],
 #root :has(> [data-slot="conversation"]) {
-  margin-bottom: var(--xrkh-workbench-height, var(--dsh-sidebar-height, 0px));
   /* Grid/flex items default to min-height:auto. A long unbreakable token
      (OAuth URL) then grows this column past the viewport and clips the
      composer + left-rail Settings row. min-height:0 lets the cell shrink;
@@ -59,7 +66,7 @@
      size. The host's own descendants remain responsible for scrolling. */
   min-height: 0;
   overflow-wrap: anywhere;
-  transition: margin-bottom var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
+  transition: padding-bottom var(--xrkh-sidebar-motion-duration) var(--xrkh-sidebar-motion-ease);
 }
 
 /* Cluster sits in the conversation title band — reserve header actions. */

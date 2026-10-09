@@ -28,7 +28,7 @@
  * drawer floats). Widening does not migrate back: the tabs keep living in
  * the right tree.
  */
-import { createElement, memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from 'react'
+import { createElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from 'react'
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { IconCloseFill14, Tooltip } from '@xrkseek/client-ui-primitives'
@@ -1082,7 +1082,18 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // crush the app shell to zero. Dragging disables the layout transition.
   // On NARROW viewports the drawer FLOATS over the app shell — no push, the
   // conversation keeps the full width behind the drawer.
-  useEffect(() => {
+  //
+  // useLayoutEffect (NOT useEffect): expand/collapse animates the panel via
+  // its class transition AND the conversation via the pushed margin, and the
+  // panel's class is already flipped by commit time. A passive effect would
+  // write the margin on the NEXT frame — the panel slides in while the
+  // conversation still holds its old width, painting the panel over the main
+  // content (the "重影"/double-image flicker). Writing the push synchronously
+  // before paint starts BOTH transitions on the same frame, so the
+  // conversation yields exactly as the panel enters. (The bottom panel does
+  // not need this because Host mirrors its push var via MutationObserver,
+  // which also fires synchronously.)
+  useLayoutEffect(() => {
     const { width, height } = layoutPushSize({
       narrow,
       panelOpen: snapshot.state?.panelOpen === true,

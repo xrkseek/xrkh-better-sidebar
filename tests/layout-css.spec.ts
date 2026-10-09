@@ -8,6 +8,11 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync('src/client/layout.css', 'utf8')
 
+/** Rule body of the conversation-column selector block. */
+function conversationRule(): string | undefined {
+  return css.match(/#root \[data-dsh-frame\][\s\S]*?\{([\s\S]*?)\n\}/)?.[1]
+}
+
 describe('layout.css conversation column', () => {
   it('targets the AppFrame center column', () => {
     expect(css).toContain('[data-pane="conversation"]')
@@ -20,10 +25,19 @@ describe('layout.css conversation column', () => {
   })
 
   it('leaves overflow ownership to the host conversation descendants', () => {
-    const conversationRule = css.match(
-      /#root \[data-dsh-frame\][\s\S]*?\{([\s\S]*?)\n\}/,
-    )?.[1]
-    expect(conversationRule).toBeDefined()
-    expect(conversationRule).not.toMatch(/(?:^|[;\s])overflow\s*:/)
+    const body = conversationRule()
+    expect(body).toBeDefined()
+    expect(body).not.toMatch(/(?:^|[;\s])overflow\s*:/)
+  })
+
+  // The Host shell (ui-layout's AppFrame) yields the bottom panel through the
+  // column's own padding-bottom, reading this plugin's --xrkh-workbench-height
+  // as its fallback. A margin-bottom here charged the panel height TWICE: the
+  // composer lifted an extra full panel height and a blank band opened between
+  // it and the panel. The inset must stay single-counted.
+  it('does not squeeze the column a second time with a margin', () => {
+    const body = conversationRule()
+    expect(body).toBeDefined()
+    expect(body).not.toMatch(/margin-bottom/)
   })
 })
