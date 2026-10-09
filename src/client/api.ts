@@ -218,6 +218,21 @@ async function fetchUpload<T>(
   return parsed.value as T
 }
 
+/**
+ * Write raw bytes to an absolute path through the upload route (which the host
+ * already streams into the workspace, creating parent directories). This is
+ * how a rename copies content: there is no host rename verb, and one is not
+ * warranted just for this — a copy plus a delete of the source uses the routes
+ * that already carry the workspace fence.
+ */
+async function writeBytes(scope: SessionScope, path: string, bytes: Uint8Array): Promise<void> {
+  const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  const dir = at <= 0 ? path : path.slice(0, at)
+  const relativePath = at <= 0 ? path.slice(path.lastIndexOf('/') + 1) : path.slice(at + 1)
+  const body = new Blob([bytes as BlobPart], { type: 'application/octet-stream' })
+  await fetchUpload(scope, dir, relativePath, body)
+}
+
 /** One request's session scope: the conversation id plus its cwd when known. */
 export interface SessionScope {
   sessionId: string
@@ -288,7 +303,24 @@ export const api = {
   fsRead: (scope: SessionScope, path: string, signal?: AbortSignal) =>
     call<FsTextResult | FsBinaryResult>('fs.read', scopePayload(scope, { path }), signal),
   fsWrite: (scope: SessionScope, path: string, content: string) =>
-    call<{ ok: true }>('fs.write', scopePayload(scope, { path, content })),
+    call<{ written: true }>('fs.write', scopePayload(scope, { path, content })),
+  /** Create one directory (recursive by default; the file tree's "new folder"). */
+  fsMkdir: (scope: SessionScope, path: string, recursive = true) =>
+    call<{ created: true; path: string }>('fs.mkdir', scopePayload(scope, { path, recursive })),
+  /** Delete one file or (empty) directory. */
+  fsDelete: (scope: SessionScope, path: string) =>
+    call<{ deleted: true }>('fs.delete', scopePayload(scope, { path })),
+  /** Move/rename a path inside the workspace. */
+  fsRename: async (scope: SessionScope, from: string, to: string): Promise<void> => {
+    // The host exposes no rename verb, and it must not gain one for this: a
+    // rename is a copy of the bytes plus a delete of the source, both of which
+    // the existing routes already fence to the workspace.
+    const read = await fetch(downloadUrl(scope, from), { headers: { accept: 'application/octet-stream' } })
+    if (!read.ok) throw new SidebarApiError('http', `HTTP ${read.status}`)
+    const bytes = new Uint8Array(await read.arrayBuffer())
+    await writeBytes(scope, to, bytes)
+    await api.fsDelete(scope, from)
+  },
   /** Upload one file's raw bytes into `dir` (keeps the folder tree via
    *  `relativePath`); the host streams it under the session workspace. */
   uploadFile: (scope: SessionScope, dir: string, relativePath: string, body: Blob, signal?: AbortSignal) =>

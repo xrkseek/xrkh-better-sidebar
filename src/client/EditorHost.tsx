@@ -112,6 +112,8 @@ export function EditorHost(props: {
   // the viewer loading flow (a directory is not a file).
   const isDir = metaOf(tab).dir === true
   const [load, setLoad] = useState<EditorLoad>({ status: 'loading' })
+  /** Last "open with" failure, shown as a dismissible notice on the tree. */
+  const [externalError, setExternalError] = useState<string | null>(null)
   // Manual refresh (issue #167): bumping the sequence re-runs the load effect
   // with the same path/scope — the only reload entry besides open/close.
   const [reloadSeq, setReloadSeq] = useState(0)
@@ -202,22 +204,27 @@ export function EditorHost(props: {
   /** The context menu's "open with" action: reveal the path in the OS file
    *  manager, or hand the target's URL (a local `file` URL, or the SSH-remote
    *  form for VSCode-family editors in remote mode) to the host's external
-   *  opener. Failures are logged only — a missing handler is the OS's
-   *  dialog, not a sidebar error. */
+   *  opener. Failures surface as a notice on the tree panel: the action is
+   *  fire-and-forget, so a swallowed rejection is indistinguishable from a
+   *  dead menu row — a policy refusal or a missing handler used to read as
+   *  "nothing happened". */
   const openWith = useCallback((targetId: string, absolute: string): void => {
     const target = openWithTargets.find(item => item.id === targetId)
     if (target === undefined) return
+    const report = (error: unknown): void => {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('open external failed', error)
+      setExternalError(t('openExternalFailed', { message }))
+    }
     if (target.kind === 'reveal') {
-      void api.openExternal({ action: 'reveal', path: absolute }).catch(
-        (error: unknown) => { console.error('open external failed', error) },
-      )
+      setExternalError(null)
+      void api.openExternal({ action: 'reveal', path: absolute }).catch(report)
       return
     }
     const url = openWithUrl(target, absolute, openWithConfig)
     if (url === undefined) return
-    void api.openExternal({ action: 'url', url }).catch(
-      (error: unknown) => { console.error('open external failed', error) },
-    )
+    setExternalError(null)
+    void api.openExternal({ action: 'url', url }).catch(report)
   }, [openWithConfig, openWithTargets])
 
   /** Toggle one target's pinned state. The write is serialized (see
@@ -231,6 +238,58 @@ export function EditorHost(props: {
       return { ...blob, openWith: { ...config, pinned } }
     })
   }, [store])
+
+  /* ── File mutations (new file/folder, rename, delete) ──────────────────
+     The tree owns the prompts; this host owns the API calls, the error
+     surface and the tree invalidation. Every failure lands on the same
+     `externalError` notice rather than the console: a silent refusal on a
+     destructive action is indistinguishable from a broken menu. */
+  const joinPath = (dir: string, name: string): string => {
+    const sep = dir.includes('\\') && !dir.includes('/') ? '\\' : '/'
+    return `${dir}${sep}${name}`
+  }
+
+  const reportFs = (error: unknown): void => {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error('file operation failed', error)
+    setExternalError(t('openExternalFailed', { message }))
+  }
+
+  /** Re-list the levels a mutation touched, then surface the new entry. */
+  const afterMutation = useCallback((path: string): void => {
+    setExternalError(null)
+    nudgeTreeWatch(scope)
+    if (path === '') return
+    // Open the parent so a freshly created entry is actually visible — the
+    // expansion set is owned above through `onToggleDir`.
+    const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    if (at > 0) onToggleDir(path.slice(0, at))
+  }, [onToggleDir, scope])
+
+  const createEntry = useCallback((dir: string, name: string, isDir: boolean): void => {
+    const path = joinPath(dir, name)
+    const work = isDir
+      ? api.fsMkdir(scope, path)
+      : api.fsWrite(scope, path, '')
+    void work.then(() => { afterMutation(path) }).catch(reportFs)
+  }, [afterMutation, scope])
+
+  const renameEntry = useCallback((path: string, name: string): void => {
+    const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    const parent = at <= 0 ? path : path.slice(0, at)
+    void api.fsRename(scope, path, joinPath(parent, name))
+      .then(() => { afterMutation(joinPath(parent, name)) })
+      .catch(reportFs)
+  }, [afterMutation, scope])
+
+  const deleteEntry = useCallback((path: string): void => {
+    void api.fsDelete(scope, path)
+      .then(() => {
+        setExternalError(null)
+        nudgeTreeWatch(scope)
+      })
+      .catch(reportFs)
+  }, [scope])
 
   // The viewer's toolbar, hoisted into THIS header: the text editor reports
   // its state and registers its commands (both null/absent for viewers
@@ -431,9 +490,19 @@ export function EditorHost(props: {
   // chrome. File opens land in new per-path tabs through openFile above.
   // A folder window (meta.dir, any mode) renders the SAME surface rooted
   // at the folder instead of the session cwd.
-  if (treeOnly || folderRoot !== undefined) {
+      if (treeOnly || folderRoot !== undefined) {
     return (
       <div className={css.editor}>
+        {externalError !== null && (
+          <div
+            className={clsx(css.editorSearchHint, css.editorError)}
+            role="alert"
+            onClick={() => { setExternalError(null) }}
+            title={t('close')}
+          >
+            {externalError}
+          </div>
+        )}
         <TreePanel
           full
           store={store}
@@ -451,6 +520,9 @@ export function EditorHost(props: {
           onOpenWith={openWith}
           onToggleOpenWithPin={toggleOpenWithPin}
           onReferenceFile={onReferenceFile}
+          onFsCreate={createEntry}
+          onFsRename={renameEntry}
+          onFsDelete={deleteEntry}
         />
       </div>
     )
@@ -545,7 +617,16 @@ export function EditorHost(props: {
           {!showEmpty && load.status === 'error' && (isOutsideWorkspaceMessage(load.message)
             ? <FenceErrorNotice store={store} onDisabled={() => { setReloadSeq(sequence => sequence + 1) }} />
             : <div className={css.editorError}>{load.message}</div>)}
-          {!showEmpty && load.status === 'binary' && <BinaryDownload scope={scope} path={path} />}
+          {!showEmpty && load.status === 'binary' && (
+            <BinaryDownload scope={scope} path={path} notice={externalError ?? undefined} />
+          )}
+          {/* A failed "open with" is shown over whatever content is live —
+              it is a one-shot notice, not a file-state error. */}
+          {!showEmpty && externalError !== null && (
+            <div className={clsx(css.editorSearchHint, css.editorError)} role="alert">
+              {externalError}
+            </div>
+          )}
           {!showEmpty && load.status === 'ready' && createElement(load.viewer.component, {
             ctx, store, scope, path, title,
             viewerId: load.viewer.id,
@@ -587,7 +668,20 @@ export function EditorHost(props: {
               onOpenWith={openWith}
               onToggleOpenWithPin={toggleOpenWithPin}
               onReferenceFile={onReferenceFile}
+              onFsCreate={createEntry}
+              onFsRename={renameEntry}
+              onFsDelete={deleteEntry}
             />
+            {externalError !== null && (
+              <div
+                className={clsx(css.editorSearchHint, css.editorError)}
+                role="alert"
+                onClick={() => { setExternalError(null) }}
+                title={t('close')}
+              >
+                {externalError}
+              </div>
+            )}
           </div>
         )}
       </div>

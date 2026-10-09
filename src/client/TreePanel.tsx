@@ -65,6 +65,10 @@ export interface TreePanelProps {
   onOpenWith?: (targetId: string, path: string) => void
   onToggleOpenWithPin?: (targetId: string) => void
   onReferenceFile: (path: string, kind?: 'file' | 'directory') => void
+  /** Create / rename / delete one entry (prompts live in FileTree). */
+  onFsCreate: (dir: string, name: string, isDir: boolean) => void
+  onFsRename: (path: string, name: string) => void
+  onFsDelete: (path: string, name: string) => void
   /** Full-window presentation: the panel fills its host instead of docking
    *  at a fixed width. */
   full?: boolean
@@ -79,7 +83,7 @@ export interface TreePanelProps {
  * alone instead of the whole explorer subtree.
  */
 export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
-  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, full } = props
+  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, onFsCreate, onFsRename, onFsDelete, full } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ matches: string[]; truncated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -249,6 +253,9 @@ export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
           onOpenWith={onOpenWith}
           onToggleOpenWithPin={onToggleOpenWithPin}
           onReferenceFile={onReferenceFile}
+          onFsCreate={onFsCreate}
+          onFsRename={onFsRename}
+          onFsDelete={onFsDelete}
           refreshTick={refreshTick}
           onUploadRequest={startUpload}
           busy={busy}

@@ -138,10 +138,18 @@ export function FileTree(props: {
   refreshTick: number
   /** Upload into `dir` (absolute, inside the workspace); runs in the caller. */
   onUploadRequest: (dir: string, items: UploadItem[]) => void
+  /**
+   * Create / rename / delete one entry inside the workspace. `dir` is the
+   * containing directory, `name` the leaf. The caller owns the API calls and
+   * the refresh, so this surface only owns the prompts and the menu.
+   */
+  onFsCreate: (dir: string, name: string, isDir: boolean) => void
+  onFsRename: (path: string, name: string) => void
+  onFsDelete: (path: string, name: string) => void
   /** True while an upload is in flight (drops are ignored). */
   busy: boolean
 }) {
-  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, refreshTick, onUploadRequest, busy } = props
+  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, refreshTick, onUploadRequest, onFsCreate, onFsRename, onFsDelete, busy } = props
   const [data, setData] = useState<Record<string, LevelData>>({})
   const dataRef = useRef(data)
   /** The row whose path was just copied ("copied" label replaces its button). */
@@ -712,9 +720,27 @@ export function FileTree(props: {
           ...(rowMenu?.isDir === false
             ? [{ id: 'download', label: t('download'), icon: <IconDownloadOutline16 size={16} /> }]
             : []),
-          // Upload into a directory (incl. the workspace root row).
+          // Create / mutate the entry. The workspace-root row is a directory
+          // too, so the "new …" pair is offered on it as well.
           ...(rowMenu?.isDir === true
-            ? [{ id: 'upload-here', label: t('uploadHere'), icon: <IconUploadOutline16 size={16} /> }]
+            ? [
+                { id: 'upload-here', label: t('uploadHere'), icon: <IconUploadOutline16 size={16} /> },
+                { id: 'fs-sep-1', type: 'separator' } as MenuEntry,
+                { id: 'new-file', label: t('newFile'), icon: <IconCodeOutline16 size={16} /> },
+                { id: 'new-folder', label: t('newFolder'), icon: <VscFolderOpened size={16} /> },
+              ]
+            : [
+                { id: 'fs-sep-1', type: 'separator' } as MenuEntry,
+                { id: 'rename', label: t('rename'), icon: <IconCodeOutline16 size={16} /> },
+              ]),
+          {
+            id: 'delete',
+            label: t('delete'),
+            icon: <IconDownloadOutline16 size={16} />,
+            danger: true,
+          },
+          ...(rowMenu?.isDir === true
+            ? [{ id: 'fs-sep-2', type: 'separator' } as MenuEntry]
             : []),
           { id: 'relative', label: t('copyRelative'), icon: <IconCopyOutline16 size={16} /> },
           { id: 'absolute', label: t('copyAbsolute'), icon: <IconCopyOutline16 size={16} /> },
@@ -742,6 +768,28 @@ export function FileTree(props: {
           if (id === 'upload-here') {
             pendingUploadDir.current = target.path
             fileInputRef.current?.click()
+            return
+          }
+          if (id === 'new-file' || id === 'new-folder') {
+            const name = window.prompt(t(id === 'new-file' ? 'newFile' : 'newFolder'), '')
+            // A cancelled prompt returns null; an empty name would create an
+            // unopenable entry, so both are no-ops.
+            if (name === null || name.trim() === '') return
+            onFsCreate(target.path, name.trim(), id === 'new-folder')
+            return
+          }
+          if (id === 'rename') {
+            const name = window.prompt(t('renamePrompt'), baseName(target.path))
+            if (name === null || name.trim() === '' || name.trim() === baseName(target.path)) return
+            onFsRename(target.path, name.trim())
+            return
+          }
+          if (id === 'delete') {
+            const name = baseName(target.path)
+            // Deleting is irreversible, and a mis-click here loses work: the
+            // name goes into the prompt so the target is never ambiguous.
+            if (!window.confirm(t('deleteConfirm', { name }))) return
+            onFsDelete(target.path, name)
             return
           }
           copyPath(
