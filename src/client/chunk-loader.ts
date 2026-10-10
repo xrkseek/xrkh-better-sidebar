@@ -3,9 +3,9 @@
  * libraries (CodeMirror, xterm --the editor/terminal stacks, several MB)
  * live in separate build-time bundles (`lib/client-<name>.js`) fetched only
  * on first use of the feature that needs them, so startup downloads/parses
- * only the ~1MB core bundle. (The office stack --Univer / docx-preview /
- * pptx-renderer --is no longer bundled here: Office previews moved to the
- * recommended office plugin, see plugins-viewers.ts.)
+* only the ~1MB core bundle. (The office stack — Univer / docx-preview /
+* pptx-renderer — lives in `xrkh-better-sidebar-plugin-office`; see
+* plugins-viewers.ts.)
  *
  * How a chunk script works (see tsdown.config.ts chunkBundle):
  *

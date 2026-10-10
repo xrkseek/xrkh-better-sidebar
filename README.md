@@ -10,7 +10,7 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.0
+xrkh plugin add xrkh-better-sidebar@0.20.2
 xrkh restart
 ```
 
@@ -18,34 +18,38 @@ xrkh restart
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
+## 0.20.2
+
+- 图片预览 Ctrl/⌘+滚轮灵敏度修正：单次滚轮不再跳到 800%/1600%。
+- 自由窗口 z-index 提到 48（高于面板开关簇 45），重叠顶栏缝时可正常关闭。
+- 自由窗口 y 夹取尊重 Desktop 标题栏高度（`--xrk-desktop-chrome-height` / `--dsh-title-bar-strip`），避免钻到 chrome（z=55）下面点不到。
+
+## 0.20.1
+
+- OOXML 高保真预览外置为独立包 `xrkh-better-sidebar-plugin-office`（AGPL）；本包仅保留 `office-legacy` 下载兜底。
+- Side card →「添加预览插件」推荐目录收录 office 安装命令。
+
+```bash
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.1
+```
+
 ## 0.20.0
 
-### Office 文档预览（.docx / .xlsx / .pptx）
+### Office 文档预览（独立插件）
 
-首次真正支持打开 Office 文档，而不只是「下载」按钮。
+高保真 `.docx` / `.xlsx` / `.pptx` 预览由独立包
+`xrkh-better-sidebar-plugin-office` 提供（docx-preview / Univer /
+`@aiden0z/pptx-renderer`），通过 `ctx.betterSidebar.registerFileViewer`
+注册，不进本包 client bundle。安装：
 
-- **零新依赖**：新增 `src/client/office/` 纯逻辑模块——用浏览器原生
-  `DecompressionStream('deflate-raw')` 实现 ZIP 读取（`zip.ts`），用原生
-  `DOMParser` 做 XML 取值（`xml.ts`），再分别解析 pptx / docx / xlsx 的
-  OOXML。不引入任何第三方包，不依赖 LibreOffice，离线可用。
-- **保真度的诚实边界**：这是**结构化预览**，不是像素级还原——
-  - pptx：按 `presentation.xml` 的真实页序逐页展示文字、图片、演讲者备注，
-    支持左右键翻页。
-  - docx：标题分级、段落、列表项。
-  - xlsx：多工作表切换、表格网格（每表上限 200 行 × 60 列，代码里有注释说明）。
+```bash
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0
+```
 
-  前端**高保真**还原幻灯片/文档排版目前没有可用的开源方案：同类标杆
-  `vue-office`（5.7k star）的 pptx 预览是基于其自研闭源库（README 注明
-  「源码单独付费」），docx 用 `docx-preview`、excel 用 `exceljs`。所以我们选择
-  结构化而非画布级还原——宁可少承诺，不假装。`.doc/.xls/.ppt`（旧二进制）、ODF、
-  `.rtf` 没有客户端解析器，继续走下载兜底。
+或源码：`xrkh plugin add ./extensions/xrkh-better-sidebar-plugin-office`。
 
-- **ZIP 读取健壮性**：支持 ZIP64（EOCD 哨兵 + locator + per-entry extra field）、
-  store 与 deflate 两种压缩方法、UTF-8 文件名；截断/损坏/加密/超大条目会抛
-  带明确 message 的错误而不是静默返回空。单条目解压上限 512MB（zip bomb 防护）。
-- 修复一个真实 bug：ZIP 解压原先走 `Blob.stream()` + `Response.arrayBuffer()`，
-  在 jsdom 环境无 `Blob.stream()` 会直接炸；改为手动 `ReadableStream` + reader
-  循环，兼容面更广（浏览器 / jsdom / 部分 polyfill 环境都能跑）。
+未安装时，OOXML 与旧格式（`.doc/.xls/.ppt` / ODF / RTF）一律走本包
+`office-legacy` 下载兜底。Side card →「添加预览插件」也可一键复制安装命令。
 
 ### 图片预览缩放
 
@@ -76,8 +80,8 @@ xrkh restart
 
 ### 其它
 
-- 新增 `IconOfficeOutline16` 文件预览图标；office viewer 拆成 `office`（OOXML
-  应用内预览）与 `office-legacy`（旧格式下载兜底）两个 descriptor，设置页可分别开关。
+- 新增 `IconOfficeOutline16` 文件预览图标；OOXML 高保真预览外置为
+  `xrkh-better-sidebar-plugin-office`，本包保留 `office-legacy` 下载兜底。
 - i18n：20 个语言字典补齐本轮全部新键（image* / office* / openExternalFailed /
   newFolder / rename / delete 等）。
 - 新增/更新测试：图片缩放 10 例、Office 组件 8 例、文件操作 10 例、OOXML 解析

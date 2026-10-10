@@ -2,11 +2,9 @@
  * Interception of the chat's file-open funnel. The client runtime's
  * `ctx.workspaces.openPath` is the SINGLE door every chat-side file open goes
  * through — ui-conversation's apply.ts resolves the path against the session
- * cwd and calls it for tool-row path links, the produced-files row, and
- * prose file mentions alike (verified against the DSH source:
- * `packages/client/ui-conversation/src/client/apply.ts` is the only
- * production caller). Wrapping that one method reroutes those opens into the
- * sidebar editor instead of the Host OS — no DSH modification needed.
+ * cwd and calls it for tool-row path links, deliverables opens, and
+ * prose file mentions alike. Wrapping that one method reroutes those opens
+ * into the sidebar editor instead of the Host OS.
  *
  * The wrapper is dependency-free by design (no React / ui-primitives), so
  * the takeover logic is unit-testable and the file stays importable from the
@@ -15,7 +13,7 @@
 
 /** The one service method the wrapper replaces (mirror of the runtime IWorkspaces). */
 export interface OpenPathService {
-  openPath(path: string): Promise<void>
+  openPath(path: string, options?: { readonly reveal?: boolean }): Promise<void>
 }
 
 /** Per-call decisions the wrapper needs (wired to the store + ctx in the client half). */
@@ -51,8 +49,9 @@ export function isFolderRevealPath(path: string): boolean {
  * Wrap `workspaces.openPath`: intercepted calls open the file in the sidebar
  * editor instead of the Host OS and resolve as success (the original's
  * callers ignore the result); anything that declines falls through to the
- * original method untouched. The one exception is the folder-reveal gesture,
- * which is routed to {@link OpenPathInterceptDeps.revealInExplorer} instead.
+ * original method untouched (options preserved). The one exception is the
+ * folder-reveal gesture, which is routed to
+ * {@link OpenPathInterceptDeps.revealInExplorer} instead.
  * @param workspaces - the client workspaces service to wrap.
  * @param deps - per-call takeover decisions.
  * @returns the disposer restoring the original method (HMR-safe).
@@ -62,16 +61,22 @@ export function wrapOpenPath(workspaces: OpenPathService, deps: OpenPathIntercep
   // exact original so a chain of wrappers (other plugins wrapping the same
   // method) keeps working across disposals in any order.
   const original = workspaces.openPath
-  workspaces.openPath = (path: string): Promise<void> => {
+  workspaces.openPath = (path: string, options?: { readonly reveal?: boolean }): Promise<void> => {
     if (deps.takeoverEnabled()) {
       const sessionId = deps.currentSessionId()
       if (sessionId !== undefined) {
-        if (isFolderRevealPath(path)) deps.revealInExplorer(path, sessionId)
-        else deps.openInSidebar(path, sessionId)
-        return Promise.resolve()
+        if (isFolderRevealPath(path)) {
+          deps.revealInExplorer(path, sessionId)
+          return Promise.resolve()
+        }
+        // File opens only — never swallow a non-folder `reveal: true` (Host OS).
+        if (options?.reveal !== true) {
+          deps.openInSidebar(path, sessionId)
+          return Promise.resolve()
+        }
       }
     }
-    return original.call(workspaces, path)
+    return original.call(workspaces, path, options)
   }
   return () => {
     workspaces.openPath = original

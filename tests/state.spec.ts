@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  activateTab, allLeaves, BOTTOM_DEFAULT, BOTTOM_MIN, closeFloatByTab, closeTab, createSidebarStore,
+  activateTab, allLeaves, BOTTOM_DEFAULT, BOTTOM_MIN, clampFloatGeometry, closeFloatByTab, closeTab, createSidebarStore,
   dockFloat, editorHomeTitle, FLOAT_MIN_H, FLOAT_MIN_W, floatTab, floatWithTab, insertLeafAt, makeDefaultState,
   migrateBottomTabs, moveFloat, moveTab, moveTabToEdge, openDiffTab,
   openTabInActivePane, patchTab, raiseFloat, reconcileAgentTerminals, resizeFloat, resizeSplit,
@@ -1014,6 +1014,30 @@ describe('free windows (v0.16.0)', () => {
     } finally {
       if (previous === undefined) delete g.window
       else g.window = previous
+    }
+  })
+
+  it('clampFloatGeometry respects the Desktop title-bar strip', () => {
+    const g = globalThis as Record<string, unknown>
+    const previousWindow = g.window
+    g.window = { innerWidth: 1024, innerHeight: 768 }
+    vi.stubGlobal('document', { documentElement: {} })
+    vi.stubGlobal('getComputedStyle', () => ({
+      getPropertyValue: (name: string) => {
+        if (name === '--xrk-desktop-chrome-height') return '36px'
+        if (name === '--dsh-title-bar-strip') return '0px'
+        return ''
+      },
+    }))
+    try {
+      const geo = clampFloatGeometry(-10, -10, 400, 500)
+      expect(geo.x).toBe(0)
+      expect(geo.y).toBe(36)
+      expect(geo.h).toBeLessThanOrEqual(768 - 36)
+    } finally {
+      vi.unstubAllGlobals()
+      if (previousWindow === undefined) delete g.window
+      else g.window = previousWindow
     }
   })
 

@@ -26,13 +26,26 @@ import css from './sidebar.module.css'
 
 /** Below this a pinch/drag delta is noise, not intent. */
 const MIN_SCALE = 0.05
-const MAX_SCALE = 16
-/** Wheel notch step; a fine-pointer wheel reports small deltas, so scale by `exp`. */
-const WHEEL_BASE = 1.0015
+/** Hard ceiling; with sane wheel steps this is many notches away, not one flick. */
+const MAX_SCALE = 8
+/**
+ * Per-pixel wheel sensitivity for `exp(-deltaY * k)`.
+ * Must stay ~1e-3: `1.0015` made a single ±120 notch jump straight to MAX
+ * (~1600%) / MIN, which is what users hit with Ctrl+scroll.
+ */
+const WHEEL_SENSITIVITY = 0.0015
+/** Cap one wheel event so a coalesced trackpad delta cannot leap to the clamp. */
+const WHEEL_DELTA_CAP = 160
 /** A pointer move beyond this (px) turns a press into a pan. */
 const DRAG_THRESHOLD = 3
 /** Double-click step. */
 const DBL_CLICK_SCALE = 2
+
+/** Multiplicative zoom factor for one wheel event (Ctrl/⌘ held). */
+function wheelZoomFactor(deltaY: number): number {
+  const capped = Math.max(-WHEEL_DELTA_CAP, Math.min(WHEEL_DELTA_CAP, deltaY))
+  return Math.exp(-capped * WHEEL_SENSITIVITY)
+}
 
 export function ImagePreview(props: { scope: SessionScope; path: string; title: string }): ReactNode {
   const { scope, path, title } = props
@@ -117,7 +130,7 @@ export function ImagePreview(props: { scope: SessionScope; path: string; title: 
       if (!event.ctrlKey && !event.metaKey) return
       event.preventDefault()
       event.stopPropagation()
-      zoomAbout(scale * Math.exp(-event.deltaY * WHEEL_BASE), event.clientX, event.clientY)
+      zoomAbout(scale * wheelZoomFactor(event.deltaY), event.clientX, event.clientY)
     }
     el.addEventListener('wheel', onNativeWheel, { passive: false })
     return () => { el.removeEventListener('wheel', onNativeWheel) }

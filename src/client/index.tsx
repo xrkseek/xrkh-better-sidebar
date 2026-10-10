@@ -3,10 +3,11 @@
  * preferences through the plugin's own fenced settings route, mounts the
  * right sidebar portal (inside an error boundary so a rendering failure
  * shows an error strip instead of a blank panel), registers the turn-tail
- * interception, and contributes the Side card settings section to the Host
- * Settings shell. Requires the runtime's slots and sessions services; the
- * bundle itself is a module-table consumer only (react + ui-primitives +
- * xterm, all provided or inlined).
+ * open-path interception, and contributes the Side card settings section to
+ * the Host Settings shell. Turn-tail deliverables stay first-party
+ * (`@xrkseek/client-ui-deliverables`). Requires the runtime's slots and
+ * sessions services; the bundle itself is a module-table consumer only
+ * (react + ui-primitives + xterm, all provided or inlined).
  */
 import { createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -19,7 +20,7 @@ import { revalidateChunksOnReactivate, setChunkModuleSystem } from './chunk-load
 import { registerBuiltins } from './builtins/index.ts'
 import { Sidebar } from './Sidebar.tsx'
 import { RenderBoundary } from './RenderBoundary.tsx'
-import { registerOpenPathInterception, registerTurnTailInterception } from './intercept.tsx'
+import { registerOpenPathInterception } from './intercept.tsx'
 import { registerLinkInterception } from './link-intercept.ts'
 import { registerImeGuard } from './ime-guard.ts'
 import { registerSettingsNavIcon } from './settings-nav-icon.ts'
@@ -273,18 +274,6 @@ export function apply(ctx: Context): void {
         unmount()
       }
     }, 'xrkh-better-sidebar: sidebar mount')
-
-    ctx.effect(
-      () => {
-        try {
-          return registerTurnTailInterception(ctx, sidebarStore)
-        } catch (error) {
-          fail('interception', error)
-          return () => {}
-        }
-      },
-      'xrkh-better-sidebar: turn-tail interception',
-    )
 
     ctx.effect(
       () => {

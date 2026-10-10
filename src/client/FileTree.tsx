@@ -453,6 +453,21 @@ export function FileTree(props: {
         label: openWithLabelOf(target),
         icon: itemIcon(target),
       }))
+    // "Show in folder" is the one open-with target users reach for on every
+    // file; burying it two levels deep (submenu only) made it read as missing.
+    // Always promote the reveal target to the top level, labeled by what it
+    // does (`showInFolder`) rather than "File Manager" (the app name).
+    const reveal = openWithTargets.find(target => target.kind === 'reveal')
+    const topLevel = reveal === undefined
+      ? pinned
+      : [
+          ...pinned.filter(item => item.id !== `open-with:${reveal.id}`),
+          {
+            id: `open-with:${reveal.id}`,
+            label: t('showInFolder'),
+            icon: itemIcon(reveal),
+          } as MenuItem,
+        ]
     const submenu = openWithTargets.map<MenuItem>(target => {
       const pinnedNow = pinnedIds.includes(target.id)
       return {
@@ -485,8 +500,8 @@ export function FileTree(props: {
       }
     })
     return [
-      ...pinned,
-      ...(pinned.length > 0 ? [{ id: 'open-with-sep', type: 'separator' } as MenuEntry] : []),
+      ...topLevel,
+      ...(topLevel.length > 0 ? [{ id: 'open-with-sep', type: 'separator' } as MenuEntry] : []),
       {
         id: 'open-with-menu',
         // The primitives Menu renders no chevron for submenu parents — the

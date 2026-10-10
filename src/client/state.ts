@@ -904,17 +904,35 @@ function viewportH(): number {
   return typeof window !== 'undefined' && Number.isFinite(window.innerHeight) ? window.innerHeight : Infinity
 }
 
+/**
+ * Top inset reserved by Desktop chrome / title-bar strip. Float z-index (48)
+ * sits under chrome (55), so y=0 would hide the float header under the
+ * caption bar. Same CSS vars the toggle cluster already respects.
+ */
+function titleBarInsetTop(): number {
+  if (typeof document === 'undefined') return 0
+  const style = getComputedStyle(document.documentElement)
+  const strip = Number.parseFloat(style.getPropertyValue('--dsh-title-bar-strip'))
+  const chrome = Number.parseFloat(style.getPropertyValue('--xrk-desktop-chrome-height'))
+  const a = Number.isFinite(strip) ? strip : 0
+  const b = Number.isFinite(chrome) ? chrome : 0
+  return Math.max(0, a, b)
+}
+
 /** Clamp free-window geometry: sizes respect the floor and the viewport, and
- *  the position keeps the whole window inside the viewport. Without a window
- *  (unit tests) only the floor applies — the caller's values pass through. */
+ *  the position keeps the whole window inside the viewport (below the
+ *  title-bar strip on Desktop). Without a window (unit tests) only the floor
+ *  applies — the caller's values pass through. */
 export function clampFloatGeometry(x: number, y: number, w: number, h: number): Pick<FloatWindow, 'x' | 'y' | 'w' | 'h'> {
   const vw = viewportW()
   const vh = viewportH()
+  const minY = titleBarInsetTop()
+  const availH = Number.isFinite(vh) ? Math.max(FLOAT_MIN_H, vh - minY) : Infinity
   const width = Math.round(Math.min(Math.max(w, FLOAT_MIN_W), Math.max(FLOAT_MIN_W, vw)))
-  const height = Math.round(Math.min(Math.max(h, FLOAT_MIN_H), Math.max(FLOAT_MIN_H, vh)))
+  const height = Math.round(Math.min(Math.max(h, FLOAT_MIN_H), Math.max(FLOAT_MIN_H, availH)))
   return {
     x: Math.round(Math.min(Math.max(x, 0), Math.max(0, vw - width))),
-    y: Math.round(Math.min(Math.max(y, 0), Math.max(0, vh - height))),
+    y: Math.round(Math.min(Math.max(y, minY), Math.max(minY, vh - height))),
     w: width,
     h: height,
   }

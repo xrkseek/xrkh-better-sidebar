@@ -4,3 +4,17 @@ packages:
 allowBuilds:
   node-pty: true
   protobufjs: true
+
+overrides:
+  "@xrkseek/cordis": link:../../packages/cordis
+  "@xrkseek/client-locale": link:../../packages/client/locale
+  "@xrkseek/client-ui-conversation": link:../../packages/client/ui-conversation
+  "@xrkseek/client-ui-layout": link:../../packages/client/ui-layout
+  "@xrkseek/client-ui-primitives": link:../../packages/client/ui-primitives
+  "@xrkseek/client-ui-settings": link:../../packages/client/ui-settings
+  "@xrkseek/client-ui-slots": link:../../packages/client/ui-slots
+  "@xrkseek/xrk-invariants": link:../../packages/stubs/xrk-invariants
+  "@xrkseek/xrk-settings": link:../../packages/stubs/xrk-settings
+  "@xrkseek/xrk-tools": link:../../packages/stubs/xrk-tools
+  "@xrkseek/xrk-llm": link:../../packages/stubs/xrk-llm
+  "@xrkseek/xrk-agent": link:../../packages/stubs/xrk-agent

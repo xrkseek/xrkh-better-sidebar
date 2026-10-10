@@ -346,15 +346,16 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 /* One floating tab: the same card surface as the panels, at viewport
    coordinates inside the panel host (immune to shell transforms). z-index
-   42: above the panels (40) so a window drags across them, below the
-   toggle cluster (45) and the app's overlay stack (100+, issue #52).
-   Stacking among windows is the floats array order (siblings share the
-   z-index; DOM order wins). Deliberately NO box transition — the header/
-   resize drags write left/top/width/height per frame. Elevated surface,
-   so unlike the flat panels it earns a shadow token. */
+   48: above the panels (40) AND the toggle cluster (45) so the float's
+   close/header stay clickable — 42 sat under the toggles and trapped
+   windows that overlapped the top-right seam. Still below app overlays
+   (100+, issue #52). Stacking among windows is the floats array order
+   (siblings share the z-index; DOM order wins). Deliberately NO box
+   transition — the header/resize drags write left/top/width/height per
+   frame. Elevated surface, so unlike the flat panels it earns a shadow. */
 .floatWindow {
   position: absolute;
-  z-index: 42;
+  z-index: 48;
   display: flex;
   flex-direction: column;
   /* Re-enable interaction inside the click-transparent panel host. */
@@ -461,11 +462,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 /* The drag-out hint over the conversation column: a dashed frame marking
    the drop zone, pointer-transparent so it never disturbs the drag it
-   describes. z-index 46: above the windows (42) for unambiguous feedback,
+   describes. z-index 50: above the windows (48) for unambiguous feedback,
    still below the app's overlay stack. */
 .floatDropHint {
   position: absolute;
-  z-index: 46;
+  z-index: 50;
   pointer-events: none;
   border: 2px dashed var(--dsw-alias-interactive-bg-hover-accent);
   border-radius: 8px;

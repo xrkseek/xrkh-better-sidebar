@@ -10,7 +10,7 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.0
+xrkh plugin add xrkh-better-sidebar@0.20.2
 xrkh restart
 ```
 
@@ -18,35 +18,39 @@ Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
 
+## 0.20.2
+
+- Image preview Ctrl/⌘+wheel sensitivity: a single notch no longer jumps to 800%/1600%.
+- Free-window z-index raised to 48 (above the toggle cluster at 45) so close/header stay clickable when overlapping the top-right seam.
+- Free-window y clamp respects the Desktop title-bar strip (`--xrk-desktop-chrome-height` / `--dsh-title-bar-strip`) so windows do not slide under chrome (z=55).
+
+## 0.20.1
+
+- High-fidelity OOXML preview moves to `xrkh-better-sidebar-plugin-office` (AGPL); this package keeps `office-legacy` download only.
+- Side card → “Add preview plugin” catalogs the office install command.
+
+```bash
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.1
+```
+
 ## 0.20.0
 
-### Office preview (.docx / .xlsx / .pptx)
+### Office preview (separate plugin)
 
-Office files can now actually be opened instead of offering only a download button.
+High-fidelity `.docx` / `.xlsx` / `.pptx` preview is provided by the separate package
+`xrkh-better-sidebar-plugin-office` (docx-preview / Univer / `@aiden0z/pptx-renderer`),
+registered via `ctx.betterSidebar.registerFileViewer` — not part of this package's
+client bundle. Install:
 
-- **Zero new dependencies**: a new `src/client/office/` pure-logic module reads ZIP through
-  the browser-native `DecompressionStream('deflate-raw')` (`zip.ts`) and XML through the
-  native `DOMParser` (`xml.ts`), then parses OOXML for pptx / docx / xlsx. No third-party
-  package, no LibreOffice, works offline.
-- **The fidelity boundary, stated honestly**: this is a **structured preview**, not
-  pixel-level reproduction —
-  - pptx: real slide order from `presentation.xml`, text, images and speaker notes, arrow keys to page.
-  - docx: heading levels, paragraphs, list items.
-  - xlsx: multiple sheets, a table grid (capped at 200 rows × 60 columns per sheet, noted in code).
+```bash
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0
+```
 
-  High-fidelity slide/document rendering has no usable open-source option on the client: the
-  closest reference, `vue-office` (5.7k stars), previews pptx through its own closed-source
-  library (its README notes the source is sold separately) and uses `docx-preview` / `exceljs`
-  for the rest. So we chose structured over canvas-level fidelity — promise less rather than
-  pretend. Legacy `.doc/.xls/.ppt` binaries, ODF and `.rtf` have no client parser and keep the
-  download fallback.
-- **ZIP robustness**: ZIP64 (EOCD sentinel + locator + per-entry extra field), store and
-  deflate methods, UTF-8 filenames; truncated / corrupt / encrypted / oversized entries throw
-  with an explicit message instead of silently returning empty. Per-entry decompression is
-  capped at 512MB (zip-bomb guard).
-- Fixes a real bug: extraction went through `Blob.stream()` + `Response.arrayBuffer()`, which
-  throws outright where `Blob.stream()` is missing (jsdom); it now uses a manual
-  `ReadableStream` + reader loop, so it runs in browsers, jsdom and partial polyfills alike.
+Or from source: `xrkh plugin add ./extensions/xrkh-better-sidebar-plugin-office`.
+
+Without the plugin, OOXML and legacy formats (`.doc/.xls/.ppt` / ODF / RTF) all use
+this package's `office-legacy` download fallback. Side card → “Add preview plugin”
+also copies the install command.
 
 ### Image preview zoom
 
@@ -83,9 +87,8 @@ Office files can now actually be opened instead of offering only a download butt
 
 ### Other
 
-- New `IconOfficeOutline16` file-preview icon; the office viewer is split into `office`
-  (in-app OOXML preview) and `office-legacy` (legacy download fallback) descriptors, each
-  toggleable in settings.
+- New `IconOfficeOutline16` file-preview icon; high-fidelity OOXML preview lives in
+  `xrkh-better-sidebar-plugin-office`, while this package keeps `office-legacy` download.
 - i18n: all 20 locale dictionaries gained this round's keys (image* / office* /
   openExternalFailed / newFolder / rename / delete, …).
 - New/updated tests: 10 image-zoom cases, 8 office component cases, 10 file-operation cases,

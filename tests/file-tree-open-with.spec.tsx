@@ -115,12 +115,15 @@ describe('FileTree open-with menu', () => {
     document.body.innerHTML = ''
   })
 
-  it('renders the pinned direct row and the submenu parent for a file row', async () => {
+  it('renders the pinned direct row, Show in folder, and the submenu parent', async () => {
     harness = await mountTree()
     openMenu(harness.container)
     const items = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+    const labels = items.map(item => item.textContent?.trim())
     // The pinned VS Code sits at the top level (before the submenu parent).
-    expect(items.map(item => item.textContent?.trim())).toContain('VS Code')
+    expect(labels).toContain('VS Code')
+    // Reveal is always promoted to the top level (not buried in the submenu).
+    expect(labels).toContain('Show in folder')
     const parent = items.find(item => item.getAttribute('aria-haspopup') === 'menu')
     expect(parent?.textContent).toContain('Open with')
     // The submenu parent carries the trailing chevron affordance (the

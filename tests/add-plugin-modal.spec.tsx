@@ -48,12 +48,12 @@ describe('PluginListBody (render)', () => {
     expect(html).toContain('Copy')
   })
 
-  it('tab kind renders the sentinel entry (its own catalog, no office entry)', () => {
+  it('tab kind renders the empty curated catalog (no office entry)', () => {
     const store = createSidebarStore()
     const service = createBetterSidebarService(store)
     const html = renderToString(createElement(PluginListBody, { service, kind: 'tab' }))
-    expect(html).toContain('dsh-sentinel 唤醒系统')
-    expect(html).toContain('github:fuhefei/dsh-sentinel')
+    expect(builtinTabPlugins).toEqual([])
+    expect(html).toContain('No plugins curated yet')
     expect(html).not.toContain(officeEntry.name)
   })
 })
@@ -76,7 +76,8 @@ describe('AddPluginModal wiring', () => {
       if (kind === 'viewer') {
         expect(html).toContain(officeEntry.name)
       } else {
-        expect(html).toContain('dsh-sentinel 唤醒系统')
+        expect(html).toContain('No plugins curated yet')
+        expect(html).not.toContain(officeEntry.name)
       }
       act(() => { root.unmount() })
       container.remove()

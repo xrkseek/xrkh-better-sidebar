@@ -2,9 +2,9 @@
  * Built-in registration tests: the plugin registers 6 tabs and 6 file
  * viewers through the same service external plugins use (dogfooding);
  * the catch-all `code` viewer, the NUL-sniffing `binary-download` viewer,
- * and the html sandbox settings pin the registry's behavior. (Office
- * previews are built in (download pane) alongside csv/audio/video,
- * see src/client/plugins-viewers.ts.) The git tab is the unified changes
+ * and the html sandbox settings pin the registry's behavior. (Hi-fi Office
+ * preview is an optional plugin; see plugins-viewers.ts. Built-ins keep
+ * office-legacy download + csv/audio/video.) The git tab is the unified changes
  * tab (git lens + session lens, PR #471's file-trace merged in).
  * Side Chat (beta) was removed for xrkh localization.
  */
@@ -184,10 +184,10 @@ describe('built-in tab registrations', () => {
 })
 
 describe('built-in file viewer registrations', () => {
-  it('registers built-in file viewers including office / csv / audio / video', () => {
+  it('registers built-in file viewers including office-legacy / csv / audio / video', () => {
     const { service } = setup()
     expect(service.getFileViewers().map(v => v.id).sort()).toEqual(
-      ['audio', 'binary-download', 'code', 'csv', 'html', 'image', 'markdown', 'office', 'office-legacy', 'pdf', 'video'],
+      ['audio', 'binary-download', 'code', 'csv', 'html', 'image', 'markdown', 'office-legacy', 'pdf', 'video'],
     )
   })
 
@@ -225,25 +225,30 @@ describe('built-in file viewer registrations', () => {
     expect(toggles[1]?.desc).toBeDefined()
   })
 
-  /** OOXML (.docx/.xlsx/.pptx) gets the in-app `office` preview; the legacy
-   *  binary formats (doc/xls/ppt, ODF, rtf) have no client parser and stay
-   *  on the download pane under their own `office-legacy` id. They must be
-   *  SEPARATE descriptors so a settings toggle can disable the heavy preview
-   *  without also disabling the download escape. */
-  it('office viewer claims OOXML in-app, legacy office falls back to download', () => {
+  /** Without the hi-fi office plugin, OOXML + legacy Office share the
+   *  download pane (`office-legacy`). The plugin registers docx/xlsx/pptx
+   *  at higher priority when installed. */
+  it('office-legacy claims OOXML and legacy Office as download fallback', () => {
     const { service } = setup()
-    expect(service.matchFileViewer('book.docx', new Uint8Array([0x50, 0x4b, 0x03, 0x04]))?.id).toBe('office')
-    expect(service.matchFileViewer('sheet.xlsx')?.id).toBe('office')
-    expect(service.matchFileViewer('deck.pptx')?.id).toBe('office')
+    expect(service.matchFileViewer('book.docx', new Uint8Array([0x50, 0x4b, 0x03, 0x04]))?.id).toBe('office-legacy')
+    expect(service.matchFileViewer('sheet.xlsx')?.id).toBe('office-legacy')
+    expect(service.matchFileViewer('deck.pptx')?.id).toBe('office-legacy')
     expect(service.matchFileViewer('old.doc')?.id).toBe('office-legacy')
     expect(service.matchFileViewer('old.xls')?.id).toBe('office-legacy')
     expect(service.matchFileViewer('old.ppt')?.id).toBe('office-legacy')
+    expect(service.getFileViewers().find(v => v.id === 'office-legacy')?.fetchStrategy).toBe('binary-download')
   })
 
-  it('the in-app office viewer reads bytes itself (no host fetch strategy)', () => {
+  it('hi-fi office plugin viewers (priority 20) win over office-legacy for OOXML', () => {
     const { service } = setup()
-    const office = service.getFileViewers().find(v => v.id === 'office')
-    expect(office?.fetchStrategy).toBe('none')
+    const stub = { fetchStrategy: 'mediaUrl' as const, component: () => null }
+    service.registerFileViewer({ id: 'docx', exts: ['docx'], priority: 20, ...stub })
+    service.registerFileViewer({ id: 'xlsx', exts: ['xlsx'], priority: 20, ...stub })
+    service.registerFileViewer({ id: 'pptx', exts: ['pptx'], priority: 20, ...stub })
+    expect(service.matchFileViewer('book.docx')?.id).toBe('docx')
+    expect(service.matchFileViewer('sheet.xlsx')?.id).toBe('xlsx')
+    expect(service.matchFileViewer('deck.pptx')?.id).toBe('pptx')
+    expect(service.matchFileViewer('old.doc')?.id).toBe('office-legacy')
   })
 
   it('binary-download NUL detect claims unknown-extension binaries over code', () => {

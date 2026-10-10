@@ -1,7 +1,7 @@
 /**
- * Built-in plugin catalog integrity: XRKH ships empty curated catalogs
- * (community entries are not bundled). Shape guards still apply when entries
- * are added later.
+ * Built-in plugin catalog integrity: tab catalog stays empty (XRKH-native);
+ * viewer catalog seeds the optional office preview plugin. Shape guards
+ * apply to every entry.
  */
 import { describe, expect, it } from 'vitest'
 import { builtinTabPlugins } from '../src/client/plugins-tabs.ts'
@@ -19,9 +19,10 @@ const catalogs: Array<[string, readonly PluginEntry[]]> = [
 ]
 
 describe('builtin plugin catalogs', () => {
-  it('ships empty curated catalogs (XRKH-native; no DSH marketplace bundle)', () => {
+  it('seeds the office viewer plugin; tab catalog stays empty', () => {
     expect(builtinTabPlugins).toEqual([])
-    expect(builtinViewerPlugins).toEqual([])
+    expect(builtinViewerPlugins.map(p => p.id)).toEqual(['xrkh-better-sidebar-plugin-office'])
+    expect(builtinViewerPlugins[0]?.install).toBe('xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0')
   })
 
   for (const [name, list] of catalogs) {

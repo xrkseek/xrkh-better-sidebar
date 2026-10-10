@@ -1,8 +1,9 @@
 /**
- * Built-in file viewer descriptors: image / pdf / markdown / html / office /
- * csv / audio / video / code / binary-download. Office OOXML and legacy OLE
- * share the download pane for now (heavy Univer / docx-preview stacks stay
- * out of the core bundle); CSV/audio/video are native light previews.
+ * Built-in file viewer descriptors: image / pdf / markdown / html /
+ * csv / audio / video / code / binary-download / office-legacy.
+ * High-fidelity .docx/.xlsx/.pptx lives in
+ * `xrkh-better-sidebar-plugin-office` (registerFileViewer); legacy OLE/ODF
+ * stay on the download pane here.
  *
  * The heavy viewers (CodeMirror-backed markdown/html/code) render through
  * {@link lazyChunkComponent} wrappers — libraries load on first open.
@@ -27,7 +28,6 @@ import {
   IconPdfOutline16,
   IconHtmlOutline16,
 } from '../icons.tsx'
-import { OfficePreview } from '../OfficePreview.tsx'
 import type { ComponentType } from 'react'
 import type { FileViewerDescriptor, FileViewerProps } from '../service.ts'
 import { t } from '../locales.ts'
@@ -91,21 +91,13 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       component: (props) => <LazyTextEditor {...props} />,
     },
     {
-      id: 'office',
-      title: () => t('viewerOffice'),
-      icon: (size: number) => <IconOfficeOutline16 size={size} />,
-      // OOXML renders in place; the legacy binary formats (doc/xls/ppt, ODF,
-      // rtf) have no client-side parser and stay on the download pane.
-      exts: ['docx', 'xlsx', 'pptx'],
-      priority: 10,
-      fetchStrategy: 'none',
-      component: ({ scope, path }) => <OfficePreview scope={scope} path={path} />,
-    },
-    {
       id: 'office-legacy',
       title: () => t('viewerOffice'),
-      icon: (size: number) => <IconDownloadOutline16 size={size} />,
-      exts: ['doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'rtf'],
+      icon: (size: number) => <IconOfficeOutline16 size={size} />,
+      // Download fallback for Office formats. High-fidelity OOXML preview
+      // (docx/xlsx/pptx at priority 20) is registered by
+      // xrkh-better-sidebar-plugin-office when that plugin is installed.
+      exts: ['docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt', 'odt', 'ods', 'odp', 'rtf'],
       priority: 10,
       fetchStrategy: 'binary-download',
       component: ({ scope, path }) => <BinaryDownload scope={scope} path={path} />,

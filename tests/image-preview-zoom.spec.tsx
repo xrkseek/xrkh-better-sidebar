@@ -158,9 +158,19 @@ describe('ImagePreview zoom', () => {
   it('never zooms past the clamp', async () => {
     await setNaturalSize(100, 100)
     for (let i = 0; i < 60; i += 1) wheel(stage(), -600, { ctrl: true })
-    expect(scaleOf()).toBeLessThanOrEqual(16)
+    expect(scaleOf()).toBeLessThanOrEqual(8)
     for (let i = 0; i < 120; i += 1) wheel(stage(), 600, { ctrl: true })
     expect(scaleOf()).toBeGreaterThanOrEqual(0.05)
+  })
+
+  it('one Ctrl+wheel notch stays gentle (not a leap to MAX)', async () => {
+    await setNaturalSize(100, 100)
+    const before = scaleOf()
+    wheel(stage(), -120, { ctrl: true })
+    const after = scaleOf()
+    // A single mouse-wheel notch used to jump to 1600%; keep it under 2x.
+    expect(after).toBeGreaterThan(before)
+    expect(after / before).toBeLessThan(2)
   })
 
   it('pans on drag and leaves a click alone', async () => {
