@@ -15,7 +15,7 @@ afterEach(() => {
 
 /** Minimal client context the open-path seats touch. */
 const clientCtx = (): Context => {
-  const betterSidebar = { openTab: vi.fn() }
+  const betterSidebar = { openTab: vi.fn(), updateTab: vi.fn() }
   const workspaces = { openPath: vi.fn(async () => {}) }
   return {
     workspaces,
@@ -59,7 +59,8 @@ describe('open-path folder reveal (replaces turnTail takeover)', () => {
     expect(store.getSnapshot().state?.revealed).toEqual([])
   })
 
-  it('file opens still go to the sidebar editor (not Host)', async () => {
+  it('file opens go to the sidebar editor and flash in the explorer', async () => {
+    vi.useFakeTimers()
     const ctx = clientCtx()
     const store = createSidebarStore()
     store.setSession('s1')
@@ -70,7 +71,15 @@ describe('open-path folder reveal (replaces turnTail takeover)', () => {
       title: 'a.ts',
       path: '/w/src/a.ts',
       id: 'editor:/w/src/a.ts',
+      meta: { treeOpen: true },
     })
+    // Chip / mention opens must tint the tree row (and expand ancestors).
+    expect(store.getSnapshot().state?.revealed).toEqual(['/w/src/a.ts'])
+    expect(store.getSnapshot().state?.expanded).toEqual(expect.arrayContaining(['/w/src']))
+    // One openTab only — must not also open the pathless Files home.
+    expect(ctx.get('betterSidebar')!.openTab).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1_600)
+    expect(store.getSnapshot().state?.revealed).toEqual([])
     restore()
   })
 })

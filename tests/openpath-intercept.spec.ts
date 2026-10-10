@@ -125,6 +125,7 @@ describe('open-path interception wiring', () => {
       title: 'a.ts',
       path: '/w/src/a.ts',
       id: 'editor:/w/src/a.ts',
+      meta: { treeOpen: true },
     }])
 
     // The interceptOpenPath pref off → the original funnel runs untouched.

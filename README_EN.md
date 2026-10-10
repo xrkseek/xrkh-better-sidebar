@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.2
+xrkh plugin add xrkh-better-sidebar@0.20.3
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.3
+
+- Opening a file from chat deliverables / mentions expands ancestors, opens the explorer tree, and briefly highlights the row (previously only the editor opened; path tabs keep the tree closed by default).
 
 ## 0.20.2
 

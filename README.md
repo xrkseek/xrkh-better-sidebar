@@ -10,13 +10,17 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.2
+xrkh plugin add xrkh-better-sidebar@0.20.3
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.3
+
+- 对话交付物 / 提及点击打开文件时：展开祖先目录、打开资源树、短暂高亮对应行（此前只开编辑器、树默认收起看不到高亮）。
 
 ## 0.20.2
 
