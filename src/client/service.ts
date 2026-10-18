@@ -28,6 +28,7 @@ import {
   type SidebarSnapshot, type SidebarState, type SidebarStore, type SidebarTab,
 } from './state.ts'
 import { isNarrowWidth } from './breakpoints.ts'
+import { baseName } from './paths.ts'
 import type { SessionScope } from './api.ts'
 import type { SidebarPrefs } from '../prefs-shared.ts'
 
@@ -149,8 +150,8 @@ export interface TabComponentProps {
   visible: boolean
   /** The explorer's expanded directory set (ExplorerView). */
   expanded?: string[]
-  /** The explorer's reveal-highlight set (ExplorerView; "Show in folder" targets). */
-  revealed?: string[]
+  /** Absolute paths tinted in the explorer (a chat file open / "Show in folder"). */
+  revealed?: readonly string[]
   onToggleDir?: (path: string) => void
   onReferenceFile?: (path: string, kind?: 'file' | 'directory') => void
   onOpenFile?: (path: string) => void
@@ -436,12 +437,6 @@ function extOfPath(path: string): string {
   return base.includes('/') || base.includes('\\') ? '' : base
 }
 
-/** The file name of a path (both separators). */
-function baseNameOf(path: string): string {
-  const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return at === -1 ? path : path.slice(at + 1)
-}
-
 /**
  * Display title for a newly minted tab. Pathless editor stays the
  * descriptor「文件」home; `openTab({ type: 'editor', path })` (chat wake
@@ -450,7 +445,7 @@ function baseNameOf(path: string): string {
 function tabTitleFromSeed(seed: OpenTabSeed, descriptor: TabDescriptor): string {
   if (seed.title !== undefined && seed.title !== '') return seed.title
   if (seed.type === 'editor' && seed.path !== undefined && seed.path !== '') {
-    const leaf = baseNameOf(seed.path)
+    const leaf = baseName(seed.path)
     if (leaf !== '') return leaf
   }
   return typeof descriptor.title === 'function' ? descriptor.title() : descriptor.title
@@ -487,7 +482,7 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
  * The plugin version this service instance reports. Keep in lockstep with
  * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.20.0'
+export const SIDEBAR_SERVICE_VERSION = '0.20.4'
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features
@@ -838,7 +833,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
    *  to the file name; the tab id is path-derived, like the internal
    *  open-path interception, so distinct files open side by side). */
   const openFile = (scope: SessionScope, path: string, title?: string): void => {
-    openTab({ type: 'editor', title: title ?? baseNameOf(path), path, id: `editor:${path}` }, scope)
+    openTab({ type: 'editor', title: title ?? baseName(path), path, id: `editor:${path}` }, scope)
   }
 
   return {

@@ -13,6 +13,7 @@
 import { SIDEBAR_PREFS_DEFAULTS, type SidebarPrefs } from '../prefs-shared.ts'
 import { isNarrowWidth } from './breakpoints.ts'
 import { t } from './locales.ts'
+import { baseName } from './paths.ts'
 
 /**
  * Tab type identifier. Builtins register their ids (editor / git / terminal
@@ -57,14 +58,6 @@ export function editorHomeTitle(): string {
   return t('files')
 }
 
-/** Leaf name of a path (either separator); empty path → empty string. */
-function pathLeafName(path: string): string {
-  const trimmed = path.replace(/[\\/]+$/, '')
-  if (trimmed === '') return ''
-  const at = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
-  return at === -1 ? trimmed : trimmed.slice(at + 1)
-}
-
 /**
  * Tab bar / float title: pathless editor = localized「文件」home; an editor
  * that is showing a file always uses the path leaf (never the home label).
@@ -74,7 +67,7 @@ function pathLeafName(path: string): string {
 export function tabDisplayTitle(tab: SidebarTab): string {
   if (isEditorHomeTab(tab)) return editorHomeTitle()
   if (tab.type === 'editor' && tab.path !== undefined && tab.path !== '') {
-    const leaf = pathLeafName(tab.path)
+    const leaf = baseName(tab.path)
     if (leaf !== '') return leaf
   }
   return tab.title
@@ -131,9 +124,11 @@ export interface SidebarState {
   /** Explorer expansion set (absolute directory paths). */
   expanded: string[]
   /**
-   * Explorer rows highlighted by a "Show in folder" reveal (absolute paths).
-   * Transient by design: sanitizeState never restores it, so a reload starts
-   * unhighlighted.
+   * Paths tinted in the explorer by a reveal (absolute; the file a chat open
+   * landed on, or the folder "Show in folder" named). The tint lives on the
+   * tree row — that is what the gestures point at — and an open tab for the
+   * same path flashes along with it. Transient by design: sanitizeState never
+   * restores it, so a reload starts unhighlighted.
    */
   revealed: string[]
   /** The right sidebar's split tree (the original workbench). */
@@ -159,6 +154,12 @@ export const PANEL_MIN = 280
 export const PANEL_MAX = 640
 export const PANEL_DEFAULT = 400
 export const TAB_MAX_WIDTH = 160
+/** Docked explorer geometry contract (an editor tab's `meta.treeWidth`).
+ *  Mirrors the old inline dock: a floor that keeps names readable and a
+ *  ceiling that never eats the file view. */
+export const TREE_PANEL_DEFAULT = 240
+export const TREE_PANEL_MIN = 160
+export const TREE_PANEL_MAX = 480
 /** Bottom panel geometry contract (mirrors the width contract; the upper
  *  bound is the viewport, enforced by {@link setBottomHeight}). */
 export const BOTTOM_MIN = 120
@@ -238,16 +239,15 @@ export type DefaultSeed = 'editor-home' | 'none'
  * PANEL_DEFAULT) and `panelOpen` whether the panel starts expanded (default
  * true); the store seeds new sessions from the user's side card prefs.
  * `seed` picks the seeded tab: 'editor-home' places the EMPTY files window
- * (an editor tab with no path whose tree panel starts open,
- * `meta.treeOpen: true`) — in BOTH editorExplorer modes that window is the
- * file explorer page — and 'none' starts with an empty pane (the store
+ * (an editor tab with no path; in split mode that path-less window IS the
+ * file explorer page) and 'none' starts with an empty pane (the store
  * passes it when the user disabled the editor tab type in settings). */
 export function makeDefaultState(width = PANEL_DEFAULT, panelOpen = true, seed: DefaultSeed = 'editor-home'): SidebarState {
   const leaf: SidebarLeaf = { kind: 'leaf', id: uid('pane'), tabs: [], active: null }
   if (seed === 'editor-home') {
-    // No path: the editor host renders its empty-state hint and the docked
-    // tree panel (treeOpen defaults open for path-less tabs; meta pins it).
-    leaf.tabs = [{ id: uid('tab'), type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true } }]
+    // No path: the editor host renders the empty-state hint (merged mode) or
+    // the full-window file tree (split mode).
+    leaf.tabs = [{ id: uid('tab'), type: 'editor', title: editorHomeTitle() }]
     leaf.active = leaf.tabs[0]!.id
   }
   // The bottom panel starts closed with an empty pane (its welcome cards
@@ -823,9 +823,9 @@ export function setBottomHeight(state: SidebarState, height: number): SidebarSta
 }
 
 /** Toggle a directory in the explorer expansion set.
- *  Clears a stale "Show in folder" reveal: expanding/collapsing is a manual
- *  navigation, and leaving `revealed` set made FileTree re-smooth-scroll to
- *  the tinted row on every load/watch `data` update (felt like endless scroll). */
+ *  Clears a stale reveal tint: expanding/collapsing is a manual navigation,
+ *  and leaving the tint set made FileTree re-smooth-scroll to the tinted row
+ *  on every load/watch `data` update (felt like endless scroll). */
 export function toggleExpanded(state: SidebarState, path: string): SidebarState {
   const expanded = state.expanded.includes(path)
     ? state.expanded.filter(item => item !== path)
@@ -835,36 +835,130 @@ export function toggleExpanded(state: SidebarState, path: string): SidebarState 
   return { ...next, revealed: [] }
 }
 
+/** Make sure a directory is expanded (idempotent).
+ *  Used after a mutation (new file/folder, rename) so the fresh entry is
+ *  visible: `toggleExpanded` would FLIP an already-open parent shut and hide
+ *  the row the user just created. Deliberately leaves the reveal tint alone —
+ *  this is a programmatic nudge, not manual navigation. */
+export function expandDir(state: SidebarState, path: string): SidebarState {
+  if (path === '' || state.expanded.includes(path)) return state
+  return { ...state, expanded: [...state.expanded, path] }
+}
+
 /**
- * Reveal files in the explorer: expand every ancestor directory between the
- * explorer root and each file (so the lazy tree actually shows the row) and
- * record the paths for highlighting. The reveal set is transient —
- * sanitizeState never restores it, so a reload starts unhighlighted.
+ * Tint the explorer rows a reveal points at and expand their ancestors so
+ * those rows are reachable. One reducer for both gestures: a chat file open
+ * passes the file, "Show in folder" passes the folder (or the workspace root).
+ * The tint set is transient — sanitizeState never restores it, so a reload
+ * starts unhighlighted.
  * @param state - current sidebar state.
  * @param cwd - the explorer's root (session working directory).
- * @param files - absolute paths to highlight (parent dirs are expanded).
- * @returns the next state, or the same reference when nothing is revealed.
+ * @param paths - absolute files/folders to tint (their parent dirs expand).
+ * @param ancestorsToo - also expand the revealed path ITSELF (a folder reveal
+ *   opens the folder; a file reveal stops at its parent).
+ * @returns the next state, or the same reference when nothing is tinted.
  */
-export function revealPaths(state: SidebarState, cwd: string | undefined, files: readonly string[]): SidebarState {
+export function revealPaths(
+  state: SidebarState,
+  cwd: string | undefined,
+  paths: readonly string[],
+  ancestorsToo = false,
+): SidebarState {
   const expanded = new Set(state.expanded)
   const revealed: string[] = []
   const rootParts = (cwd ?? '').split(/[\\/]+/).filter(part => part !== '')
-  for (const file of files) {
+  for (const file of paths) {
     if (typeof file !== 'string' || file === '') continue
     revealed.push(file)
     const parts = file.split(/[\\/]+/).filter(part => part !== '' && part !== '.')
     const separator = file.includes('\\') ? '\\' : '/'
     // Keep the original leading separator(s) when rebuilding ancestor dirs:
     // FileTree matches expansion against ABSOLUTE paths, so dropping the
-    // root (POSIX `/w/src` �W `w/src`) or a UNC prefix (`\\server\share`)
+    // root (POSIX `/w/src` → `w/src`) or a UNC prefix (`\\server\share`)
     // would leave every ancestor collapsed and the row unreachable.
     const prefix = file.startsWith('/') ? '/' : file.startsWith('\\\\') ? '\\\\' : file.startsWith('\\') ? '\\' : ''
-    for (let i = rootParts.length; i < parts.length - 1; i++) {
-      expanded.add(prefix + parts.slice(0, i + 1).join(separator))
+    const end = ancestorsToo ? parts.length : parts.length - 1
+    // Only walk ancestors for a path that is actually UNDER cwd: slicing by
+    // segment count alone would mint a phantom directory for any path that
+    // merely shares the count, and every phantom lands in the persisted
+    // `expanded` set and fires a real fsTree read (FileTree expands it).
+    const underRoot = rootParts.every((part, index) => parts[index] === part)
+    if (underRoot) {
+      for (let i = rootParts.length; i < end; i++) {
+        expanded.add(prefix + parts.slice(0, i + 1).join(separator))
+      }
     }
   }
   if (revealed.length === 0) return state
   return { ...state, expanded: [...expanded], revealed }
+}
+
+/**
+ * The docked explorer's open state for one tab (`meta.treeOpen`). An explicit
+ * boolean wins; otherwise a PATH-LESS tab (the seeded「文件」home) defaults
+ * open — that window IS the explorer — and a file tab defaults closed.
+ * @param tab - the editor tab to read.
+ * @returns whether the tab's explorer panel should be shown.
+ */
+export function treeOpenOf(tab: SidebarTab): boolean {
+  const meta = tab.meta !== null && typeof tab.meta === 'object' && !Array.isArray(tab.meta)
+    ? tab.meta as Record<string, unknown>
+    : {}
+  const open = meta.treeOpen
+  return typeof open === 'boolean' ? open : (tab.path === undefined || tab.path === '')
+}
+
+/**
+ * The docked explorer's width for one tab (`meta.treeWidth`), clamped into
+ * the contract range. A missing/invalid value falls back to the default.
+ * @param tab - the editor tab to read.
+ * @returns the panel width in px.
+ */
+export function treeWidthOf(tab: SidebarTab): number {
+  const meta = tab.meta !== null && typeof tab.meta === 'object' && !Array.isArray(tab.meta)
+    ? tab.meta as Record<string, unknown>
+    : {}
+  const width = meta.treeWidth
+  return typeof width === 'number' && Number.isFinite(width)
+    ? Math.min(TREE_PANEL_MAX, Math.max(TREE_PANEL_MIN, Math.round(width)))
+    : TREE_PANEL_DEFAULT
+}
+
+/**
+ * Merge a patch into one open tab's persisted meta (rides the layout).
+ * Resolves the tab's CURRENT meta first, so a partial patch never drops
+ * sibling keys; an unknown tab id is a strict no-op (same state reference).
+ * @param state - the current per-session sidebar state.
+ * @param tabId - the tab whose meta to patch.
+ * @param patch - the keys to merge.
+ * @returns the next state (or the same reference when the tab is missing).
+ */
+export function patchTabMeta(state: SidebarState, tabId: string, patch: Record<string, unknown>): SidebarState {
+  const tab = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
+    .concat(state.floats.map(float => float.tab)).find(candidate => candidate.id === tabId)
+  if (tab === undefined) return state
+  const meta = tab.meta !== null && typeof tab.meta === 'object' && !Array.isArray(tab.meta)
+    ? tab.meta as Record<string, unknown>
+    : {}
+  return patchTab(state, tabId, { meta: { ...meta, ...patch } })
+}
+
+/**
+ * Flip one tab's docked-explorer flag (`meta.treeOpen`).
+ *
+ * Reads the tab's CURRENT meta inside the reducer, so a memoised caller is
+ * free of a stale `tab` prop: the toggle always flips the live value, no
+ * matter how many times the same tab has toggled since the caller was
+ * created. An unknown tab id is a strict no-op (same state reference).
+ * @param state - the current per-session sidebar state.
+ * @param tabId - the tab whose panel to toggle.
+ * @returns the next state.
+ */
+export function toggleTabTree(state: SidebarState, tabId: string): SidebarState {
+  const tab = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
+    .concat(state.floats.map(float => float.tab)).find(candidate => candidate.id === tabId)
+  if (tab === undefined) return state
+  return patchTabMeta(state, tabId, { treeOpen: !treeOpenOf(tab) })
 }
 
 /** Adjust one split divider: `i` is the left/top child index, delta in fractions. */
@@ -1433,13 +1527,11 @@ function sanitizePersistedTab(tab: unknown): SidebarTab | 'diff' | undefined {
   // view time and recovers if its plugin loads later.
   if (typeof candidate.type !== 'string') return undefined
   // The standalone explorer tab type merged INTO the editor (the single
-  // files window): a persisted explorer tab reopens as an editor home tab —
-  // no path, tree panel open (an existing meta object survives).
+  // files window): a persisted explorer tab reopens as an editor home tab
+  // (no path — its docked explorer defaults open, so it still lands as the
+  // browsable window).
   if (candidate.type === 'explorer') {
-    const meta = candidate.meta !== null && typeof candidate.meta === 'object' && !Array.isArray(candidate.meta)
-      ? candidate.meta as Record<string, unknown>
-      : undefined
-    return { id: candidate.id, type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true, ...meta } }
+    return { id: candidate.id, type: 'editor', title: editorHomeTitle() }
   }
   // `meta` is plugin-owned JSON-serializable state (v0.12.0+): the persisted
   // value already went through JSON.parse, so it is inherently serializable —

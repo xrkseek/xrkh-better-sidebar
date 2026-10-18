@@ -63,10 +63,13 @@ export function isWithinWorkspace(base: string, target: string): boolean {
 }
 
 /**
- * The last path segment of a '/'- or '\'-separated path (a diff tab title,
- * a worktree label). Returns the whole string when no separator is present.
+ * The last path segment of a '/'- or '\'-separated path (a file tab title,
+ * a worktree label, a rename prompt default). Trailing separators are
+ * ignored, so a directory path still names its directory. Returns the whole
+ * string when no separator is present, and '' for the empty path.
  */
 export function baseName(path: string): string {
-  const at = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-  return at === -1 ? path : path.slice(at + 1)
+  const trimmed = path.replace(/[\\/]+$/, '')
+  const at = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  return at === -1 ? trimmed : trimmed.slice(at + 1)
 }

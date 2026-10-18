@@ -2,76 +2,93 @@
  * Chat file-open interception for the sidebar workbench.
  *
  * Wraps `ctx.workspaces.openPath` so tool-row / chip / mention opens land in
- * the sidebar editor and flash once in the explorer. The folder-reveal
- * gesture (`'.'` — official deliverables "Show in folder") highlights the
- * workspace folder once, then clears the tint.
+ * the sidebar editor with that tab's docked explorer panel forced open — the
+ * file and its place in the tree appear together, exactly like "Show in
+ * folder" — and the file's row tinted once. The folder-reveal gesture (`'.'`
+ * — official deliverables "Show in folder") tints the workspace root once.
  *
  * Turn-tail UI is owned by first-party `@xrkseek/client-ui-deliverables`
  * only; this plugin does not register on `conversation.chat.turnTail`.
  */
 import type { Context } from '../context-types.ts'
 import {
-  allLeaves, firstLeaf, revealPaths, togglePanel,
-  type SidebarState, type SidebarStore, type SidebarTab,
+  allLeaves, patchTabMeta, revealPaths, togglePanel,
+  type SidebarState, type SidebarStore,
 } from './state.ts'
 import { t } from './locales.ts'
-import { resolveSidebarPath } from './produced-files.ts'
+import { baseName } from './paths.ts'
+import { rebasePath, sessionCwdFor } from './session-cwd.ts'
 import { wrapOpenPath } from './openpath-intercept.ts'
 
 /** Clear the explorer reveal tint after one flash (ms). */
 const REVEAL_FLASH_MS = 1_600
 
-/** Timer that clears the current reveal highlight (one flash only). */
-let revealClearTimer: ReturnType<typeof setTimeout> | undefined
+/**
+ * Timers that clear the reveal highlight (one flash each), keyed per store.
+ * A single module-level timer let two stores (two sidebar roots / sessions)
+ * cancel each other's clear, so one session's tint could stay lit until the
+ * next reveal — the WeakMap keeps each store's flash independent and lets
+ * the entry go away with its store.
+ */
+const revealClearTimers = new WeakMap<SidebarStore, ReturnType<typeof setTimeout>>()
 
-/** Every open tab across both split trees and free windows. */
-function allOpenTabs(state: SidebarState): SidebarTab[] {
-  return allLeaves(state.splits)
-    .concat(allLeaves(state.bottomSplits))
-    .flatMap(leaf => leaf.tabs)
-    .concat(state.floats.map(float => float.tab))
+/** Clear one store's pending reveal-tint timer (if any). */
+function clearRevealTimer(store: SidebarStore): void {
+  const pending = revealClearTimers.get(store)
+  if (pending === undefined) return
+  clearTimeout(pending)
+  revealClearTimers.delete(store)
 }
 
-/** Ensure the explorer pane is open on a path editor so reveal tint can paint. */
-function ensureTreeOpen(ctx: Context, store: SidebarStore, tabId: string, absolute: string): void {
-  const face = ctx.get('betterSidebar')
-  const state = store.getSnapshot().state
-  if (face === undefined || state === undefined) return
-  const existing = allOpenTabs(state).find(tab => tab.id === tabId || tab.path === absolute)
-  if (existing === undefined) return
-  const meta = (existing.meta !== null && typeof existing.meta === 'object'
-    ? existing.meta
-    : {}) as Record<string, unknown>
-  if (meta.treeOpen === true) return
-  face.updateTab(existing.id, { meta: { ...meta, treeOpen: true } })
+/**
+ * Force one editor tab's docked explorer panel open. Accepts both the editor
+ * The tab is found by PATH — openTab may have CREATED a per-path tab or
+ * FOCUSED an existing one, and the path is the one identifier both share.
+ * Passing `undefined` targets the pathless「文件」home window.
+ * @param state - current sidebar state.
+ * @param path - the tab's absolute file path, or undefined for the home window.
+ * @returns the next state, or the same reference when no tab matches.
+ */
+function forceTreeOpen(state: SidebarState, path: string | undefined): SidebarState {
+  const home = path === undefined || path === ''
+  const target = allLeaves(state.splits).concat(allLeaves(state.bottomSplits)).flatMap(leaf => leaf.tabs)
+    .concat(state.floats.map(float => float.tab))
+    .find(tab => (home ? tab.path === undefined || tab.path === '' : tab.path === path))
+  return target === undefined ? state : patchTabMeta(state, target.id, { treeOpen: true })
 }
 
 /** Open a file in the sidebar's editor (used by the explorer and openPath wrap). */
 export function openSidebarFile(ctx: Context, store: SidebarStore, sessionId: string, path: string): void {
   const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
-  const absolute = resolveSidebarPath(summary?.cwd, path)
-  const at = Math.max(absolute.lastIndexOf('/'), absolute.lastIndexOf('\\'))
-  const title = at === -1 ? absolute : absolute.slice(at + 1)
+  // Chat spells its absolute path against the *list summary* cwd, which the
+  // session may have outgrown; re-spell it under the host's cwd so the editor
+  // tab and every later read agree with where the session actually lives.
+  const absolute = rebasePath(sessionCwdFor(sessionId, summary?.cwd), summary?.cwd, path)
+  const title = baseName(absolute)
   const tabId = `editor:${absolute}`
   // Route through the sidebar service so the editor descriptor's dedupeKey
   // (per-path) applies; the id is path-derived so multiple editors coexist.
-  // treeOpen on create: path tabs default closed, so a chat chip open would
-  // otherwise land with no explorer to paint the reveal tint.
   ctx.get('betterSidebar')?.openTab({
     type: 'editor',
     title,
     path: absolute,
     id: tabId,
-    meta: { treeOpen: true },
   })
-  // Focus of an existing path tab ignores seed.meta — force the tree open.
-  ensureTreeOpen(ctx, store, tabId, absolute)
+  // The tab may have been FOCUSED (same path already open) rather than
+  // created, in which case the seed's meta was ignored — force the docked
+  // explorer open on the tab that actually ended up active for this path.
+  store.reduce(state => forceTreeOpen(state, absolute))
 }
 
 /**
- * Reveal paths in the sidebar explorer: expand parents, highlight once,
- * and (for the folder gesture) focus the files window. Empty `files`
- * falls back to the session workspace root ("Show in folder").
+ * Reveal a chat open in the sidebar.
+ *
+ * A FILE open tints the freshly opened file's row in the explorer and expands
+ * its ancestors; the tab itself flashes too (TabBar), and the docked panel
+ * was already forced open by {@link openSidebarFile}. A FOLDER gesture
+ * (`files` empty, the official "Show in folder") has no file to point at, so
+ * it opens the workspace root's explorer — the pathless editor home window —
+ * and tints that root row.
  */
 export function revealInExplorer(
   ctx: Context,
@@ -80,25 +97,26 @@ export function revealInExplorer(
   files: readonly string[],
 ): void {
   const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
-  const cwd = summary?.cwd
-  const targets = files.length > 0
-    ? files.map(path => resolveSidebarPath(cwd, path))
-    : cwd === undefined ? [] : [cwd]
-  store.reduce(state => revealPaths(state, cwd, targets))
-  store.reduce(s => (s.panelOpen ? s : togglePanel(s)))
-  // Folder gesture only: open the pathless Files tab. File opens already
-  // landed an editor tab — switching to Files would steal that focus.
-  if (files.length === 0) {
-    store.reduce(s => ({ ...s, activePane: firstLeaf(s.splits).id }))
+  const cwd = sessionCwdFor(sessionId, summary?.cwd)
+  if (files.length > 0) {
+    const targets = files.map(path => rebasePath(cwd, summary?.cwd, path))
+    store.reduce(state => revealPaths(state, cwd, targets))
+  } else {
+    // Folder gesture: reveal the workspace root — the folder the session
+    // lives in — and open the pathless「文件」home window so its tree (and the
+    // tinted root row) is on screen. File opens land their own editor tab, so
+    // they never take this branch.
+    if (cwd !== undefined) store.reduce(state => revealPaths(state, cwd, [cwd], true))
     ctx.get('betterSidebar')?.openTab({ type: 'editor', title: t('files') })
+    store.reduce(state => forceTreeOpen(state, undefined))
   }
-  // One flash only: clear the tint so tree-watch / expand churn cannot
-  // keep re-scrolling to a sticky highlight.
-  if (revealClearTimer !== undefined) clearTimeout(revealClearTimer)
-  revealClearTimer = setTimeout(() => {
-    revealClearTimer = undefined
+  store.reduce(s => (s.panelOpen ? s : togglePanel(s)))
+  // One flash only: clear the tint so tree-watch / tab churn cannot keep it lit.
+  clearRevealTimer(store)
+  revealClearTimers.set(store, setTimeout(() => {
+    revealClearTimers.delete(store)
     store.reduce(s => ((s.revealed ?? []).length === 0 ? s : { ...s, revealed: [] }))
-  }, REVEAL_FLASH_MS)
+  }, REVEAL_FLASH_MS))
 }
 
 /**

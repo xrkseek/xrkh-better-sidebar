@@ -62,6 +62,7 @@ import { detectNewDirectSubagent } from './subagent-detect.ts'
 import { detectFirstJob } from './subagent-jobs.ts'
 import { t } from './locales.ts'
 import { api, type SessionScope } from './api.ts'
+import { noteHostCwd, sessionCwdFor } from './session-cwd.ts'
 import css from './sidebar.module.css'
 
 /** How many consecutive reconnect failures stop the agent-terminals push loop
@@ -360,21 +361,37 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     store.reduce(migrateBottomTabs)
   }, [narrow, sessionId, store])
 
-  // While the session's header is still hydrating (or the session is blank),
-  // the list summary may carry no cwd; ask the host once (it falls back to
-  // the process cwd) so the explorer root and terminal cwd are real from
-  // first paint instead of showing "no session".
-  const [fetchedCwd, setFetchedCwd] = useState<string | undefined>(undefined)
+  // The session's cwd, always taken from the host.
+  //
+  // The list summary is a snapshot: a `working_directory` call or a linked
+  // worktree moves the session on the host while this summary keeps the old
+  // root, and every path spelled against it then points at a directory the
+  // session has left (reads answer "file missing" for files that exist). Ask
+  // the host for the authoritative cwd on every session change — the summary
+  // is only the first-paint placeholder until the reply lands, and the answer
+  // is noted in session-cwd.ts so the synchronous openPath interception can
+  // re-spell chat's paths against it too.
+  const [hostCwd, setHostCwd] = useState<string | undefined>(undefined)
   useEffect(() => {
-    setFetchedCwd(undefined)
-    if (sessionId === undefined || summaryCwd !== undefined) return
+    setHostCwd(undefined)
+    if (sessionId === undefined) return
     let cancelled = false
     api.sessionCwd({ sessionId })
-      .then(result => { if (!cancelled) setFetchedCwd(result.cwd) })
-      .catch(() => { /* the explorer/git rows surface their own errors */ })
+      .then(result => {
+        if (cancelled) return
+        noteHostCwd(sessionId, result.cwd)
+        setHostCwd(result.cwd)
+      })
+      .catch((error: unknown) => {
+        // Not silent: the explorer falls back to the session summary cwd,
+        // which may be stale (see session-cwd.ts) — log it so a wrong-root
+        // report is diagnosable. The tree rows then surface their own reads.
+        if (cancelled) return
+        console.error('[xrkh-better-sidebar] session cwd lookup failed; using the summary cwd', sessionId, error)
+      })
     return () => { cancelled = true }
   }, [sessionId, summaryCwd])
-  const cwd = summaryCwd ?? fetchedCwd
+  const cwd = hostCwd ?? sessionCwdFor(sessionId, summaryCwd)
 
   /**
    * Agent terminals push: subscribe to the host's live list of agent-owned
