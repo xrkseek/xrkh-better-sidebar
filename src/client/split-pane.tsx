@@ -155,8 +155,10 @@ function LeafView(props: {
   renderTab: (tab: SidebarTab, active: boolean, paneId: string) => ReactNode
   getTabIcon?: (tab: SidebarTab) => ReactNode
   getTabBadge?: (tab: SidebarTab) => ReactNode
+  /** Absolute paths of the tabs a chat open just flashed. */
+  revealed: readonly string[]
 }) {
-  const { leaf, newTabOptions, actions, onNewTab, renderTab, getTabIcon, getTabBadge } = props
+  const { leaf, newTabOptions, actions, onNewTab, renderTab, getTabIcon, getTabBadge, revealed } = props
   const [dropZone, setDropZone] = useState<DropZone | null>(null)
   const activeTab = leaf.tabs.find(tab => tab.id === leaf.active) ?? leaf.tabs[leaf.tabs.length - 1]
 
@@ -206,6 +208,7 @@ function LeafView(props: {
         paneId={leaf.id}
         tabs={leaf.tabs}
         active={leaf.active}
+        revealed={revealed}
         onActivate={(tabId) => { actions.activateTab(leaf.id, tabId) }}
         onClose={(tabId) => { actions.closeTab(leaf.id, tabId) }}
         onNewTab={onNewTab}
@@ -266,6 +269,7 @@ function NodeView(props: {
         renderTab={renderTab}
         getTabIcon={getTabIcon}
         getTabBadge={getTabBadge}
+        revealed={state.revealed ?? []}
       />
     )
   }

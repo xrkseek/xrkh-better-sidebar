@@ -33,7 +33,7 @@ import { api, downloadUrl, isOutsideWorkspaceMessage, type FsEntry } from './api
 import { FenceErrorNotice } from './FenceErrorNotice.tsx'
 import { IconUploadOutline16, IconVscode16 } from './icons.tsx'
 import type { OpenWithTarget } from './open-with.ts'
-import { relativeTo } from './paths.ts'
+import { baseName, relativeTo } from './paths.ts'
 import { reconcileLevel, subscribeTreeWatch, type TreeWatchLevel } from './tree-watch.ts'
 import { t } from './locales.ts'
 import type { SidebarStore } from './state.ts'
@@ -43,13 +43,6 @@ import css from './sidebar.module.css'
 interface LevelData {
   entries?: FsEntry[]
   error?: string
-}
-
-/** Root label: the last path segment (mirror of the host rootLabel). */
-export function baseName(path: string): string {
-  const trimmed = path.replace(/[\\/]+$/, '')
-  const at = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
-  return at === -1 ? trimmed : trimmed.slice(at + 1)
 }
 
 /** The containing directory of an absolute row path (never the root edge here). */
@@ -111,8 +104,13 @@ export function FileTree(props: {
   /** The sidebar store: the fence-refusal notice writes the `workspaceFence` pref through it. */
   store: SidebarStore
   expanded: string[]
-  /** Files highlighted by a "Show in folder" reveal (absolute paths). */
-  revealed: string[]
+  /**
+   * Absolute paths a reveal tinted (the file a chat open landed on, or the
+   * folder "Show in folder" named). The tint lives on the row; a reveal
+   * that targets the workspace ROOT (an empty/open-folder gesture) leaves
+   * this empty and only the root row's own hover/active state shows.
+   */
+  revealed: readonly string[]
   onToggle: (path: string) => void
   onOpenFile: (path: string) => void
   /** Context-menu "open in a new tab" (file rows; absent → no entry). */
@@ -298,7 +296,7 @@ export function FileTree(props: {
     })
   }, [sessionId, cwd, watchedDirs, applyFreshLevels])
 
-  // `expanded` / `revealed` are consulted once per rendered row; a Set keeps
+  // `expanded` / the folder tint are consulted once per rendered row; a Set keeps
   // that lookup O(1) on deep trees (the array scan was quadratic in rows).
   const expandedSet = useMemo(() => new Set(expanded), [expanded])
   const revealedSet = useMemo(() => new Set(revealed), [revealed])
@@ -354,7 +352,7 @@ export function FileTree(props: {
       lastRevealScrollKey.current = ''
       return
     }
-    const key = revealed.join('\0')
+    const key = [...revealed].sort().join('\0')
     const body = bodyRef.current
     if (body === null) return
     const row = body.querySelector<HTMLElement>('[data-dsh-revealed]')
@@ -365,7 +363,10 @@ export function FileTree(props: {
     const rowRect = row.getBoundingClientRect()
     const target = body.scrollTop + (rowRect.top + rowRect.height / 2) - (bodyTop + body.clientHeight / 2)
     const max = Math.max(body.scrollHeight - body.clientHeight, 0)
-    body.scrollTo({ top: Math.min(Math.max(target, 0), max), behavior: 'smooth' })
+    // A reduced-motion viewer gets the destination, not the travel.
+    const reduced = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    body.scrollTo({ top: Math.min(Math.max(target, 0), max), behavior: reduced ? 'auto' : 'smooth' })
   }, [revealed, data])
 
   /** Copy `text`; on success flip the row's copied label for a moment. */
@@ -626,7 +627,12 @@ export function FileTree(props: {
       ) : (
         <>
           <div
-            className={clsx(css.explorerRow, dropTarget === root && css.explorerRowDropTarget)}
+            className={clsx(
+              css.explorerRow,
+              dropTarget === root && css.explorerRowDropTarget,
+              revealedSet.has(root) && css.explorerRowRevealed,
+            )}
+            data-dsh-revealed={revealedSet.has(root) ? 'true' : undefined}
             style={{ paddingLeft: 6 }}
             onDragOver={(event) => { handleRowDragOver(event, root) }}
             onDrop={(event) => { handleDirDrop(event, root) }}

@@ -23,8 +23,8 @@ export interface TabContentMemoKey {
   cwd: string | undefined
   visible: boolean
   expanded: string[]
-  /** Files highlighted in the file tree (the "Show in folder" reveal). */
-  revealed: string[]
+  /** Absolute paths tinted in the explorer (a chat file open / "Show in folder"). */
+  revealed: readonly string[]
   localeRevision: string
   tabsVersion: number
   /** When the tab is a pinned virtual tab (injected from another session),

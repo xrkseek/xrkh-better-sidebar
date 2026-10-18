@@ -50,7 +50,8 @@ export interface TreePanelProps {
   /** The sidebar store (passed through to the tree's fence-refusal notice). */
   store: SidebarStore
   expanded: string[]
-  revealed: string[]
+  /** Absolute paths tinted by a reveal (a chat file open / "Show in folder"). */
+  revealed: readonly string[]
   onToggle: (path: string) => void
   onOpenFile: (path: string) => void
   /** File context-menu "open in a new tab" (passed through to FileTree). */
@@ -69,8 +70,8 @@ export interface TreePanelProps {
   onFsCreate: (dir: string, name: string, isDir: boolean) => void
   onFsRename: (path: string, name: string) => void
   onFsDelete: (path: string, name: string) => void
-  /** Full-window presentation: the panel fills its host instead of docking
-   *  at a fixed width. */
+  /** Full-window presentation: the panel fills its host window instead of
+   *  rendering as a companion to a file view. */
   full?: boolean
 }
 

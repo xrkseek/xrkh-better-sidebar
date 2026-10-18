@@ -39,7 +39,7 @@ vi.mock('../src/client/api.ts', () => ({
 
 interface TreeHarness {
   /** Re-render with new props; the refresh tick reloads the level cache. */
-  rerender: (revealed: string[], refreshTick: number) => Promise<void>
+  rerender: (revealed: readonly string[], refreshTick: number) => Promise<void>
   body: HTMLElement
   /** Pin one row's geometry (jsdom has no layout). */
   layoutRow: (top: number, height: number) => void
@@ -51,7 +51,7 @@ async function mountTree(bodyScroll: { top: number; client: number; height: numb
   const container = document.createElement('div')
   document.body.append(container)
   const root: Root = createRoot(container)
-  const render = (revealed: string[], refreshTick: number): void => {
+  const render = (revealed: readonly string[], refreshTick: number): void => {
     root.render(createElement(FileTree, {
       sessionId: 's1',
       cwd: '/tmp',
@@ -93,22 +93,22 @@ async function mountTree(bodyScroll: { top: number; client: number; height: numb
 afterEach(() => { document.body.innerHTML = '' })
 
 describe('FileTree reveal scrolling (show in folder)', () => {
-  it('centers the revealed row in the tree body only', async () => {
+  it('centers the tinted folder row in the tree body only', async () => {
     // Body: top 100, 300 tall, scrolled 40; row lands at 400, 20 tall →
     // target = 40 + (400 + 10) − (100 + 150) = 200.
     const tree = await mountTree({ top: 40, client: 300, height: 1000 })
     // Mount the file row, pin its geometry, then (re)apply the reveal so the
     // scroll runs against known layout — not against a prior once-per-key hit.
-    await tree.rerender(['/tmp/a.ts'], 0)
+    await tree.rerender(['/tmp/src'], 0)
     tree.layoutRow(400, 20)
     tree.scrollTo.mockClear()
     await tree.rerender([], 0)
-    await tree.rerender(['/tmp/a.ts'], 1)
+    await tree.rerender(['/tmp/src'], 1)
     expect(scrollIntoView).not.toHaveBeenCalled()
     expect(tree.scrollTo.mock.calls.map(call => call[0])).toContainEqual({ top: 200, behavior: 'smooth' })
     // Data churn with the same reveal must not keep smooth-scrolling.
     tree.scrollTo.mockClear()
-    await tree.rerender(['/tmp/a.ts'], 2)
+    await tree.rerender(['/tmp/src'], 2)
     expect(tree.scrollTo).not.toHaveBeenCalled()
     tree.unmount()
   })
@@ -116,13 +116,34 @@ describe('FileTree reveal scrolling (show in folder)', () => {
   it('clamps the target to the scrollable range', async () => {
     // 5000px-tall scroller with 300 visible: max scrollTop 4700.
     const tree = await mountTree({ top: 0, client: 300, height: 5000 })
-    await tree.rerender(['/tmp/a.ts'], 0)
+    await tree.rerender(['/tmp/src'], 0)
     tree.layoutRow(9000, 20)
     tree.scrollTo.mockClear()
     await tree.rerender([], 0)
-    await tree.rerender(['/tmp/a.ts'], 1)
+    await tree.rerender(['/tmp/src'], 1)
     expect(tree.scrollTo.mock.calls.map(call => call[0]?.top)).toContainEqual(4700)
     tree.unmount()
+  })
+
+  it('honors prefers-reduced-motion: the row jumps instead of gliding', async () => {
+    const original = window.matchMedia
+    // Reduced-motion viewer: same centered target, behavior 'auto'.
+    ;(window as unknown as Record<string, unknown>).matchMedia = (query: string) => ({
+      matches: query.includes('prefers-reduced-motion'), media: query, onchange: null,
+      addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
+    })
+    try {
+      const tree = await mountTree({ top: 40, client: 300, height: 1000 })
+      await tree.rerender(['/tmp/src'], 0)
+      tree.layoutRow(400, 20)
+      tree.scrollTo.mockClear()
+      await tree.rerender([], 0)
+      await tree.rerender(['/tmp/src'], 1)
+      expect(tree.scrollTo.mock.calls.map(call => call[0])).toContainEqual({ top: 200, behavior: 'auto' })
+      tree.unmount()
+    } finally {
+      ;(window as unknown as Record<string, unknown>).matchMedia = original
+    }
   })
 
   it('scrolls nothing without a reveal', async () => {

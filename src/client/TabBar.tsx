@@ -61,6 +61,12 @@ export function TabBar(props: {
   paneId: string
   tabs: SidebarTab[]
   active: string | null
+  /**
+   * Absolute paths of the tabs a chat open just flashed. The highlight lives
+   * on the tab itself: it is the thing that opened, and it is on screen no
+   * matter which pane or panel the file landed in.
+   */
+  revealed?: readonly string[]
   onActivate: (tabId: string) => void
   onClose: (tabId: string) => void
   onNewTab: (optionId: string) => void
@@ -83,8 +89,8 @@ export function TabBar(props: {
    *  resolver returns the rendered pill or null). */
   getTabBadge?: (tab: SidebarTab) => ReactNode
 }) {
-  const {
-    paneId, tabs, active, onActivate, onClose, onNewTab, newTabOptions, onDropTab, onFloatTab, onPinTab, getTabIcon, getTabBadge,
+ const {
+    paneId, tabs, active, revealed, onActivate, onClose, onNewTab, newTabOptions, onDropTab, onFloatTab, onPinTab, getTabIcon, getTabBadge,
   } = props
   const [menuOpen, setMenuOpen] = useState(false)
   // The tab right-click context menu: the target tab plus the cursor
@@ -185,10 +191,13 @@ export function TabBar(props: {
       <div ref={listRef} className={css.tabList}>
         {tabs.map(tab => {
           const pinned = isPinnedVirtualTab(tab) || tab.pin !== undefined
+          // The chat-open flash. A tab carries its file in `path`, so an
+          // empty reveal set (or a path-less tab) simply never matches.
+          const flashed = tab.path !== undefined && revealed?.includes(tab.path) === true
           return (
           <div
             key={tab.id}
-            className={clsx(css.tab, active === tab.id && css.tabActive, pinned && css.pinnedTab)}
+            className={clsx(css.tab, active === tab.id && css.tabActive, pinned && css.pinnedTab, flashed && css.tabRevealed)}
             title={tabDisplayTitle(tab)}
             draggable={!pinned}
             onDragStart={pinned ? undefined : (event) => {

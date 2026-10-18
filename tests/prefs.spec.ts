@@ -347,7 +347,7 @@ describe('side card preferences', () => {
       expect(tabs[0]!.type).toBe('editor')
       expect(tabs[0]!.title).toBe(editorHomeTitle())
       expect(tabs[0]!.path).toBeUndefined()
-      expect(tabs[0]!.meta).toEqual({ treeOpen: true })
+    expect(tabs[0]!.meta).toBeUndefined()
     }
   })
 
