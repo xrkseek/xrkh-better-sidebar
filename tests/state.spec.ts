@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   activateTab, allLeaves, BOTTOM_DEFAULT, BOTTOM_MIN, clampFloatGeometry, closeFloatByTab, closeTab, createSidebarStore,
-  dockFloat, editorHomeTitle, FLOAT_MIN_H, FLOAT_MIN_W, floatTab, floatWithTab, insertLeafAt, makeDefaultState,
+  dockFloat, editorHomeTitle, expandDir, FLOAT_MIN_H, FLOAT_MIN_W, floatTab, floatWithTab, insertLeafAt,
+  makeDefaultState,
   migrateBottomTabs, moveFloat, moveTab, moveTabToEdge, openDiffTab,
   openTabInActivePane, patchTab, raiseFloat, reconcileAgentTerminals, resizeFloat, resizeSplit,
-  resizeSplitIn, revealPaths, sanitizeState, setBottomHeight, setTabPin,
+  resizeSplitIn, revealPaths, sanitizeState, setBottomHeight, setTabPin, patchTabMeta,
+  treeOpenOf, treeWidthOf, TREE_PANEL_DEFAULT, TREE_PANEL_MAX, TREE_PANEL_MIN,
   splitPane, tabDisplayTitle, tabOpenIn, toggleBottomPanel, toggleExpanded, togglePanel,
   type SidebarLeaf, type SidebarState, type SidebarTab, type SplitNode,
 } from '../src/client/state.ts'
@@ -26,20 +28,21 @@ describe('sidebar state', () => {
 
   it('makeDefaultState seeds per the seed enum (editor-home / none)', () => {
     // Default and explicit 'editor-home' seed an EMPTY editor tab (the files
-    // window) with the tree panel pinned open.
+    // window). The tree lives in its own window now, so the home tab
+    // carries no tree meta at all.
     for (const s of [makeDefaultState(), makeDefaultState(400, true, 'editor-home')]) {
       const leaf = s.splits as { tabs: SidebarTab[]; active: string | null }
       expect(leaf.tabs).toHaveLength(1)
       expect(leaf.tabs[0]!.type).toBe('editor')
       expect(leaf.tabs[0]!.title).toBe(editorHomeTitle())
       expect(leaf.tabs[0]!.path).toBeUndefined()
-      expect(leaf.tabs[0]!.meta).toEqual({ treeOpen: true })
+      expect(leaf.tabs[0]!.meta).toBeUndefined()
       expect(leaf.active).toBe(leaf.tabs[0]!.id)
     }
-    // The seeded home tab survives the persist round-trip (meta intact).
+    // The seeded home tab survives the persist round-trip.
     const restored = sanitizeState(JSON.parse(JSON.stringify(makeDefaultState())))
     const restoredLeaf = restored!.splits as { tabs: SidebarTab[] }
-    expect(restoredLeaf.tabs[0]!.meta).toEqual({ treeOpen: true })
+    expect(restoredLeaf.tabs[0]!.meta).toBeUndefined()
     // 'none' seeds an empty pane.
     const bare = makeDefaultState(400, true, 'none')
     const bareLeaf = bare.splits as { tabs: SidebarTab[]; active: string | null }
@@ -58,7 +61,7 @@ describe('sidebar state', () => {
         kind: 'leaf',
         id: 'pane:1',
         active: 'ex-right',
-        tabs: [{ id: 'ex-right', type: 'explorer', title: 'Explorer', meta: { treeWidth: 300 } }],
+        tabs: [{ id: 'ex-right', type: 'explorer', title: 'Explorer' }],
       },
       bottomSplits: {
         kind: 'leaf',
@@ -69,12 +72,13 @@ describe('sidebar state', () => {
     })
     const right = (valid?.splits as { tabs: SidebarTab[] }).tabs
     expect(right).toHaveLength(1)
-    // Migrated: editor home tab (no path), tree pinned open, prior meta kept.
-    expect(right[0]).toMatchObject({ id: 'ex-right', type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true, treeWidth: 300 } })
+    // Migrated: an editor home tab (no path) and no leftover tree meta.
+    expect(right[0]).toMatchObject({ id: 'ex-right', type: 'editor', title: editorHomeTitle() })
+    expect(right[0]!.meta).toBeUndefined()
     expect(right[0]!.path).toBeUndefined()
     const bottom = (valid?.bottomSplits as { tabs: SidebarTab[] }).tabs
     expect(bottom).toHaveLength(1)
-    expect(bottom[0]).toMatchObject({ id: 'ex-bottom', type: 'editor', title: editorHomeTitle(), meta: { treeOpen: true } })
+    expect(bottom[0]).toMatchObject({ id: 'ex-bottom', type: 'editor', title: editorHomeTitle() })
   })
 
   it('opens tabs into the active pane and dedupes by id (safety net)', () => {
@@ -337,12 +341,46 @@ describe('sidebar state', () => {
     expect((after.splits as { active: string | null }).active).toBe(tabId)
   })
 
-  it('toggleExpanded clears a stale Show-in-folder reveal', () => {
-    let s = revealPaths(state(), '/p', ['/p/src/a.ts'])
-    expect(s.revealed).toEqual(['/p/src/a.ts'])
+  it('toggleExpanded clears a stale Show-in-folder folder tint', () => {
+    let s = revealPaths(state(), '/p', ['/p/src'], true)
+    expect(s.revealed).toEqual(['/p/src'])
     s = toggleExpanded(s, '/p/other')
     expect(s.revealed).toEqual([])
     expect(s.expanded).toContain('/p/other')
+  })
+
+  it('revealPaths expands ancestors under cwd but never mints a phantom dir for an outside path', () => {
+    // Under the root: the ancestor chain is real and must be expanded.
+    let s = revealPaths(state(), '/p', ['/p/src/a.ts'])
+    expect(s.revealed).toEqual(['/p/src/a.ts'])
+    expect(s.expanded).toEqual(['/p/src'])
+    // Outside the root: `/q/x/y.ts` merely SHARES a segment count with the
+    // root. Slicing by count alone walked `/q/x` into `expanded` — which is
+    // persisted, and makes FileTree fire a real fsTree read for a directory
+    // it can never show. The row itself is still reported as revealed.
+    s = revealPaths(state(), '/p', ['/q/x/y.ts'])
+    expect(s.revealed).toEqual(['/q/x/y.ts'])
+    expect(s.expanded).toEqual([])
+  })
+
+  it('expandDir opens a parent idempotently and leaves the reveal tint alone', () => {
+    // The file-mutation path (new file/folder, rename) must EXPAND the parent:
+    // the folder the menu was opened on is normally ALREADY expanded, and the
+    // toggle it used to call would fold it shut and hide the new row.
+    let s = expandDir(state(), '/p/src')
+    expect(s.expanded).toEqual(['/p/src'])
+    // Idempotent: a second call is a no-op (same reference, same list).
+    s = expandDir(s, '/p/src')
+    expect(s.expanded).toEqual(['/p/src'])
+    // The workspace root ('') is never an expansion key.
+    expect(expandDir(s, '')).toBe(s)
+    // A programmatic expand must NOT clear a pending reveal tint — unlike
+    // toggleExpanded, which is manual navigation and does clear it.
+    const tinted = revealPaths(state(), '/p', ['/p/src/a.ts'])
+    expect(tinted.revealed).toEqual(['/p/src/a.ts'])
+    s = expandDir(tinted, '/p/lib')
+    expect(s.expanded).toEqual(['/p/src', '/p/lib'])
+    expect(s.revealed).toEqual(['/p/src/a.ts'])
   })
 
   it('patchTab updates the title and path of one open tab (browser persistence)', () => {
@@ -1140,7 +1178,7 @@ describe('free windows (v0.16.0)', () => {
     expect(allLeaves(after.splits).flatMap(leaf => leaf.tabs).some(tab => tab.id === 'agent:u2')).toBe(true)
   })
 
-  describe('revealPaths (show in folder)', () => {
+  describe('revealPaths (chat file open → the tab it produced)', () => {
     it('expands ancestors with their ABSOLUTE path (leading separator preserved)', () => {
       // POSIX: the root (/w/src) is not itself expanded, but the subdirs
       // below it must be recorded as ABSOLUTE paths so FileTree's
@@ -1164,6 +1202,68 @@ describe('free windows (v0.16.0)', () => {
     it('resolves nothing to the same reference (no churn)', () => {
       const base = makeDefaultState()
       expect(revealPaths(base, '/w', [])).toBe(base)
+    })
+  })
+
+  describe('revealPaths with ancestorsToo (show in folder → the folder row)', () => {
+    it('tints the folder and expands it (ancestorsToo opens the folder itself)', () => {
+      const next = revealPaths(makeDefaultState(), '/w', ['/w/src/deep'], true)
+      expect(next.revealed).toEqual(['/w/src/deep'])
+      expect(next.expanded).toContain('/w/src')
+      expect(next.expanded).toContain('/w/src/deep')
+    })
+
+    it('keeps a Windows drive-letter root and a UNC prefix', () => {
+      const drive = revealPaths(makeDefaultState(), 'C:\\work', ['C:\\work\\src'], true)
+      expect(drive.expanded).toContain('C:\\work\\src')
+      const unc = revealPaths(makeDefaultState(), '\\\\server\\share', ['\\\\server\\share\\sub'], true)
+      expect(unc.expanded).toContain('\\\\server\\share\\sub')
+    })
+
+    it('resolves nothing to the same reference (no churn)', () => {
+      const base = makeDefaultState()
+      expect(revealPaths(base, '/w', [])).toBe(base)
+    })
+  })
+
+  describe('treeOpenOf / treeWidthOf / patchTabMeta (the docked explorer)', () => {
+    const fileTab = (meta?: unknown): SidebarTab => ({ id: 't', type: 'editor', title: 'a.ts', path: '/w/a.ts', meta })
+    const homeTab = (meta?: unknown): SidebarTab => ({ id: 'h', type: 'editor', title: 'Files', meta })
+
+    it('defaults open for the path-less home and closed for a file tab', () => {
+      expect(treeOpenOf(homeTab())).toBe(true)
+      expect(treeOpenOf(fileTab())).toBe(false)
+    })
+
+    it('an explicit meta flag wins over the default', () => {
+      expect(treeOpenOf(fileTab({ treeOpen: true }))).toBe(true)
+      expect(treeOpenOf(homeTab({ treeOpen: false }))).toBe(false)
+      // A malformed meta reads as empty, never throws.
+      expect(treeOpenOf(fileTab('nonsense'))).toBe(false)
+    })
+
+    it('clamps a persisted width into the contract range', () => {
+      expect(treeWidthOf(fileTab())).toBe(TREE_PANEL_DEFAULT)
+      expect(treeWidthOf(fileTab({ treeWidth: 10 }))).toBe(TREE_PANEL_MIN)
+      expect(treeWidthOf(fileTab({ treeWidth: 9999 }))).toBe(TREE_PANEL_MAX)
+      expect(treeWidthOf(fileTab({ treeWidth: 300.4 }))).toBe(300)
+      // A non-numeric width falls back to the default.
+      expect(treeWidthOf(fileTab({ treeWidth: 'wide' }))).toBe(TREE_PANEL_DEFAULT)
+    })
+
+    it('patchTabMeta merges keys without dropping siblings', () => {
+      let s = openTabInActivePane(makeDefaultState(), { id: 'e1', type: 'editor', title: 'a.ts', path: '/w/a.ts', meta: { dir: true } })
+      s = patchTabMeta(s, 'e1', { treeOpen: true })
+      const tab = allLeaves(s.splits).flatMap(leaf => leaf.tabs).find(candidate => candidate.id === 'e1')
+      expect(tab?.meta).toEqual({ dir: true, treeOpen: true })
+      s = patchTabMeta(s, 'e1', { treeWidth: 300 })
+      const again = allLeaves(s.splits).flatMap(leaf => leaf.tabs).find(candidate => candidate.id === 'e1')
+      expect(again?.meta).toEqual({ dir: true, treeOpen: true, treeWidth: 300 })
+    })
+
+    it('patchTabMeta is a no-op for a missing tab id', () => {
+      const s = makeDefaultState()
+      expect(patchTabMeta(s, 'nope', { treeOpen: true })).toBe(s)
     })
   })
 
@@ -1215,7 +1315,8 @@ describe('free windows (v0.16.0)', () => {
       ]
       const restored = sanitizeState(parsed)!
       expect(restored.floats.map(f => f.tab.type)).toEqual(['editor'])
-      expect(restored.floats[0]!.tab).toMatchObject({ title: editorHomeTitle(), meta: { treeOpen: true } })
+      expect(restored.floats[0]!.tab).toMatchObject({ title: editorHomeTitle() })
+      expect(restored.floats[0]!.tab.meta).toBeUndefined()
     })
 
     it('clamps stale off-screen geometry into the current viewport', () => {

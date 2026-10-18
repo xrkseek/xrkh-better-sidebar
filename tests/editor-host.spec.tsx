@@ -1,12 +1,11 @@
 /**
- * EditorHost (the files window): in merged (in-place) mode a path-less tab
- * renders the empty-state hint with the tree dock open, and the header's
- * tree toggle persists its flag through ctx.betterSidebar.updateTab
- * (meta.treeOpen rides the tab's persisted layout). The editorExplorer pref
- * controls FILE-OPEN behavior — in-place rewrites the current tab via
- * updateTab, split opens a per-path dedupe tab via openSidebarFile — and in
- * split mode a PATH-LESS window becomes the standalone explorer (tree panel
- * only, no editor chrome); file tabs keep the full chrome in both modes.
+ * EditorHost (the files window): a path-less tab renders the empty-state hint
+ * with its docked explorer open (meta.treeOpen defaults open for the home
+ * window), a file tab defaults it closed. The editorExplorer pref controls
+ * FILE-OPEN behavior — in-place rewrites the current tab via updateTab, split
+ * opens a per-path dedupe tab via openSidebarFile — and in split mode a
+ * PATH-LESS window becomes the standalone explorer (tree panel only, no
+ * editor chrome); file tabs keep the full chrome in both modes.
  */
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
@@ -16,7 +15,7 @@ import { act } from 'react-dom/test-utils'
 import type { Context } from '../src/context-types.ts'
 import { EditorHost } from '../src/client/EditorHost.tsx'
 import { createBetterSidebarService } from '../src/client/service.ts'
-import { allLeaves, createSidebarStore, type SidebarTab } from '../src/client/state.ts'
+import { allLeaves, createSidebarStore, treeOpenOf, treeWidthOf, type SidebarTab } from '../src/client/state.ts'
 
 // The act() environment flag (React 18.2 reads it before flushing effects).
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
@@ -92,48 +91,22 @@ function typeAndCommit(input: HTMLInputElement, value: string): void {
 }
 
 describe('EditorHost (files window)', () => {
-  it('a path-less tab renders the empty-state hint with the tree panel open', () => {
+  it('a path-less tab renders the empty-state hint with the docked explorer open', () => {
     const { store, ctx, homeTab } = setup()
     store.setPrefs({ ...store.getPrefs(), editorExplorer: true })
     const { container, unmount } = mountHost(ctx, store, homeTab)
     try {
       const html = container.innerHTML
       // The empty-state hint renders instead of the viewer loading flow.
-      expect(html).toContain('Pick a file from the tree panel')
+      expect(html).toContain('use the file-tree button')
       expect(html).not.toContain('Loading…')
-      // The header carries the path input and the pressed tree toggle; the
-      // docked panel (search box) is open by default for path-less tabs.
-      expect(container.querySelector('input')).not.toBeNull()
-      const toggle = container.querySelector('button[aria-pressed]')
-      expect(toggle?.getAttribute('aria-pressed')).toBe('true')
-      // No cwd: the embedded tree renders its no-session placeholder
-      // instead of touching the network.
-      expect(html).toContain('Select a conversation')
-    } finally {
-      unmount()
-    }
-  })
-
-  it('the tree toggle persists meta.treeOpen through updateTab', () => {
-    const { store, ctx, homeTab } = setup()
-    store.setPrefs({ ...store.getPrefs(), editorExplorer: true })
-    expect(homeTab().meta).toEqual({ treeOpen: true })
-    const { container, rerender, unmount } = mountHost(ctx, store, homeTab)
-    try {
-      act(() => {
-        container.querySelector('button[aria-pressed]')!
-          .dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
-      expect(homeTab().meta).toEqual({ treeOpen: false })
-      // The store change re-renders the host with the fresh tab (Sidebar's
-      // subscription in the real app); the second click flips it back.
-      rerender()
-      expect(container.querySelector('button[aria-pressed]')?.getAttribute('aria-pressed')).toBe('false')
-      act(() => {
-        container.querySelector('button[aria-pressed]')!
-          .dispatchEvent(new MouseEvent('click', { bubbles: true }))
-      })
-      expect(homeTab().meta).toEqual({ treeOpen: true })
+      // The header carries the path input AND the explorer toggle (on).
+      expect(container.querySelector('input[placeholder^="File path"]')).not.toBeNull()
+      expect(container.querySelector('button[aria-pressed="true"]')).not.toBeNull()
+      // The path-less home window IS the browsable one: its docked explorer
+      // (search row + tree) is on screen, separated by the resize handle.
+      expect(container.querySelector('[role="separator"]')).not.toBeNull()
+      expect(container.querySelector('input[placeholder^="Search files"]')).not.toBeNull()
     } finally {
       unmount()
     }
@@ -153,7 +126,7 @@ describe('EditorHost (files window)', () => {
       expect(after.id).toBe(before.id)
       expect(after.path).toBe('/tmp/a.ts')
       expect(after.title).toBe('a.ts')
-      expect(after.meta).toEqual({ treeOpen: true })
+      expect(after.meta).toBeUndefined()
       // No new tab landed.
       expect(allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)).toHaveLength(1)
     } finally {
@@ -202,11 +175,11 @@ describe('EditorHost (files window)', () => {
     }
   })
 
-  it('split mode: a file tab keeps the full chrome (path input + tree toggle + dock)', () => {
+  it('split mode: a file tab keeps the full chrome; its docked explorer defaults closed', () => {
     const { store, ctx } = setup()
     store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
     ctx.betterSidebar.openTab({
-      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts', meta: { treeOpen: true },
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
     })
     const fileTab = (): SidebarTab =>
       allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
@@ -214,39 +187,177 @@ describe('EditorHost (files window)', () => {
     const { container, unmount } = mountHost(ctx, store, fileTab)
     try {
       expect(container.querySelector('input[placeholder^="File path"]')).not.toBeNull()
-      expect(container.querySelector('button[aria-pressed]')?.getAttribute('aria-pressed')).toBe('true')
-      expect(container.querySelector('[role="separator"]')).not.toBeNull()
+      // The toggle is there but OFF, and no tree is docked until asked for.
+      expect(container.querySelector('button[aria-pressed="false"]')).not.toBeNull()
+      expect(container.querySelector('[role="separator"]')).toBeNull()
+      expect(container.querySelector('input[placeholder^="Search files"]')).toBeNull()
     } finally {
       unmount()
     }
   })
 
-  it('dragging the panel edge resizes the dock and persists meta.treeWidth on release', async () => {
-    const { store, ctx, homeTab } = setup()
-    store.setPrefs({ ...store.getPrefs(), editorExplorer: true })
-    const { container, unmount } = mountHost(ctx, store, homeTab)
+  it('a file tab with meta.treeOpen docks the explorer beside the content', () => {
+    const { store, ctx } = setup()
+    store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
+    ctx.betterSidebar.openTab({
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
+      meta: { treeOpen: true, treeWidth: 300 },
+    })
+    const fileTab = (): SidebarTab =>
+      allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
+        .find(tab => tab.path === '/tmp/a.ts')!
+    const { container, unmount } = mountHost(ctx, store, fileTab)
     try {
-      const handle = container.querySelector('[role="separator"]')!
-      expect(handle).not.toBeNull()
-      // The dock starts at the default width.
-      const dock = handle.parentElement!
-      expect(dock.style.width).toBe('240px')
-      // Drag the left edge LEFT by 100px → the right-docked panel widens.
-      // Pointer capture keeps move/up on the handle (jsdom: MouseEvent with
-      // pointer* type names; setPointerCapture is absent and skipped).
-      // Moves are batched to one application per frame (#315), so flush the
-      // pending frame before asserting the width.
+      // The file content keeps the chrome AND the explorer is docked open,
+      // at the persisted width.
+      expect(container.querySelector('input[placeholder^="File path"]')).not.toBeNull()
+      expect(container.querySelector('button[aria-pressed="true"]')).not.toBeNull()
+      expect(container.querySelector('[role="separator"]')).not.toBeNull()
+      expect(container.querySelector('input[placeholder^="Search files"]')).not.toBeNull()
+      const dock = container.querySelector<HTMLElement>('[class*="editorTreeDock"]')
+      expect(dock?.style.width).toBe('300px')
+    } finally {
+      unmount()
+    }
+  })
+
+  it('the docked splitter is keyboard-nudgeable and commits to meta.treeWidth', () => {
+    const { store, ctx } = setup()
+    store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
+    ctx.betterSidebar.openTab({
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
+      meta: { treeOpen: true, treeWidth: 300 },
+    })
+    const fileTab = (): SidebarTab =>
+      allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
+        .find(tab => tab.path === '/tmp/a.ts')!
+    const { container, rerender, unmount } = mountHost(ctx, store, fileTab)
+    try {
+      const splitter = container.querySelector<HTMLElement>('[role="separator"]')!
+      // Reachable by keyboard, and it advertises the contract range.
+      expect(splitter.tabIndex).toBe(0)
+      expect(splitter.getAttribute('aria-valuenow')).toBe('300')
+      expect(splitter.getAttribute('aria-valuemin')).toBe('160')
+      expect(splitter.getAttribute('aria-valuemax')).toBe('480')
+      // The panel docks right, so ArrowLeft widens it by one step (16px).
+      act(() => { splitter.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true })) })
+      expect(store.getSnapshot().state).toBeDefined()
+      expect(treeWidthOf(fileTab())).toBe(316)
+      // Home/End snap to the contract bounds.
+      act(() => { splitter.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true, cancelable: true })) })
+      expect(treeWidthOf(fileTab())).toBe(160)
+      act(() => { splitter.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true })) })
+      expect(treeWidthOf(fileTab())).toBe(480)
+      // An unrelated key is a no-op (no preventDefault, no write).
+      act(() => { splitter.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true })) })
+      expect(treeWidthOf(fileTab())).toBe(480)
+      rerender()
+      expect(container.querySelector<HTMLElement>('[class*="editorTreeDock"]')?.style.width).toBe('480px')
+    } finally {
+      unmount()
+    }
+  })
+
+  it('dragging the splitter commits the pointer delta, and a bare click writes nothing', () => {
+    const { store, ctx } = setup()
+    store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
+    ctx.betterSidebar.openTab({
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
+      meta: { treeOpen: true, treeWidth: 300 },
+    })
+    const fileTab = (): SidebarTab =>
+      allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
+        .find(tab => tab.path === '/tmp/a.ts')!
+    const { container, unmount } = mountHost(ctx, store, fileTab)
+    try {
+      const splitter = container.querySelector<HTMLElement>('[role="separator"]')!
+      const pointer = (type: string, clientX: number): void => {
+        splitter.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button: 0 }))
+      }
+      // A bare click (press + release, no move) must NOT rewrite the width:
+      // an un-seeded pending ref read as 0 and clamped to 160, silently
+      // snapping a custom width on the first click of the handle.
+      act(() => { pointer('pointerdown', 500); pointer('pointerup', 500) })
+      expect(treeWidthOf(fileTab())).toBe(300)
+      // A real drag left by 40px widens the dock by 40px (it docks right).
       act(() => {
-        handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 300 }))
-        handle.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 200 }))
+        pointer('pointerdown', 500)
+        pointer('pointermove', 460)
+        pointer('pointerup', 460)
       })
-      await act(async () => {
-        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+      expect(treeWidthOf(fileTab())).toBe(340)
+    } finally {
+      unmount()
+    }
+  })
+
+  it('a non-primary press and a lost capture never resize the dock', () => {
+    const { store, ctx } = setup()
+    store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
+    ctx.betterSidebar.openTab({
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
+      meta: { treeOpen: true, treeWidth: 300 },
+    })
+    const fileTab = (): SidebarTab =>
+      allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
+        .find(tab => tab.path === '/tmp/a.ts')!
+    const { container, unmount } = mountHost(ctx, store, fileTab)
+    try {
+      const splitter = container.querySelector<HTMLElement>('[role="separator"]')!
+      const pointer = (type: string, clientX: number, button: number): void => {
+        splitter.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button }))
+      }
+      // A right press belongs to the context menu: the strip must not grab it
+      // (a drag that never ends would then follow the pointer forever).
+      act(() => {
+        pointer('pointerdown', 500, 2)
+        pointer('pointermove', 300, 2)
+        pointer('pointerup', 300, 2)
       })
-      expect(dock.style.width).toBe('340px')
-      // Release: the drag state clears and the width persists on the tab.
-      act(() => { handle.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 200 })) })
-      expect(homeTab().meta).toEqual({ treeOpen: true, treeWidth: 340 })
+      expect(treeWidthOf(fileTab())).toBe(300)
+      // A capture lost mid-drag (the OS took the pointer, the window went
+      // away) aborts the drag — the release must not commit the swept width.
+      act(() => {
+        pointer('pointerdown', 500, 0)
+        pointer('pointermove', 300, 0)
+        splitter.dispatchEvent(new MouseEvent('lostpointercapture', { bubbles: true }))
+        pointer('pointerup', 300, 0)
+      })
+      expect(treeWidthOf(fileTab())).toBe(300)
+    } finally {
+      unmount()
+    }
+  })
+
+  it('the docked-explorer toggle flips on every click (the handler reads the live meta)', () => {
+    const { store, ctx } = setup()
+    store.setPrefs({ ...store.getPrefs(), editorExplorer: false })
+    ctx.betterSidebar.openTab({
+      type: 'editor', title: 'a.ts', path: '/tmp/a.ts', id: 'editor:/tmp/a.ts',
+      meta: { treeOpen: true, treeWidth: 300 },
+    })
+    const fileTab = (): SidebarTab =>
+      allLeaves(store.getSnapshot().state!.splits).flatMap(leaf => leaf.tabs)
+        .find(tab => tab.path === '/tmp/a.ts')!
+    const { container, rerender, unmount } = mountHost(ctx, store, fileTab)
+    try {
+      const toggle = container.querySelector<HTMLButtonElement>('button[aria-pressed]')!
+      expect(toggle.getAttribute('aria-pressed')).toBe('true')
+      // Open → the first click closes it, and the chrome re-renders closed.
+      act(() => { toggle.click() })
+      rerender()
+      expect(treeOpenOf(fileTab())).toBe(false)
+      expect(container.querySelector('button[aria-pressed="false"]')).not.toBeNull()
+      expect(container.querySelector('[role="separator"]')).toBeNull()
+      // A SECOND click on the same button must reopen it. A handler memoised on
+      // [store, tab.id] but closing over the first render's `tab` would keep
+      // reading the original value and write `false` again — the panel would
+      // never come back.
+      act(() => { toggle.click() })
+      rerender()
+      expect(treeOpenOf(fileTab())).toBe(true)
+      expect(container.querySelector('button[aria-pressed="true"]')).not.toBeNull()
+      expect(container.querySelector('[role="separator"]')).not.toBeNull()
     } finally {
       unmount()
     }
@@ -316,7 +427,7 @@ describe('EditorHost (files window)', () => {
       // hint and the file path input are NOT.
       expect(html).toContain('src')
       expect(html).toContain('Search files by name…')
-      expect(html).not.toContain('Pick a file from the tree panel')
+      expect(html).not.toContain('Type a path in the input above')
       expect(html).not.toContain('File path (relative')
     } finally {
       unmount()

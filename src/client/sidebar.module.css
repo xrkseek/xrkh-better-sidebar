@@ -800,6 +800,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   background: transparent;
   cursor: pointer;
   user-select: none;
+  transition: background-color 180ms ease-out;
 }
 
 .tab:hover {
@@ -810,6 +811,17 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   color: var(--dsw-alias-label-primary);
   /* Native selected fill (Rows .sessionRow.selected) — no underline, no shadow. */
   background: var(--dsw-alias-interactive-bg-active);
+}
+
+/* The chat-open flash: the tab that a file open produced. The same
+   business-blue surface the explorer's folder reveal uses, so "this just
+   opened" reads the same wherever it lands. The reveal state is dropped
+   after REVEAL_FLASH_MS, then the tint fades out at `.tab`'s 180ms — the
+   shortened duration below only hurries the tint IN, so the flash lands
+   crisply instead of ramping up. */
+.tabRevealed {
+  background: var(--dsw-alias-state-business-tertiary);
+  transition-duration: 90ms;
 }
 
 .tabTitle {
@@ -958,24 +970,27 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   animation: dsh-row-in 150ms var(--ds-ease-in-out);
 }
 
-.explorerRow:hover {
+/* The reveal tint IS the answer to a "show me this file" gesture. A plain
+   hover fill outranks it by specificity, so hovering the very row that was
+   just pointed at wiped the tint. Scope the hover fill away from it. */
+.explorerRow:not(.explorerRowRevealed):hover {
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
-/* A "Show in folder" reveal highlight: the target row stays tinted until
-   the transient reveal set is cleared (a reload starts unhighlighted).
-   The DSH business-blue surface (the same source the host's nav items use
-   for their active accent) — a flat tint, deliberately no left bar. */
+/* A reveal highlight: the target row stays tinted until the transient
+   reveal set is cleared (a reload starts unhighlighted). The DSH business-
+   blue surface (the same source the host's nav items use for their active
+   accent) — a flat tint, deliberately no left bar. */
 .explorerRowRevealed {
   background: var(--dsw-alias-state-business-tertiary);
 }
 
-/* Reveal sets usually list sibling files — consecutive tinted rows merge
-   into ONE rounded block: the touching edges square off, so a multi-file
-   highlight has no per-row radius notches. A solo revealed row (or the
-   first/last of a run) keeps its full radius. Rows are flat siblings in
-   the tree body (depth is inline padding), so the sibling combinator sees
-   every adjacency. */
+/* Consecutive tinted rows merge into ONE rounded block: the touching edges
+   square off, so a multi-file highlight has no per-row radius notches. A
+   solo revealed row (or the first/last of a run) keeps its full radius.
+   FILE rows are flat siblings in the tree body (depth is inline padding), so
+   the combinator sees their adjacency; a DIRECTORY row sits inside its own
+   keyed wrapper, so a tint boundary against one keeps its radius. */
 .explorerRowRevealed + .explorerRowRevealed {
   border-top-left-radius: 0;
   border-top-right-radius: 0;
@@ -1305,8 +1320,8 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   white-space: nowrap;
 }
 
-/* Merged mode (the editorExplorer pref): the header's path input replaces
-   the plain title, and a toggleable file tree docks at the tab's right edge. */
+/* The editor header's path input: it replaces the plain title and shows the
+   open file relative to the session cwd (absolute when outside it). */
 .editorPathInput {
   flex: 1;
   min-width: 0;
@@ -1326,8 +1341,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   box-shadow: 0 0 0 2px var(--dsw-alias-brand-primary);
 }
 
-/* The tree-panel toggle in the header: active = panel open (the selected
-   fill of the tab strip). */
+/* The docked-explorer toggle's ON state (the header's folder button). */
 .editorTreeToggleActive {
   color: var(--dsw-alias-label-primary);
   background: var(--dsw-alias-interactive-bg-active);
@@ -1335,6 +1349,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .editorBody {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
 }
@@ -1347,12 +1362,23 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   flex-direction: column;
 }
 
-/* The docked file tree: the wrapper owns the (drag-adjustable) width and
-   the hairline separation; the resize handle is a wider invisible strip on
-   its left edge with a hover affordance. */
+/* The docked explorer (a file tab's companion tree): the wrapper owns the
+   drag-adjustable width and the hairline separation. The resize handle is a
+   6px strip inside the dock's left edge — exactly the rows' left padding, so
+   it never covers row content or steals a row's click — carrying a hover and
+   a focus affordance. */
 .editorTreeDock {
   position: relative;
   flex: none;
+  /* A narrow panel must not let the dock swallow the file column: the dock
+     never takes more than 70% of the body, so `.editorMain` (flex-basis 0)
+     always keeps a readable strip instead of collapsing to nothing. Keep this
+     ratio in lockstep with TREE_DOCK_MAX_RATIO (EditorHost.tsx): the inline
+     width, the drag clamp and the ARIA range all measure against it. */
+  max-width: 70%;
+  /* The inline width is the contract: min-width:0 stops the tree's content
+     min-size from flooring the dock wider than `meta.treeWidth`. */
+  min-width: 0;
   min-height: 0;
   display: flex;
   border-left: 1px solid var(--dsw-alias-border-l1);
@@ -1362,7 +1388,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   position: absolute;
   top: 0;
   bottom: 0;
-  /* Inside the dock (left edge): pointer capture on the handle keeps the
+  /* Inside the dock's left edge: pointer capture on the handle keeps the
      drag alive even when the pointer leaves the strip. */
   left: 0;
   width: 6px;
@@ -1373,6 +1399,13 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 
 .editorTreeResize:hover {
   background: var(--dsw-alias-border-l2);
+}
+
+/* Keyboard focus gets the same affordance as hover — the splitter is a
+   control, and a focusable control without a ring is a trap. */
+.editorTreeResize:focus-visible {
+  outline: none;
+  background: var(--dsw-alias-brand-primary);
 }
 
 .editorTreePanel {
@@ -2700,6 +2733,7 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .paneCard:focus-visible,
 .explorerRow:focus-visible,
 .explorerRef:focus-visible,
+.editorSearchResult:focus-visible,
 .terminalRetry:focus-visible,
 .editorModeButton:focus-visible,
 .editorDownloadLink:focus-visible,
