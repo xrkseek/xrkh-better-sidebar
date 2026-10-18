@@ -10,13 +10,26 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.3
+xrkh plugin add xrkh-better-sidebar@0.20.4
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.4
+
+- Fix "file not found": clicking a file path in chat could report a file miss for a file that exists. The session directory (a `working_directory` call, a linked worktree, an isolated subagent) had moved on the host while the client kept the stale summary, so the client spelled the absolute path against a directory the session had left. The client now takes the host's reported session cwd as authoritative and re-bases the paths chat hands it.
+- The editor window regains a toggleable docked explorer panel (VSCode-style): a header folder button shows/hides it, the left-edge splitter drags to resize, and open/width are remembered per tab (`meta.treeOpen` / `meta.treeWidth`). The path-less "Files" window docks it open by default, file windows stay collapsed.
+- Clicking a file link in chat opens the file on the right **and** expands that window's explorer, scrolling the row into view and flashing it — the same reveal semantics as "Show in folder". The tab the open produced flashes too.
+- "Show in folder" reveals the session working directory and opens the path-less "Files" window with that row tinted.
+- Docked-explorer polish: the width ceiling now matches the stylesheet's `max-width: 70%` (a narrow sidebar no longer shows a dock that will not widen while `aria-valuemax` claims more), `aria-valuemax` follows the measured ceiling, a right/middle press on the splitter no longer starts a drag, a lost pointer capture (`lostpointercapture`) aborts the drag, and a bare click no longer writes `meta.treeWidth`.
+- Fix the docked-explorer toggle going dead on the second click: the handler reads the live `meta` instead of a stale closure.
+- Fix a reveal tint being wiped by hover: moving the pointer across a just-highlighted row no longer drops its background (`.explorerRow:not(.explorerRowRevealed):hover`).
+- File create / folder create / rename now **expand** the parent directory instead of toggling it (a toggle folded an already-open parent shut and hid the row it had just created).
+- File-operation failures (create / rename / delete) get their own message instead of reusing the "cannot open externally" copy, and the binary preview no longer shows two duplicate failure notices (editor + download pane).
+- New `session-cwd` client module (host-authoritative session directory + path rebase) with its own tests.
 
 ## 0.20.3
 

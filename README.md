@@ -10,7 +10,7 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.3
+xrkh plugin add xrkh-better-sidebar@0.20.4
 xrkh restart
 ```
 
@@ -18,9 +18,30 @@ xrkh restart
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
 
+## 0.20.4
+
+- 修「文件不存在」：某些会话里点击对话中的文件路径会报 file miss（文件其实在）。根因是会话目录在
+  `working_directory` / worktree / 隔离子代理下与客户端缓存的摘要不一致，客户端拿旧目录拼出了
+  错误的绝对路径。现在客户端统一以 Host 上报的会话目录为准，并对 chat 传来的路径做重定位。
+- 文件（editor）窗口右侧恢复**可开关的资源管理器面板**（VSCode 式）：头部文件夹按钮切换显隐、
+  左缘分隔条拖拽调宽，展开/宽度按 tab 记忆（`meta.treeOpen` / `meta.treeWidth`）；无路径的
+  「文件」窗口默认展开，文件窗口默认收起。
+- 点对话里的文件链接：在右侧打开该文件的同时**自动展开它所在窗口的资源管理器并定位高亮**该文件
+  （展开祖先目录 + 滚动居中），与「在文件夹中显示」同一条 reveal 语义；打开的文件标签也会闪一下。
+- 「在文件夹中显示」：揭示会话工作目录，并打开无路径的「文件」窗口把该目录行染色定位。
+- 停靠资源管理器面板收尾：宽度上限与 CSS `max-width: 70%` 对齐（窄侧栏不再出现「拖不动、`aria-valuemax` 却报更宽」），
+  `aria-valuemax` 跟随实测上限；右键/中键按分隔条不再开始拖拽；拖拽中指针捕获丢失（`lostpointercapture`）会中止拖拽；
+  只点击不移动不再误写 `meta.treeWidth`。
+- 修复「展开/收起」二次点击失效：文件夹按钮改读实时 `meta`，不再被闭包里的旧状态吞掉。
+- 修复 reveal 高亮被 hover 抹掉：鼠标划过刚被高亮的行时底色不再消失（`.explorerRow:not(.explorerRowRevealed):hover`）。
+- 新建文件 / 新建文件夹 / 重命名后**展开**父目录（原为切换：父目录已展开时会把它折叠起来，反而看不到新建的条目）。
+- 文件操作失败（新建 / 重命名 / 删除）改用专门的失败提示，不再复用「无法在外部打开」文案；二进制文件预览不再
+  同时显示编辑器与下载页两条重复的失败 notice。
+- 新增 `session-cwd` 客户端会话目录模块（统一以 Host 上报为准 + 路径重定位），补齐对应单测。
+
 ## 0.20.3
 
-- 对话交付物 / 提及点击打开文件时：展开祖先目录、打开资源树、短暂高亮对应行（此前只开编辑器、树默认收起看不到高亮）。
+- 对话交付物 / 提及点击打开文件时：展开祖先目录、短暂高亮**打开的文件标签**（此前只开编辑器、树默认收起看不到高亮）。
 
 ## 0.20.2
 
