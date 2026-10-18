@@ -1,0 +1,22 @@
+# Line endings — the repository stores LF.
+#
+# Windows checkouts carry CRLF (core.autocrlf=true), and git must normalise
+# that back to LF on stage or every edit shows up as a whole-file diff. The
+# `text` attribute is FORCED (not `text=auto`) on purpose: auto-detection once
+# mis-flagged the locale dictionaries as binary — a stray `CR CR LF` run in
+# `src/client/locales-*.ts` tripped the heuristic — and `-text` files skip
+# normalisation entirely, so a 4-line translation edit landed as 403/403.
+# Forcing the attribute makes the guess irrelevant.
+* text eol=lf
+
+# Binary assets — never normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
