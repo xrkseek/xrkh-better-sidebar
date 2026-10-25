@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import {
-  IconCloseFill14, IconPlusOutline16, Menu,
+  IconCloseFillRegular, IconPlusOutlineRegular, Menu,
 } from '@xrkseek/client-ui-primitives'
 import type { SidebarTab } from './state.ts'
 import { isAgentTabId, tabDisplayTitle } from './state.ts'
@@ -250,7 +250,7 @@ export function TabBar(props: {
                 onClose(tab.id)
               }}
             >
-              <IconCloseFill14 />
+              <IconCloseFillRegular />
             </button>
           </div>
           )
@@ -283,7 +283,7 @@ export function TabBar(props: {
               title={t('newTab')}
               onClick={() => { setMenuOpen(v => !v); setTabMenu(null) }}
             >
-              <IconPlusOutline16 />
+              <IconPlusOutlineRegular />
             </button>
           )}
         />

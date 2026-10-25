@@ -10,7 +10,7 @@
  * this component owns only its own section.
  */
 import { useState } from 'react'
-import { IconCloseOutline16 } from '@xrkseek/client-ui-primitives'
+import { IconCloseOutlineRegular } from '@xrkseek/client-ui-primitives'
 import {
   isValidCustomEditor,
   newCustomEditorId,
@@ -121,7 +121,7 @@ export function OpenWithSettings(props: {
             title={t('openWithSettingsRemove')}
             onClick={() => { removeCustom(editor.id) }}
           >
-            <IconCloseOutline16 size={14} />
+            <IconCloseOutlineRegular size={14} />
           </button>
         </div>
       ))}

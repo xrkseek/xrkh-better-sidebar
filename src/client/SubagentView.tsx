@@ -23,7 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import {
-  IconRefreshOutline14, StateDot,
+  IconRefreshOutlineRegular, StateDot,
 } from '@xrkseek/client-ui-primitives'
 import type {
   Context,
@@ -279,7 +279,7 @@ function CatalogRows({
             className={css.subagentErrorRetry}
             onClick={() => { refresh(parentSessionId) }}
           >
-            <IconRefreshOutline14 />
+            <IconRefreshOutlineRegular />
             {t('retry')}
           </button>
         </div>
@@ -811,7 +811,7 @@ export function SubagentView(props: {
           disabled={rootId === undefined}
           onClick={() => { if (rootId !== undefined) refresh(rootId) }}
         >
-          <IconRefreshOutline14 />
+          <IconRefreshOutlineRegular />
         </button>
       </div>
       <div

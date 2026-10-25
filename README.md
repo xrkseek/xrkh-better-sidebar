@@ -10,13 +10,17 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.4
+xrkh plugin add xrkh-better-sidebar@0.20.5
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.5
+
+- 适配 Host **0.6.19** 图标表面：产品图标只保留 `IconXxxRegular` / `IconXxxMedium` 权重名，旧的 `IconXxx14` / `IconXxx16` 已从 `@xrkseek/client-ui-primitives` 移除。本插件客户端全部迁到 Regular，修复启动时 Sidebar 因 `undefined` 组件白屏（`Element type is invalid … Check the render method of Sidebar`）。
 
 ## 0.20.4
 

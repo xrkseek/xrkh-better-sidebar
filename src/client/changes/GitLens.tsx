@@ -12,8 +12,8 @@
  */
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import {
-  Button, IconCodeOutline16, IconCopyOutline16, IconPlusOutline16,
-  IconRefreshOutline16, IconTrashOutline16, Input, Menu, Modal, writeClipboard,
+  Button, IconCodeOutlineRegular, IconCopyOutlineRegular, IconPlusOutlineRegular,
+  IconRefreshOutlineRegular, IconTrashOutlineRegular, Input, Menu, Modal, writeClipboard,
 } from '@xrkseek/client-ui-primitives'
 import type { GitLogEntry, GitStatusEntry, GitStatusResult, GitWorktree, SessionScope } from '../api.ts'
 import { api } from '../api.ts'
@@ -418,7 +418,7 @@ export function GitLens(props: GitLensProps) {
           disabled={busy}
           onClick={() => { void stageEntry(entry, staged) }}
         >
-          {staged ? <IconTrashOutline16 /> : <IconPlusOutline16 />}
+          {staged ? <IconTrashOutlineRegular /> : <IconPlusOutlineRegular />}
         </button>
       </div>
     )
@@ -472,7 +472,7 @@ export function GitLens(props: GitLensProps) {
           title={t('refresh')}
           onClick={() => { void refresh() }}
         >
-          <IconRefreshOutline16 size={14} />
+          <IconRefreshOutlineRegular size={14} />
         </button>
       </div>
 
@@ -592,17 +592,17 @@ export function GitLens(props: GitLensProps) {
               // that confuses the user; with the fence disarmed (the
               // `workspaceFence` pref) the open is allowed through.
               ...(fileMenu !== null && (store.getPrefs().workspaceFence === false || isWithinWorkspace(scope.cwd ?? '', resolveSidebarPath(repoRoot ?? selectedWorktree ?? scope.cwd, fileMenu.entry.path)))
-                ? [{ id: 'open', label: t('openEditor'), icon: <IconCodeOutline16 size={14} /> }]
+                ? [{ id: 'open', label: t('openEditor'), icon: <IconCodeOutlineRegular size={14} /> }]
                 : []),
               fileMenu?.staged === true
-                ? { id: 'stage', label: t('unstage'), icon: <IconTrashOutline16 size={14} /> }
-                : { id: 'stage', label: t('stage'), icon: <IconPlusOutline16 size={14} /> },
+                ? { id: 'stage', label: t('unstage'), icon: <IconTrashOutlineRegular size={14} /> }
+                : { id: 'stage', label: t('stage'), icon: <IconPlusOutlineRegular size={14} /> },
               ...(fileMenu !== null && !isUntracked(fileMenu.entry)
-                ? [{ id: 'discard', label: t('discard'), icon: <IconTrashOutline16 size={14} />, danger: true }]
+                ? [{ id: 'discard', label: t('discard'), icon: <IconTrashOutlineRegular size={14} />, danger: true }]
                 : []),
               { type: 'separator', id: 'sep1' },
-              { id: 'relative', label: t('copyRelative'), icon: <IconCopyOutline16 size={14} /> },
-              { id: 'absolute', label: t('copyAbsolute'), icon: <IconCopyOutline16 size={14} /> },
+              { id: 'relative', label: t('copyRelative'), icon: <IconCopyOutlineRegular size={14} /> },
+              { id: 'absolute', label: t('copyAbsolute'), icon: <IconCopyOutlineRegular size={14} /> },
             ]}
             onSelect={(id) => {
               const target = fileMenu
@@ -650,9 +650,9 @@ export function GitLens(props: GitLensProps) {
             onClose={() => { setHistoryMenu(null) }}
             items={[
               { id: 'view', label: t('viewCommitDiff') },
-              { id: 'copyShort', label: t('copyShortHash'), icon: <IconCopyOutline16 size={14} /> },
-              { id: 'copyFull', label: t('copyFullHash'), icon: <IconCopyOutline16 size={14} /> },
-              { id: 'copySubject', label: t('copySubject'), icon: <IconCopyOutline16 size={14} /> },
+              { id: 'copyShort', label: t('copyShortHash'), icon: <IconCopyOutlineRegular size={14} /> },
+              { id: 'copyFull', label: t('copyFullHash'), icon: <IconCopyOutlineRegular size={14} /> },
+              { id: 'copySubject', label: t('copySubject'), icon: <IconCopyOutlineRegular size={14} /> },
               { type: 'separator', id: 'sep2' },
               { id: 'revert', label: t('revertCommit'), danger: true },
               { id: 'cherryPick', label: t('cherryPickCommit'), danger: true },

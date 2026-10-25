@@ -17,7 +17,7 @@
  */
 import { memo, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
 import clsx from 'clsx'
-import { IconFolderOpen16, IconRefreshOutline16 } from '@xrkseek/client-ui-primitives'
+import { IconFolderOpenRegular, IconRefreshOutlineRegular } from '@xrkseek/client-ui-primitives'
 import { api } from './api.ts'
 import type { SidebarStore } from './state.ts'
 import { FileTree } from './FileTree.tsx'
@@ -190,7 +190,7 @@ export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
           title={t('refresh')}
           onClick={() => { setRefreshTick(tick => tick + 1) }}
         >
-          <IconRefreshOutline16 size={14} />
+          <IconRefreshOutlineRegular size={14} />
         </button>
         <button
           type="button"
@@ -210,7 +210,7 @@ export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
           disabled={busy}
           onClick={() => { folderInputRef.current?.click() }}
         >
-          <IconFolderOpen16 size={14} />
+          <IconFolderOpenRegular size={14} />
         </button>
         <input
           ref={fileInputRef}

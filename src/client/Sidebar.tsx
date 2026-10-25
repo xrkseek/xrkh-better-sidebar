@@ -31,7 +31,7 @@
 import { createElement, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type ReactNode } from 'react'
 import { useSyncExternalStore } from 'react'
 import clsx from 'clsx'
-import { IconCloseFill14, Tooltip } from '@xrkseek/client-ui-primitives'
+import { IconCloseFillRegular, Tooltip } from '@xrkseek/client-ui-primitives'
 import type { Context, SidebarSessionList } from '../context-types.ts'
 import { appendPathMention } from './conversation-draft.ts'
 import {
@@ -1685,7 +1685,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
             aria-label={t('collapseBottomPanel')}
             onClick={() => { store.reduce(toggleBottomPanel) }}
           >
-            <IconCloseFill14 />
+            <IconCloseFillRegular />
           </button>
         </Tooltip>
         <div className={css.panelBody}>

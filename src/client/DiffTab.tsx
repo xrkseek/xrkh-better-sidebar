@@ -9,7 +9,7 @@
  * renderer — the same one the changes tab's inline preview uses.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { IconRefreshOutline16 } from '@xrkseek/client-ui-primitives'
+import { IconRefreshOutlineRegular } from '@xrkseek/client-ui-primitives'
 import type { SessionScope } from './api.ts'
 import { api } from './api.ts'
 import type { SidebarDiffRef } from './state.ts'
@@ -95,7 +95,7 @@ export function DiffTab(props: { sessionId: string; cwd: string | undefined; dif
           title={t('refresh')}
           onClick={refresh}
         >
-          <IconRefreshOutline16 size={14} />
+          <IconRefreshOutlineRegular size={14} />
         </button>
       </div>
       {loading && <div className={css.gitPlaceholder}>{t('loading')}</div>}

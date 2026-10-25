@@ -9,7 +9,7 @@
  * (the old standalone explorer merged into it).
  * Side Chat (beta) was removed for xrkh localization.
  */
-import { IconCodeOutline16, IconFolderOpen16, IconPanelLeftOutline16, IconThinkOutline16 } from '@xrkseek/client-ui-primitives'
+import { IconCodeOutlineRegular, IconFolderOpenRegular, IconPanelLeftOutlineRegular, IconThinkOutlineRegular } from '@xrkseek/client-ui-primitives'
 import type { Context } from '../../context-types.ts'
 import { allLeaves, isAgentTabId, type SidebarState } from '../state.ts'
 import { t } from '../locales.ts'
@@ -86,7 +86,7 @@ export function builtinTabs(ctx: Context, options: BuiltinTabOptions = {}): read
       // explorer (empty hint + docked tree); with a path it previews/edits
       // the file. Visible in the + menu in the explorer's old slot.
       title: () => t('files'),
-      icon: (size: number) => <IconFolderOpen16 size={size} />,
+      icon: (size: number) => <IconFolderOpenRegular size={size} />,
       order: 10,
       hidden: false,
       // Pathless tabs share one key ('' after ??) so openTab({ type: 'editor' })
@@ -108,13 +108,13 @@ export function builtinTabs(ctx: Context, options: BuiltinTabOptions = {}): read
           options: [
             {
               value: true,
-              icon: (size: number) => <IconPanelLeftOutline16 size={size} />,
+              icon: (size: number) => <IconPanelLeftOutlineRegular size={size} />,
               title: () => t('editorExplorerMerged'),
               desc: () => t('editorExplorerMergedDesc'),
             },
             {
               value: false,
-              icon: (size: number) => <IconCodeOutline16 size={size} />,
+              icon: (size: number) => <IconCodeOutlineRegular size={size} />,
               title: () => t('editorExplorerSplit'),
               desc: () => t('editorExplorerSplitDesc'),
             },
@@ -197,7 +197,7 @@ export function builtinTabs(ctx: Context, options: BuiltinTabOptions = {}): read
     {
       id: 'subagent',
       title: () => t('subagent'),
-      icon: (size: number) => <IconThinkOutline16 size={size} />,
+      icon: (size: number) => <IconThinkOutlineRegular size={size} />,
       order: 30,
       single: true,
       // Declarative settings: the auto-open switches render under this row in

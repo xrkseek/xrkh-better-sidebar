@@ -10,13 +10,17 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.4
+xrkh plugin add xrkh-better-sidebar@0.20.5
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.5
+
+- Host **0.6.19** icon surface: product icons keep only weighted `IconXxxRegular` / `IconXxxMedium` names; the old `IconXxx14` / `IconXxx16` exports are gone from `@xrkseek/client-ui-primitives`. This client migrates every call site to Regular, fixing the boot white-screen where Sidebar rendered an `undefined` element (`Element type is invalid … Check the render method of Sidebar`).
 
 ## 0.20.4
 

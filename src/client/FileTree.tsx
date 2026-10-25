@@ -24,8 +24,8 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dra
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
-  IconChevronRightOutline14, IconCodeOutline16, IconCopyOutline16, IconDownloadOutline16,
-  IconLinkOutline16, Menu, type MenuEntry, type MenuItem, writeClipboard,
+  IconChevronRightOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular, IconDownloadOutlineRegular,
+  IconLinkOutlineRegular, Menu, type MenuEntry, type MenuItem, writeClipboard,
 } from '@xrkseek/client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
 import { VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
@@ -445,7 +445,7 @@ export function FileTree(props: {
       if (target.id === 'vscode') return <IconVscode16 size={16} />
       if (target.id === 'cursor') return <SiCursor size={16} />
       if (target.id === 'zed') return <SiZedindustries size={16} />
-      return <IconCodeOutline16 size={16} />
+      return <IconCodeOutlineRegular size={16} />
     }
     const pinned = openWithTargets
       .filter(target => pinnedIds.includes(target.id))
@@ -511,7 +511,7 @@ export function FileTree(props: {
         label: (
           <span className={css.openWithLabel}>
             <span className={css.openWithName}>{t('openWithMenu')}</span>
-            <IconChevronRightOutline14 size={14} className={css.openWithChevron} aria-hidden />
+            <IconChevronRightOutlineRegular size={14} className={css.openWithChevron} aria-hidden />
           </span>
         ),
         icon: <VscLinkExternal size={16} />,
@@ -573,7 +573,7 @@ export function FileTree(props: {
             >
               {isOpen ? <VscFolderOpened size={14} /> : <VscFolder size={14} />}
               <span className={css.explorerName}>{entry.name}</span>
-              {entry.isSymlink && <IconLinkOutline16 size={12} className={css.explorerSymlink} />}
+              {entry.isSymlink && <IconLinkOutlineRegular size={12} className={css.explorerSymlink} />}
               {rowActions(entry)}
             </div>
             {isOpen && renderLevel(entry.path, depth + 1)}
@@ -606,7 +606,7 @@ export function FileTree(props: {
         >
           <VscFile size={14} />
           <span className={css.explorerName}>{entry.name}</span>
-          {entry.isSymlink && <IconLinkOutline16 size={12} className={css.explorerSymlink} />}
+          {entry.isSymlink && <IconLinkOutlineRegular size={12} className={css.explorerSymlink} />}
           {rowActions(entry)}
         </div>
       )
@@ -731,7 +731,7 @@ export function FileTree(props: {
         items={[
           // The open escapes head the FILE menu (dirs only get copy).
           ...(rowMenu?.isDir === false && onOpenFileNewTab !== undefined
-            ? [{ id: 'open-new-tab', label: t('openFileNewTab'), icon: <IconCodeOutline16 size={16} /> }]
+            ? [{ id: 'open-new-tab', label: t('openFileNewTab'), icon: <IconCodeOutlineRegular size={16} /> }]
             : []),
           ...(rowMenu?.isDir === false && onOpenFileSide !== undefined
             ? [{ id: 'open-side', label: t('openFileSide'), icon: <VscFolderOpened size={16} /> }]
@@ -739,7 +739,7 @@ export function FileTree(props: {
           ...openWithEntries(),
           // Download applies to files only (the host route refuses directories).
           ...(rowMenu?.isDir === false
-            ? [{ id: 'download', label: t('download'), icon: <IconDownloadOutline16 size={16} /> }]
+            ? [{ id: 'download', label: t('download'), icon: <IconDownloadOutlineRegular size={16} /> }]
             : []),
           // Create / mutate the entry. The workspace-root row is a directory
           // too, so the "new …" pair is offered on it as well.
@@ -747,24 +747,24 @@ export function FileTree(props: {
             ? [
                 { id: 'upload-here', label: t('uploadHere'), icon: <IconUploadOutline16 size={16} /> },
                 { id: 'fs-sep-1', type: 'separator' } as MenuEntry,
-                { id: 'new-file', label: t('newFile'), icon: <IconCodeOutline16 size={16} /> },
+                { id: 'new-file', label: t('newFile'), icon: <IconCodeOutlineRegular size={16} /> },
                 { id: 'new-folder', label: t('newFolder'), icon: <VscFolderOpened size={16} /> },
               ]
             : [
                 { id: 'fs-sep-1', type: 'separator' } as MenuEntry,
-                { id: 'rename', label: t('rename'), icon: <IconCodeOutline16 size={16} /> },
+                { id: 'rename', label: t('rename'), icon: <IconCodeOutlineRegular size={16} /> },
               ]),
           {
             id: 'delete',
             label: t('delete'),
-            icon: <IconDownloadOutline16 size={16} />,
+            icon: <IconDownloadOutlineRegular size={16} />,
             danger: true,
           },
           ...(rowMenu?.isDir === true
             ? [{ id: 'fs-sep-2', type: 'separator' } as MenuEntry]
             : []),
-          { id: 'relative', label: t('copyRelative'), icon: <IconCopyOutline16 size={16} /> },
-          { id: 'absolute', label: t('copyAbsolute'), icon: <IconCopyOutline16 size={16} /> },
+          { id: 'relative', label: t('copyRelative'), icon: <IconCopyOutlineRegular size={16} /> },
+          { id: 'absolute', label: t('copyAbsolute'), icon: <IconCopyOutlineRegular size={16} /> },
         ]}
         onSelect={(id) => {
           const target = rowMenu

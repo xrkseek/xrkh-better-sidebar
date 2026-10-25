@@ -11,7 +11,7 @@
  * Every viewer carries declarative settings-surface fields (`title`, `icon`)
  * so the Side card settings page can render the enable/disable inventory.
  */
-import { IconCodeOutline16, IconDownloadOutline16 } from '@xrkseek/client-ui-primitives'
+import { IconCodeOutlineRegular, IconDownloadOutlineRegular } from '@xrkseek/client-ui-primitives'
 import { lazyChunkComponent } from '../lazy-chunk.tsx'
 import { ImagePreview } from '../ImagePreview.tsx'
 import { PdfView } from '../PdfView.tsx'
@@ -105,7 +105,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'csv',
       title: () => t('viewerCsv'),
-      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      icon: (size: number) => <IconCodeOutlineRegular size={size} />,
       exts: ['csv', 'tsv'],
       priority: 20,
       fetchStrategy: 'fsRead',
@@ -114,7 +114,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'audio',
       title: () => t('viewerAudio'),
-      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      icon: (size: number) => <IconCodeOutlineRegular size={size} />,
       exts: ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'],
       priority: 20,
       fetchStrategy: 'mediaUrl',
@@ -123,7 +123,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'video',
       title: () => t('viewerVideo'),
-      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      icon: (size: number) => <IconCodeOutlineRegular size={size} />,
       exts: ['mp4', 'webm', 'mov', 'mkv', 'avi'],
       priority: 20,
       fetchStrategy: 'mediaUrl',
@@ -132,7 +132,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'code',
       title: () => t('viewerCode'),
-      icon: (size: number) => <IconCodeOutline16 size={size} />,
+      icon: (size: number) => <IconCodeOutlineRegular size={size} />,
       exts: [],
       priority: -100,
       fetchStrategy: 'fsRead',
@@ -141,7 +141,7 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
     {
       id: 'binary-download',
       title: () => t('viewerBinary'),
-      icon: (size: number) => <IconDownloadOutline16 size={size} />,
+      icon: (size: number) => <IconDownloadOutlineRegular size={size} />,
       exts: ['zip', 'rar', '7z', 'gz', 'tar', 'exe', 'dll', 'wasm'],
       priority: -50,
       fetchStrategy: 'binary-download',
