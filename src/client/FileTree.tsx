@@ -29,7 +29,9 @@ import {
 } from '@xrkseek/client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
 import { VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
-import { api, downloadUrl, isOutsideWorkspaceMessage, type FsEntry } from './api.ts'
+import {
+  api, downloadBasename, downloadUrl, isOutsideWorkspaceMessage, triggerBrowserDownload, type FsEntry,
+} from './api.ts'
 import { FenceErrorNotice } from './FenceErrorNotice.tsx'
 import { IconUploadOutline16, IconVscode16 } from './icons.tsx'
 import type { OpenWithTarget } from './open-with.ts'
@@ -414,13 +416,10 @@ export function FileTree(props: {
 
   /** Download a file through the host route (raw bytes, binary-safe). */
   const downloadFile = (path: string): void => {
-    const url = downloadUrl({ sessionId, cwd }, path)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.style.display = 'none'
-    document.body.appendChild(anchor)
-    anchor.click()
-    anchor.remove()
+    void triggerBrowserDownload(
+      downloadUrl({ sessionId, cwd }, path),
+      downloadBasename(path),
+    )
   }
 
   /** The menu label of one open target: a locale key for the built-ins, the

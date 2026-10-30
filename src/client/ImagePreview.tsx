@@ -20,7 +20,9 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { downloadUrl, mediaUrl, type SessionScope } from './api.ts'
+import {
+  downloadBasename, downloadUrl, mediaUrl, triggerBrowserDownload, type SessionScope,
+} from './api.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
@@ -222,7 +224,15 @@ export function ImagePreview(props: { scope: SessionScope; path: string; title: 
           {t('imageActualSize')}
         </button>
         <span className={css.editorImageZoomLabel}>{percent}%</span>
-        <a className={css.editorDownloadLink} href={downloadUrl(scope, path)} download>
+        <a
+          className={css.editorDownloadLink}
+          href={downloadUrl(scope, path)}
+          download={downloadBasename(path)}
+          onClick={(event) => {
+            event.preventDefault()
+            void triggerBrowserDownload(downloadUrl(scope, path), downloadBasename(path))
+          }}
+        >
           {t('download')}
         </a>
       </div>

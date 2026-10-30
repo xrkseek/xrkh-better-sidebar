@@ -23,6 +23,10 @@ beforeAll(() => {
   Object.defineProperty(window.navigator, 'language', { value: 'en-US', configurable: true })
 })
 
+const { triggerBrowserDownload } = vi.hoisted(() => ({
+  triggerBrowserDownload: vi.fn(async () => {}),
+}))
+
 vi.mock('../src/client/api.ts', () => ({
   api: {
     fsTree: async () => ({
@@ -34,7 +38,9 @@ vi.mock('../src/client/api.ts', () => ({
     fsWatchSync: async () => ({ changed: [], seq: 0, missed: false, unwatched: [] }),
     fsTreeBatch: async () => ({ listings: [], stats: [] }),
   },
-  downloadUrl: () => '/sidebar/file',
+  downloadUrl: (_scope: unknown, path: string) => `/sidebar/file?path=${path}&download=1`,
+  downloadBasename: (path: string) => path.split(/[/\\]/).pop() || 'download',
+  triggerBrowserDownload: (...args: unknown[]) => triggerBrowserDownload(...args),
   isOutsideWorkspaceMessage: () => false,
 }))
 
@@ -101,6 +107,7 @@ function labelsOf(row: string): string[] {
 }
 
 beforeEach(async () => {
+  triggerBrowserDownload.mockClear()
   await mount()
 })
 afterEach(() => {
@@ -115,11 +122,21 @@ describe('FileTree mutation menu', () => {
     expect(dirLabels).toContain('New file')
     expect(dirLabels).toContain('New folder')
     expect(dirLabels).not.toContain('Rename')
+    expect(dirLabels).not.toContain('Download')
 
     const fileLabels = labelsOf('a.ts')
     expect(fileLabels).toContain('Rename')
     expect(fileLabels).toContain('Delete')
+    expect(fileLabels).toContain('Download')
     expect(fileLabels).not.toContain('New folder')
+  })
+
+  it('routes file Download through the mobile-safe blob helper', () => {
+    choose('a.ts', 'Download')
+    expect(triggerBrowserDownload).toHaveBeenCalledWith(
+      '/sidebar/file?path=/tmp/a.ts&download=1',
+      'a.ts',
+    )
   })
 
   it('creates a file in the chosen directory', () => {

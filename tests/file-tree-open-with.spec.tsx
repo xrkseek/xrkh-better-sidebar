@@ -29,6 +29,8 @@ vi.mock('../src/client/api.ts', () => ({
     }),
   },
   downloadUrl: () => '/sidebar/file',
+  downloadBasename: (path: string) => path.split(/[/\\]/).pop() || 'download',
+  triggerBrowserDownload: async () => {},
 }))
 
 /** The resolved target list a caller (EditorHost) would hand FileTree. */

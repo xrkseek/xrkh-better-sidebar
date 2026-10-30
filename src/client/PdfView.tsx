@@ -1,7 +1,9 @@
 /** Browser-native PDF preview with an always-available download fallback. */
 import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
-import { downloadUrl, mediaUrl, type SessionScope } from './api.ts'
+import {
+  downloadBasename, downloadUrl, mediaUrl, triggerBrowserDownload, type SessionScope,
+} from './api.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
@@ -84,7 +86,15 @@ export function PdfView(props: { scope: SessionScope; path: string; title: strin
   return (
     <div className={css.editorPdf}>
       <div className={css.editorPdfToolbar}>
-        <a className={css.editorDownloadLink} href={downloadUrl(scope, path)} download>
+        <a
+          className={css.editorDownloadLink}
+          href={downloadUrl(scope, path)}
+          download={downloadBasename(path)}
+          onClick={(event) => {
+            event.preventDefault()
+            void triggerBrowserDownload(downloadUrl(scope, path), downloadBasename(path))
+          }}
+        >
           {t('downloadToView')}
         </a>
       </div>

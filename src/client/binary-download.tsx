@@ -7,21 +7,31 @@
  * `notice` carries a transient failure from the "open with" menu (the action
  * is fire-and-forget, so a rejection would otherwise be invisible).
  */
-import type { ReactNode } from 'react'
+import type { ReactNode, MouseEvent } from 'react'
 import type { SessionScope } from './api.ts'
-import { downloadUrl } from './api.ts'
+import { downloadBasename, downloadUrl, triggerBrowserDownload } from './api.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
 export function BinaryDownload(props: { scope: SessionScope; path: string; notice?: string }): ReactNode {
   const { scope, path, notice } = props
+  const onDownload = (event: MouseEvent<HTMLAnchorElement>): void => {
+    // Prefer fetch→blob so iOS / Android Chrome actually save instead of navigating.
+    event.preventDefault()
+    void triggerBrowserDownload(downloadUrl(scope, path), downloadBasename(path))
+  }
   return (
     <div className={css.editorBinary}>
       {notice !== undefined && notice !== '' && (
         <span className={css.editorError}>{notice}</span>
       )}
       <span className={css.editorBinaryNotice}>{t('binaryNoPreview')}</span>
-      <a className={css.editorDownloadLink} href={downloadUrl(scope, path)} download>
+      <a
+        className={css.editorDownloadLink}
+        href={downloadUrl(scope, path)}
+        download={downloadBasename(path)}
+        onClick={onDownload}
+      >
         {t('downloadToView')}
       </a>
     </div>

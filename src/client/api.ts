@@ -435,6 +435,56 @@ export function downloadUrl(scope: SessionScope, path: string): string {
   return fileUrl(scope, path, true)
 }
 
+/** Basename for a Content-Disposition / `<a download>` filename hint. */
+export function downloadBasename(path: string): string {
+  const trimmed = path.replace(/[/\\]+$/, '')
+  const slash = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'))
+  const name = slash === -1 ? trimmed : trimmed.slice(slash + 1)
+  return name === '' ? 'download' : name
+}
+
+/**
+ * Trigger a file download that works on mobile Safari / Chrome as well as
+ * desktop. A bare `<a href download>` against a query-string route often
+ * navigates (or no-ops) on iOS; fetch→blob→objectURL is the reliable path.
+ * Falls back to a classic anchor click when fetch is unavailable.
+ */
+export async function triggerBrowserDownload(
+  url: string,
+  filename: string = 'download',
+): Promise<void> {
+  try {
+    const response = await fetch(url, { credentials: 'same-origin' })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const blob = await response.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    try {
+      const anchor = document.createElement('a')
+      anchor.href = objectUrl
+      anchor.download = filename
+      anchor.rel = 'noopener'
+      anchor.style.display = 'none'
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+    } finally {
+      // Defer revoke so WebKit can start the download before the blob dies.
+      window.setTimeout(() => { URL.revokeObjectURL(objectUrl) }, 2_000)
+    }
+    return
+  } catch {
+    // Fall through to navigation-style download (desktop / older hosts).
+  }
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.rel = 'noopener'
+  anchor.style.display = 'none'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
 /** Shared URL builder for the /sidebar/file route (media vs download). */
 function fileUrl(scope: SessionScope, path: string, download: boolean): string {
   const params = new URLSearchParams({ sessionId: scope.sessionId, path })

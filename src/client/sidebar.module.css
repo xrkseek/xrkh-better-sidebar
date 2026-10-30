@@ -2779,6 +2779,39 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
     min-width: 48px;
     max-width: 128px;
   }
+
+  /* Touch: 44px hit target around the 28px icon (WCAG / iOS HIG). */
+  .toggleButton {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Full-bleed drawer: clear notches; keep content above the home indicator. */
+  .panel {
+    right: 0;
+    left: 0;
+    width: 100% !important;
+    max-width: 100%;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .toggleCluster {
+    /* Stay clear of the closed left session rail + notch when the drawer is shut. */
+    top: calc(
+      10px + env(safe-area-inset-top) +
+      var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
+    );
+    right: calc(10px + env(safe-area-inset-right));
+  }
+
+  .editorDownloadLink {
+    /* Larger tap target for download-on-mobile. */
+    min-height: 44px;
+    padding: 10px 14px;
+    display: inline-flex;
+    align-items: center;
+  }
 }
 
 /* The file tree "open with" menu rows: the label area is a BLOCK-level flex

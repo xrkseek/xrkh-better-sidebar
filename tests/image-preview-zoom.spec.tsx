@@ -32,9 +32,15 @@ beforeAll(() => {
   ;(globalThis as Record<string, unknown>).ResizeObserver = StubResizeObserver
 })
 
+const { triggerBrowserDownload } = vi.hoisted(() => ({
+  triggerBrowserDownload: vi.fn(async () => {}),
+}))
+
 vi.mock('../src/client/api.ts', () => ({
   mediaUrl: (_scope: unknown, path: string) => `/sidebar/file?path=${path}`,
   downloadUrl: (_scope: unknown, path: string) => `/sidebar/file?path=${path}&download=1`,
+  downloadBasename: (path: string) => path.split(/[/\\]/).pop() || 'download',
+  triggerBrowserDownload: (...args: unknown[]) => triggerBrowserDownload(...args),
 }))
 
 let container: HTMLDivElement
@@ -218,5 +224,19 @@ describe('ImagePreview zoom', () => {
     await act(async () => { image().dispatchEvent(new Event('error')) })
     expect(container.querySelector('img')).toBeNull()
     expect(container.textContent).toContain('Failed to load image')
+  })
+
+  it('download link prevents navigation and uses the blob helper', async () => {
+    triggerBrowserDownload.mockClear()
+    const link = container.querySelector('a')
+    expect(link).not.toBeNull()
+    expect(link!.getAttribute('download')).toBe('a.png')
+    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
+    act(() => { link!.dispatchEvent(event) })
+    expect(event.defaultPrevented).toBe(true)
+    expect(triggerBrowserDownload).toHaveBeenCalledWith(
+      '/sidebar/file?path=/tmp/a.png&download=1',
+      'a.png',
+    )
   })
 })

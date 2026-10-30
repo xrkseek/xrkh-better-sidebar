@@ -10,13 +10,18 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.5
+xrkh plugin add xrkh-better-sidebar@0.20.6
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.6
+
+- **手机下载**：二进制 / 图片 / PDF / 树菜单「下载」改走 fetch→blob→`<a download>`，避免 iOS / Android 上查询串路由只导航不落盘。
+- **手机抽屉**：窄屏全宽 + 左右安全区；开关按钮 44px 触控；下载链同样加大点按区。
 
 ## 0.20.5
 
