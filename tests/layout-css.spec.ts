@@ -30,6 +30,16 @@ describe('layout.css conversation column', () => {
     expect(body).not.toMatch(/(?:^|[;\s])overflow\s*:/)
   })
 
+  it('falls back bottom-panel left to Host sidebar inset (not bare 0)', () => {
+    const panelCss = readFileSync('src/client/sidebar.module.css', 'utf8')
+    const block = panelCss.match(/\.bottomPanel\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/)?.[0] ?? ''
+    expect(block).toContain('--xrk-layout-inset-sidebar')
+    // Edges snap — easing left/right can collapse the strip mid-tween.
+    const transition = block.match(/transition:\s*([^;]+);/)?.[1] ?? ''
+    expect(transition).not.toMatch(/\bleft\b/)
+    expect(transition).not.toMatch(/\bright\b/)
+  })
+
   // The Host shell (ui-layout's AppFrame) yields the bottom panel through the
   // column's own padding-bottom, reading this plugin's --xrkh-workbench-height
   // as its fallback. A margin-bottom here charged the panel height TWICE: the

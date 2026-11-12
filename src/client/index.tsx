@@ -272,6 +272,7 @@ export function apply(ctx: Context): void {
         disposed = true
         offRemote?.()
         unmount()
+        sidebarStore.dispose()
       }
     }, 'xrkh-better-sidebar: sidebar mount')
 

@@ -9,9 +9,9 @@
  * `meta.treeOpen` / `meta.treeWidth`, default open for the path-less home)
  * and a full-window form for the path-less window in split mode — that window
  * IS the standalone explorer — plus a folder window (`meta.dir`) rooting the
- * same tree at that folder. A chat file open lands in the editor, forces the
- * docked panel open and tints the file's row, so the file and its place in
- * the tree appear together.
+ * same tree at that folder. A chat file open lands in the editor and tints
+ * the file's row when revealed; the docked companion tree stays closed until
+ * the user opens it from the toolbar.
  *
  * The `editorExplorer` mode (read reactively so toggling it re-renders
  * without a reload) only decides what a tree click / path-input Enter does:
@@ -35,6 +35,7 @@ import { decideExternalChange, planFirstMatch, planFsReadOutcome, type EditorLoa
 import { createFrameBatcher } from './frame-batcher.ts'
 import { baseName } from './paths.ts'
 import { openSidebarFile } from './intercept.tsx'
+import { OpenWithToolbarButton } from './OpenWithToolbarButton.tsx'
 import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTargets } from './open-with.ts'
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
@@ -107,6 +108,13 @@ export function EditorHost(props: {
   // Manual refresh (issue #167): bumping the sequence re-runs the load effect
   // with the same path/scope — the only reload entry besides open/close.
   const [reloadSeq, setReloadSeq] = useState(0)
+  /** Last path the load effect ran for — soft media reload requires same path. */
+  const mediaSoftPathRef = useRef(path)
+  /**
+   * After our own save, the next stat stamp is the new baseline (not an
+   * external edit). Without this, edit-mode Ctrl+S remounts and drops the caret.
+   */
+  const adoptBaselineRef = useRef(false)
 
   // Manual refresh (issue #167 + PR #228): a dirty draft is dropped by the
   // reload (the editor instance remounts), so confirm before discarding it.
@@ -149,9 +157,8 @@ export function EditorHost(props: {
   const folderRoot = isDir ? path : undefined
 
   // ── The docked explorer panel ──────────────────────────────────────────
-  // Per-tab `meta.treeOpen` / `meta.treeWidth` (state.ts). A chat file open
-  // sets treeOpen=true on the tab it just landed, so the file and its row in
-  // the tree appear together — the behavior the reveal gestures promise.
+  // Per-tab `meta.treeOpen` / `meta.treeWidth` (state.ts). File tabs default
+  // closed; the toolbar toggle is the only way to dock the companion tree.
   const treeOpen = treeOpenOf(tab)
   const toggleTree = useCallback((): void => {
     store.reduce(state => toggleTabTree(state, tab.id))
@@ -358,25 +365,73 @@ export function EditorHost(props: {
     // Aborts the matched viewer's `load` when the editor tears down (tab
     // closed, path changed, session switched) or re-matches the viewer.
     const controller = new AbortController()
-    setLoad({ status: 'loading' })
-    const mediaUrlOf = (): string => mediaUrl(scope, path)
+    // Media soft-reload only when the PATH is unchanged (reloadSeq / mtime
+    // refresh). A different file must not keep painting the previous image
+    // while the new one loads.
+    const samePath = mediaSoftPathRef.current === path
+    mediaSoftPathRef.current = path
+    setLoad((prev) => {
+      if (
+        samePath
+        && prev.status === 'ready'
+        && (prev.viewer.fetchStrategy === 'mediaUrl' || prev.viewer.fetchStrategy === 'none')
+      ) {
+        return prev
+      }
+      return { status: 'loading' }
+    })
+    const mediaUrlOf = (revision?: number): string => mediaUrl(scope, path, revision)
     const apply = (action: EditorLoadAction): void => {
       if (cancelled) return
       switch (action.kind) {
         case 'binary':
           setLoad({ status: 'binary' })
           return
-        case 'render':
+        case 'render': {
+          // mediaUrl / none viewers never fs.read, so they arrive without an
+          // mtime baseline — and without a cache-busting URL. Stat once so
+          // external edits and browser image caches both stay honest.
+          const needsStamp = action.mtimeMs === undefined
+            && (action.viewer.fetchStrategy === 'mediaUrl' || action.viewer.fetchStrategy === 'none')
+          if (needsStamp) {
+            void api.fsTreeBatch(scope, [], [path]).then((batch) => {
+              if (cancelled) return
+              const stamp = batch.stats.find(row => row.path === path)?.mtimeMs
+              setLoad({
+                status: 'ready',
+                viewer: action.viewer,
+                content: action.content,
+                truncated: action.truncated,
+                mediaUrl: mediaUrlOf(stamp),
+                customData: action.customData,
+                mtimeMs: stamp,
+              })
+            }).catch(() => {
+              if (cancelled) return
+              setLoad({
+                status: 'ready',
+                viewer: action.viewer,
+                content: action.content,
+                truncated: action.truncated,
+                mediaUrl: action.mediaUrl ?? mediaUrlOf(),
+                customData: action.customData,
+              })
+            })
+            return
+          }
           setLoad({
             status: 'ready',
             viewer: action.viewer,
             content: action.content,
             truncated: action.truncated,
-            mediaUrl: action.mediaUrl,
+            mediaUrl: action.mtimeMs !== undefined
+              ? mediaUrlOf(action.mtimeMs)
+              : action.mediaUrl,
             customData: action.customData,
             mtimeMs: action.mtimeMs,
           })
           return
+        }
         case 'customLoad':
           void action.viewer.load?.(path, scope, controller.signal).then((data) => {
             if (cancelled) return
@@ -396,7 +451,7 @@ export function EditorHost(props: {
               truncated: result.truncated,
               head: result.kind === 'binary' ? result.head : undefined,
               mtimeMs: result.mtimeMs,
-            }, (head) => ctx.get('betterSidebar')?.matchFileViewer(path, head), mediaUrlOf)
+            }, (head) => ctx.get('betterSidebar')?.matchFileViewer(path, head), () => mediaUrlOf())
             apply(outcome)
           }).catch((error: unknown) => {
             if (cancelled) return
@@ -405,7 +460,7 @@ export function EditorHost(props: {
           return
       }
     }
-    apply(planFirstMatch(ctx.get('betterSidebar')?.matchFileViewer(path), mediaUrlOf))
+    apply(planFirstMatch(ctx.get('betterSidebar')?.matchFileViewer(path), () => mediaUrlOf()))
     return () => { cancelled = true; controller.abort() }
   }, [scope.sessionId, scope.cwd, path, ctx, showEmpty, isDir, reloadSeq])
 
@@ -414,11 +469,13 @@ export function EditorHost(props: {
   // a preview-mode Ctrl+S shows the fresh content immediately. Edit mode is
   // left alone — reloading would remount the editor and drop the caret.
   // Also nudge the explorer poller so the tree picks up rename/mtime without
-  // waiting for the idle 4s heartbeat.
+  // waiting for the idle heartbeat.
+  //
   const prevSaveState = useRef<EditorToolbarState['saveState'] | undefined>(undefined)
   useEffect(() => {
     const current = toolbar?.saveState
     if (prevSaveState.current !== 'saved' && current === 'saved') {
+      adoptBaselineRef.current = true
       if (scope.cwd !== undefined) {
         nudgeTreeWatch({ sessionId: scope.sessionId, cwd: scope.cwd })
       }
@@ -439,10 +496,15 @@ export function EditorHost(props: {
   /** The mtime of the bytes currently rendered (undefined without a baseline). */
   const loadedMtime = useRef<number | undefined>(undefined)
   useEffect(() => {
-    loadedMtime.current = load.status === 'ready' ? load.mtimeMs : undefined
-    // A reload has just made what is on screen current again, so any pending
-    // notice is stale the moment new content lands.
-    if (load.status === 'ready') setChangedOnDisk(false)
+    if (load.status === 'ready') {
+      // Keep an onStats-seeded baseline when this ready frame has no stamp
+      // (media viewer whose seed batch failed) — wiping it would make every
+      // later mtime look like "first seed" and never reload.
+      if (load.mtimeMs !== undefined) loadedMtime.current = load.mtimeMs
+      setChangedOnDisk(false)
+    } else {
+      loadedMtime.current = undefined
+    }
   }, [load])
   /** Read through a ref so the subscription below is not rebuilt per keystroke. */
   const draftDirty = useRef(false)
@@ -466,8 +528,23 @@ export function EditorHost(props: {
       onStats: (rows) => {
         const row = rows.find(item => item.path === path)
         if (row === undefined) return
+        // Own save just landed: adopt the new stamp as baseline, do not remount.
+        if (adoptBaselineRef.current && row.mtimeMs !== undefined) {
+          loadedMtime.current = row.mtimeMs
+          adoptBaselineRef.current = false
+          return
+        }
+        // First stamp for media viewers that raced the seed batch: adopt it
+        // silently. decideExternalChange ignores undefined baselines, so
+        // without this seed every later mtime would still be ignored.
+        if (loadedMtime.current === undefined && row.mtimeMs !== undefined) {
+          loadedMtime.current = row.mtimeMs
+          return
+        }
         const action = decideExternalChange(loadedMtime.current, row.mtimeMs, draftDirty.current)
         if (action === 'reload') {
+          // Bumping reloadSeq remounts the viewer with a fresh media URL
+          // (`&v=mtime`) so browser image/PDF caches cannot keep stale bytes.
           setReloadSeq(sequence => sequence + 1)
           return
         }
@@ -605,12 +682,17 @@ export function EditorHost(props: {
             <IconRefreshOutlineRegular size={14} />
           </button>
         )}
-        {/*
-          The docked explorer toggle: a VSCode-style "toggle sidebar" button
-          in the editor's own toolbar. A chat file open turns it on for the
-          tab it landed, which is how the file and its tree row appear
-          together.
-        */}
+        {!showEmpty && path !== '' && (
+          <OpenWithToolbarButton
+            path={path}
+            targets={openWithTargets}
+            pinned={openWithConfig.pinned}
+            ssh={openWithSshActive(openWithConfig)}
+            onOpenWith={openWith}
+            onTogglePin={toggleOpenWithPin}
+          />
+        )}
+        {/* Docked explorer toggle — off by default for file tabs. */}
         <button
           type="button"
           className={clsx(css.iconButton, treeOpen && css.editorTreeToggleActive)}

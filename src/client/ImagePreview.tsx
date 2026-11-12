@@ -49,8 +49,15 @@ function wheelZoomFactor(deltaY: number): number {
   return Math.exp(-capped * WHEEL_SENSITIVITY)
 }
 
-export function ImagePreview(props: { scope: SessionScope; path: string; title: string }): ReactNode {
+export function ImagePreview(props: {
+  scope: SessionScope
+  path: string
+  title: string
+  /** Host-supplied media URL (mtime cache-bust). Falls back to a live build. */
+  mediaUrl?: string
+}): ReactNode {
   const { scope, path, title } = props
+  const src = props.mediaUrl ?? mediaUrl(scope, path)
   const stageRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
   /** Intrinsic pixel size, learned from the decoded image. */
@@ -61,6 +68,20 @@ export function ImagePreview(props: { scope: SessionScope; path: string; title: 
   const [offset, setOffset] = useState({ x: 0, y: 0 })
   /** Stage box, remeasured on resize; drives the fit scale. */
   const [stage, setStage] = useState<{ width: number; height: number } | null>(null)
+
+  // Cache-bust remounts swap `src` but should keep the user's zoom/pan — only
+  // a different file (path) resets the viewport. Decode state still clears so
+  // a failed prior frame cannot stick to the new bytes.
+  useEffect(() => {
+    setFailed(false)
+    setNatural(null)
+  }, [src])
+  useEffect(() => {
+    setZoom(null)
+    setOffset({ x: 0, y: 0 })
+    setFailed(false)
+    setNatural(null)
+  }, [path])
 
   useLayoutEffect(() => {
     const el = stageRef.current
@@ -254,7 +275,7 @@ export function ImagePreview(props: { scope: SessionScope; path: string; title: 
             <img
               ref={imageRef}
               className={css.editorImage}
-              src={mediaUrl(scope, path)}
+              src={src}
               alt={title}
               draggable={false}
               style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})` }}

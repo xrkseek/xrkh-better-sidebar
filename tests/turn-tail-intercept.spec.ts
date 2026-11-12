@@ -96,14 +96,14 @@ describe('open-path folder reveal (replaces turnTail takeover)', () => {
       id: 'editor:/w/src/a.ts',
     })
     // Chip / mention opens flash the opened tab (and expand its ancestors in
-    // the explorer, so the explorer agrees).
+    // the explorer, so the explorer agrees when the user opens the dock).
     expect(store.getSnapshot().state?.revealed).toEqual(['/w/src/a.ts'])
     expect(store.getSnapshot().state?.expanded).toEqual(expect.arrayContaining(['/w/src']))
-    // …and the docked explorer is forced open on the tab that owns the file,
-    // so the file and its tree row appear together (the whole point).
+    // Path tabs keep the companion tree closed by default — phone/desktop
+    // detail views stay roomy; the editor toolbar opens the dock on demand.
     const opened = tabAt(store, '/w/src/a.ts')
     expect(opened.path).toBe('/w/src/a.ts')
-    expect(opened.meta).toMatchObject({ treeOpen: true })
+    expect(opened.meta?.treeOpen).not.toBe(true)
     // One openTab only — must not also open the pathless Files home.
     expect(openTab).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1_600)

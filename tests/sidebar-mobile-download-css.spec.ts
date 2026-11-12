@@ -47,4 +47,13 @@ describe('sidebar.module.css mobile download / drawer', () => {
     expect(body).toMatch(/width:\s*44px/)
     expect(body).toMatch(/height:\s*44px/)
   })
+
+  it('clears status-bar overlap via Settings-style max(12px, env, --ds-safe-*)', () => {
+    const body = narrowMediaBody()
+    expect(body).toMatch(/--ds-safe-top/)
+    expect(body).toMatch(/safe-area-inset-top/)
+    expect(body).toMatch(/max\(\s*12px\s*,\s*env\(safe-area-inset-top/)
+    expect(body).toMatch(/\.drawerCollapse\s*\{/)
+    expect(body).toMatch(/height:\s*34px/)
+  })
 })

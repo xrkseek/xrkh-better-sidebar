@@ -424,9 +424,13 @@ export const api = {
     call<{ started: boolean }>('open.external', payload),
 }
 
-/** Absolute URL of the media route for one path (images only). */
-export function mediaUrl(scope: SessionScope, path: string): string {
-  return fileUrl(scope, path, false)
+/** Absolute URL of the media route for one path (images / pdf / audio…).
+ *  `revision` (usually mtimeMs) busts the browser cache when the file
+ *  changes on disk so a remount actually fetches fresh bytes. */
+export function mediaUrl(scope: SessionScope, path: string, revision?: number): string {
+  const base = fileUrl(scope, path, false)
+  if (revision === undefined || !Number.isFinite(revision)) return base
+  return `${base}&v=${Math.round(revision)}`
 }
 
 /** Absolute URL of the download route: serves raw bytes (binary-safe) with

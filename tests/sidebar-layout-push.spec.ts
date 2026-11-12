@@ -15,7 +15,20 @@ describe('Sidebar layout-push integration', () => {
     expect(source).toContain('visualViewportHeight ?? viewport.height')
     expect(source).toContain('layoutViewportHeight = narrow')
     expect(source.match(/viewportHeight: layoutViewportHeight/g)).toHaveLength(4)
-    expect(source).toContain('viewport.width, layoutViewportHeight, effectiveKeyboardInset]')
+    expect(source).toContain('viewport.width, layoutViewportHeight, effectiveKeyboardInset, measureCenter]')
+  })
+
+  it('measures center edges synchronously after the layout push (blank-bottom fix)', () => {
+    // Prefer AppFrame's data-pane column (not the display:contents slot).
+    expect(source).toContain('[data-pane="conversation"]')
+    expect(source).toContain('findCenterColumn')
+    // Sync measure in the same useLayoutEffect as writeGeometry — RO alone
+    // is post-paint and left the first open frame on a zero-width strip.
+    expect(source).toMatch(/writeGeometry\(width, bottomPush\)[\s\S]{0,400}?measureCenter\(\)/)
+    // Refuse degenerate center boxes so we never stamp left+right ≈ viewport.
+    expect(source).toContain('width >= 40')
+    // Do not tear down the ResizeObserver when bottomOpen flips.
+    expect(source).not.toMatch(/\}, \[measureCenter, state\?\.bottomOpen\]\)/)
   })
 
   it('adds the keyboard inset to the conversation push, not the panel height', () => {

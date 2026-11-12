@@ -7,8 +7,15 @@ import {
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
-export function PdfView(props: { scope: SessionScope; path: string; title: string }) {
+export function PdfView(props: {
+  scope: SessionScope
+  path: string
+  title: string
+  /** Host-supplied media URL (mtime cache-bust). Falls back to a live build. */
+  mediaUrl?: string
+}) {
   const { scope, path, title } = props
+  const source = props.mediaUrl ?? mediaUrl(scope, path)
   const [load, setLoad] = useState<
     | { status: 'loading' }
     | { status: 'ready'; url: string }
@@ -24,7 +31,7 @@ export function PdfView(props: { scope: SessionScope; path: string; title: strin
     setLoad({ status: 'loading' })
     void (async () => {
       try {
-        const response = await fetch(mediaUrl(scope, path), { signal: controller.signal })
+        const response = await fetch(source, { signal: controller.signal })
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
         const bytes = await response.arrayBuffer()
         if (controller.signal.aborted) return
@@ -42,7 +49,7 @@ export function PdfView(props: { scope: SessionScope; path: string; title: strin
       controller.abort()
       if (objectUrl !== undefined) URL.revokeObjectURL(objectUrl)
     }
-  }, [scope.sessionId, scope.cwd, path])
+  }, [source])
 
   useEffect(() => {
     const block = (): void => {

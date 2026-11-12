@@ -49,8 +49,8 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       icon: (size: number) => <IconImageOutline16 size={size} />,
       exts: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif'],
       fetchStrategy: 'none',
-      component: ({ scope, path, title }) => (
-        <ImagePreview scope={scope} path={path} title={title} />
+      component: ({ scope, path, title, mediaUrl: url }) => (
+        <ImagePreview scope={scope} path={path} title={title} mediaUrl={url} />
       ),
     },
     {
@@ -59,8 +59,8 @@ export function builtinViewers(): readonly FileViewerDescriptor[] {
       icon: (size: number) => <IconPdfOutline16 size={size} />,
       exts: ['pdf'],
       fetchStrategy: 'mediaUrl',
-      component: ({ scope, path, title }) => (
-        <PdfView scope={scope} path={path} title={title} />
+      component: ({ scope, path, title, mediaUrl: url }) => (
+        <PdfView scope={scope} path={path} title={title} mediaUrl={url} />
       ),
     },
     {

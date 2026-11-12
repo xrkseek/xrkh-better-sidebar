@@ -1,12 +1,9 @@
 /**
  * Unit tests for the explorer's incremental-refresh client half.
  *
- * Two layers are covered: the pure signature/merge functions that decide
- * whether a re-listed level is worth a re-render, and the broker that owns the
- * polling round (request merging, cursor advance, degrade handling). The
- * broker tests drive real timers through `vi.advanceTimersByTimeAsync` so the
- * cadence and the in-flight guard are exercised as written, with `api` mocked
- * — no network, no React tree, no filesystem.
+ * Two layers are covered: the pure signature/merge/cadence helpers, and the
+ * broker that owns the polling round (request merging, cursor advance,
+ * degrade handling, adaptive backoff). Timers are fake; `api` is mocked.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FsBatchListing, FsStatInfo, FsWatchSyncResult } from '../src/client/api.ts'
@@ -21,7 +18,21 @@ vi.mock('../src/client/api.ts', () => ({
   },
 }))
 
-const { levelSignature, reconcileLevel, resetTreeWatch, subscribeTreeWatch } = await import('../src/client/tree-watch.ts')
+const {
+  levelSignature,
+  reconcileLevel,
+  resetTreeWatch,
+  subscribeTreeWatch,
+  nudgeTreeWatch,
+  computeWatchDelay,
+  TREE_WATCH_HOT_MS,
+  TREE_WATCH_ACTIVE_MS,
+  TREE_WATCH_IDLE_MS,
+  TREE_WATCH_DEGRADED_MS,
+  TREE_WATCH_HIDDEN_MS,
+  TREE_WATCH_ERROR_MS,
+  TREE_WATCH_FALLBACK_MS,
+} = await import('../src/client/tree-watch.ts')
 
 /** The scope every test polls; one channel is keyed on it. */
 const scope = { sessionId: 's1', cwd: '/w' }
@@ -39,13 +50,22 @@ function entry(name: string, extra: Partial<{ isDir: boolean; isSymlink: boolean
   }
 }
 
-/** Let the broker run one active-cadence round. */
+/**
+ * Fire any timer due at "now" (the subscribe `schedule(0)` path and a
+ * coalesced nudge). Does NOT advance into the next idle beat.
+ */
 async function tick(): Promise<void> {
-  await vi.advanceTimersByTimeAsync(1_200)
+  await vi.advanceTimersByTimeAsync(0)
+}
+
+/** Wait `ms`, then fire the scheduled round. */
+async function after(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms)
 }
 
 beforeEach(() => {
   vi.useFakeTimers()
+  vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'))
   fsWatchSync.mockReset()
   fsTreeBatch.mockReset()
   fsWatchSync.mockResolvedValue({ changed: [], seq: 0, missed: false, unwatched: [] })
@@ -80,20 +100,36 @@ describe('reconcileLevel', () => {
   })
 
   it('never invents a level the tree has not loaded', () => {
-    // Writing an unloaded level would seed the cache with a directory the user
-    // never expanded, and the tree would render rows it cannot explain.
     expect(reconcileLevel(undefined, [entry('a.ts')])).toBeUndefined()
   })
 
   it('repairs a level that has rows only as a placeholder or a stale error', () => {
-    // These are the states loadDir writes before/after a failed `fs.tree`; a
-    // watch round is their only other source of truth.
     expect(reconcileLevel({}, [entry('a.ts')])?.map(row => row.name)).toEqual(['a.ts'])
     expect(reconcileLevel({ error: 'EACCES' }, [entry('a.ts')])?.map(row => row.name)).toEqual(['a.ts'])
   })
 
   it('skips the write when the fresh listing matches', () => {
     expect(reconcileLevel({ entries: [entry('a.ts')] }, [entry('a.ts')])).toBeUndefined()
+  })
+})
+
+describe('computeWatchDelay', () => {
+  it('returns 0 for a coalesced nudge', () => {
+    expect(computeWatchDelay({ pendingNudge: true, hidden: false, degraded: false, quietStreak: 99 })).toBe(0)
+  })
+
+  it('uses the hidden / degraded fixed cadences', () => {
+    expect(computeWatchDelay({ pendingNudge: false, hidden: true, degraded: false, quietStreak: 0 })).toBe(TREE_WATCH_HIDDEN_MS)
+    expect(computeWatchDelay({ pendingNudge: false, hidden: false, degraded: true, quietStreak: 0 })).toBe(TREE_WATCH_DEGRADED_MS)
+  })
+
+  it('backs off from hot → active → idle like VS Code / chokidar', () => {
+    expect(computeWatchDelay({ pendingNudge: false, hidden: false, degraded: false, quietStreak: 0 })).toBe(TREE_WATCH_HOT_MS)
+    expect(computeWatchDelay({ pendingNudge: false, hidden: false, degraded: false, quietStreak: 1 })).toBe(TREE_WATCH_ACTIVE_MS)
+    expect(computeWatchDelay({ pendingNudge: false, hidden: false, degraded: false, quietStreak: 3 })).toBe(
+      Math.min(TREE_WATCH_IDLE_MS, TREE_WATCH_ACTIVE_MS * 2),
+    )
+    expect(computeWatchDelay({ pendingNudge: false, hidden: false, degraded: false, quietStreak: 9 })).toBe(TREE_WATCH_IDLE_MS)
   })
 })
 
@@ -104,21 +140,26 @@ describe('tree-watch broker', () => {
       dirs: () => ['/w/a', '/w/b'],
       onLevels: (levels) => { seen.push(levels.map(level => level.path)) },
     })
+    // First round is a dueSweep (lastSweepAt=0) — skip past it.
+    await tick()
+    expect(fsTreeBatch).toHaveBeenCalled()
+    fsWatchSync.mockClear()
+    fsTreeBatch.mockClear()
+    seen.length = 0
+
     fsWatchSync.mockResolvedValue({ changed: ['/w/b'], seq: 7, missed: false, unwatched: [] })
     fsTreeBatch.mockResolvedValue({ listings: [{ path: '/w/b', entries: [entry('b.ts')], truncated: false }], stats: [] })
 
-    await tick()
-
+    // After a quiet initial sweep the streak is 1 → ACTIVE, not HOT.
+    await after(TREE_WATCH_ACTIVE_MS)
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
     expect(fsWatchSync.mock.calls[0]?.[1]).toEqual(['/w/a', '/w/b'])
-    expect(fsWatchSync.mock.calls[0]?.[2]).toBe(0)
-    expect(fsWatchSync.mock.calls[0]?.[3]).toBe('s1//w')
     expect(fsTreeBatch.mock.calls[0]?.[1]).toEqual(['/w/b'])
     expect(seen).toEqual([['/w/b']])
 
-    // The next round carries the host's cursor forward, so a consumed event
-    // is never re-delivered.
-    await tick()
+    // Activity resets to HOT for the follow-up pull.
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 7, missed: false, unwatched: [] })
+    await after(TREE_WATCH_HOT_MS)
     expect(fsWatchSync.mock.calls[1]?.[2]).toBe(7)
   })
 
@@ -137,7 +178,8 @@ describe('tree-watch broker', () => {
     const right: string[][] = []
     subscribeTreeWatch(scope, { dirs: () => ['/w/a'], onLevels: (levels) => { left.push(levels.map(l => l.path)) } })
     subscribeTreeWatch(scope, { dirs: () => ['/w/b'], onLevels: (levels) => { right.push(levels.map(l => l.path)) } })
-    fsWatchSync.mockResolvedValue({ changed: ['/w/a', '/w/b'], seq: 1, missed: false, unwatched: [] })
+    // First round sweeps everything (lastSweepAt=0).
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: [] })
     fsTreeBatch.mockResolvedValue({
       listings: [
         { path: '/w/a', entries: [entry('a.ts')], truncated: false },
@@ -145,28 +187,45 @@ describe('tree-watch broker', () => {
       ],
       stats: [],
     })
-
     await tick()
+    left.length = 0
+    right.length = 0
+    fsTreeBatch.mockClear()
+
+    fsWatchSync.mockResolvedValue({ changed: ['/w/a', '/w/b'], seq: 2, missed: false, unwatched: [] })
+    fsTreeBatch.mockResolvedValue({
+      listings: [
+        { path: '/w/a', entries: [entry('a.ts')], truncated: false },
+        { path: '/w/b', entries: [entry('b.ts')], truncated: false },
+      ],
+      stats: [],
+    })
+    await after(TREE_WATCH_ACTIVE_MS)
 
     expect(left).toEqual([['/w/a']])
     expect(right).toEqual([['/w/b']])
   })
 
-  it('skips the batch entirely when nothing changed and no stat is wanted', async () => {
+  it('skips the batch when nothing changed after the initial sweep and no stat is wanted', async () => {
     subscribeTreeWatch(scope, { dirs: () => ['/w/a'], onLevels: () => {} })
-    await tick()
+    await tick() // initial dueSweep lists
+    expect(fsTreeBatch).toHaveBeenCalledTimes(1)
+    fsTreeBatch.mockClear()
+    fsWatchSync.mockClear()
+
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: [] })
+    await after(TREE_WATCH_ACTIVE_MS)
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
     expect(fsTreeBatch).not.toHaveBeenCalled()
   })
 
   it('re-reads the whole subscription when the cursor was missed', async () => {
     subscribeTreeWatch(scope, { dirs: () => ['/w/a', '/w/b'], onLevels: () => {} })
-    // The host answers a stale cursor with the full subscription; the client
-    // must trust it and re-read, not wait for the next event.
-    fsWatchSync.mockResolvedValue({ changed: ['/w/a', '/w/b'], seq: 99, missed: true, unwatched: [] })
-
     await tick()
+    fsTreeBatch.mockClear()
 
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 99, missed: true, unwatched: [] })
+    await after(TREE_WATCH_ACTIVE_MS)
     expect([...(fsTreeBatch.mock.calls[0]?.[1] ?? [])].sort()).toEqual(['/w/a', '/w/b'])
   })
 
@@ -175,11 +234,11 @@ describe('tree-watch broker', () => {
       dirs: () => ['/w/a', '/w/locked'],
       onLevels: () => {},
     })
-    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: ['/w/locked'] })
-
     await tick()
-    // An unwatchable directory never appears in `changed`; without this the
-    // tree would freeze on it until some unrelated event woke it up.
+    fsTreeBatch.mockClear()
+
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: ['/w/locked'] })
+    await after(TREE_WATCH_ACTIVE_MS)
     expect(fsTreeBatch.mock.calls[0]?.[1]).toEqual(['/w/locked'])
   })
 
@@ -199,7 +258,7 @@ describe('tree-watch broker', () => {
       onStats: (rows) => { statsSeen.push(rows.map(row => row.path)) },
     })
     fsTreeBatch.mockResolvedValue({
-      listings: [],
+      listings: [{ path: '/w/a', entries: [], truncated: false }],
       stats: [
         { path: '/w/a/one.ts', mtimeMs: 5, size: 1 },
         { path: '/w/a/two.ts', mtimeMs: 6, size: 2 },
@@ -212,14 +271,20 @@ describe('tree-watch broker', () => {
     expect(statsSeen).toEqual([['/w/a/one.ts'], ['/w/a/two.ts']])
   })
 
-  it('sweeps the full subscription periodically so a dropped event still lands', async () => {
+  it('time-based fallback sweep re-lists after TREE_WATCH_FALLBACK_MS', async () => {
     subscribeTreeWatch(scope, { dirs: () => ['/w/a', '/w/b'], onLevels: () => {} })
-    // Nineteen idle rounds (nothing ever reported dirty) cost zero listings.
-    for (let round = 0; round < 19; round += 1) await tick()
+    await tick() // initial sweep
+    fsTreeBatch.mockClear()
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: [] })
+
+    // Quiet rounds: no listings while under the fallback window.
+    await after(TREE_WATCH_HOT_MS)
+    await after(TREE_WATCH_ACTIVE_MS)
     expect(fsTreeBatch).not.toHaveBeenCalled()
 
-    // The twentieth is the sweep — the backstop for a dropped watch event.
-    await tick()
+    // Jump past the wall-clock backstop.
+    vi.setSystemTime(new Date(Date.now() + TREE_WATCH_FALLBACK_MS + 1))
+    await after(TREE_WATCH_IDLE_MS)
     expect([...(fsTreeBatch.mock.calls[0]?.[1] ?? [])].sort()).toEqual(['/w/a', '/w/b'])
   })
 
@@ -231,12 +296,27 @@ describe('tree-watch broker', () => {
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
     expect(fsTreeBatch).not.toHaveBeenCalled()
 
-    // The error cadence (4s) is longer than the active one, so the next tick
-    // stays quiet; the retry lands 4s after the failed round, not on the
-    // active cadence.
+    await after(TREE_WATCH_ACTIVE_MS)
+    expect(fsWatchSync).toHaveBeenCalledTimes(1)
+    await after(TREE_WATCH_ERROR_MS - TREE_WATCH_ACTIVE_MS)
+    expect(fsWatchSync).toHaveBeenCalledTimes(2)
+  })
+
+  it('coalesces nudge while a round is in flight into an immediate follow-up', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    fsWatchSync.mockImplementation(async () => {
+      await gate
+      return { changed: [], seq: 1, missed: false, unwatched: [] }
+    })
+    subscribeTreeWatch(scope, { dirs: () => ['/w/a'], onLevels: () => {} })
     await tick()
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
-    await vi.advanceTimersByTimeAsync(2_800)
+
+    nudgeTreeWatch(scope)
+    release()
+    await Promise.resolve()
+    await tick()
     expect(fsWatchSync).toHaveBeenCalledTimes(2)
   })
 
@@ -246,7 +326,7 @@ describe('tree-watch broker', () => {
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
 
     stop()
-    await tick()
+    await after(TREE_WATCH_IDLE_MS)
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
   })
 })

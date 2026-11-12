@@ -74,21 +74,20 @@ export function openSidebarFile(ctx: Context, store: SidebarStore, sessionId: st
     path: absolute,
     id: tabId,
   })
-  // The tab may have been FOCUSED (same path already open) rather than
-  // created, in which case the seed's meta was ignored — force the docked
-  // explorer open on the tab that actually ended up active for this path.
-  store.reduce(state => forceTreeOpen(state, absolute))
+  // File opens keep the companion tree closed (meta.treeOpen defaults false
+  // for path tabs). Users open it from the editor toolbar when they want
+  // the VS Code-style side explorer; forcing it on every chat/path open
+  // crowded the detail view on phone and desktop alike.
 }
 
 /**
  * Reveal a chat open in the sidebar.
  *
  * A FILE open tints the freshly opened file's row in the explorer and expands
- * its ancestors; the tab itself flashes too (TabBar), and the docked panel
- * was already forced open by {@link openSidebarFile}. A FOLDER gesture
+ * its ancestors; the tab itself flashes too (TabBar). A FOLDER gesture
  * (`files` empty, the official "Show in folder") has no file to point at, so
  * it opens the workspace root's explorer — the pathless editor home window —
- * and tints that root row.
+ * and tints that root row (that window IS the explorer, so treeOpen is on).
  */
 export function revealInExplorer(
   ctx: Context,

@@ -10,13 +10,23 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.5
+xrkh plugin add xrkh-better-sidebar@0.20.7
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.7
+
+- **Layout memory**: panel / bottom open state survives hard refresh and WebView backgrounding (immediate persist on expand + `pagehide` / `visibilitychange` flush).
+- **Open file**: chat file opens no longer force the companion tree open; editor toolbar gains “Open with”; tree-watch refresh is more reliable.
+
+## 0.20.6
+
+- **Mobile download**: binary / image / PDF / tree “Download” use fetch→blob→`<a download>` so iOS / Android query-string routes do not navigate instead of saving.
+- **Mobile drawer**: full-width narrow viewports with safe-area insets; 44px toggle hit targets; download links get the same larger tap area.
 
 ## 0.20.5
 

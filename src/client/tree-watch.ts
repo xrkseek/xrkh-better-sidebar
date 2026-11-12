@@ -8,16 +8,17 @@
  * subscriber would multiply the request rate by the number of open panes and
  * make the host do the same `opendir` work several times per second.
  *
- * The poller is deliberately dumb about content — it hands raw levels to the
- * subscribers and lets each one diff what it shows. That keeps the "did
- * anything change" decision in one place (the host's watch log) while the
- * "should I re-render" decision stays with the component that owns the state.
- *
- * Reliability: `fs.watch` is best-effort on every platform (inotify queues
- * overflow, FSEvents coalesces, network shares may not notify at all). So the
- * loop also re-reads the full subscription periodically, which turns a lost
- * event into a delayed refresh instead of a frozen tree. When the page is
- * hidden the cadence relaxes; a background tab needs no millisecond freshness.
+ * Cadence model (VS Code / chokidar family):
+ * - Native `fs.watch` on the host is the source of truth; this loop only
+ *   *pulls* the cheap watch-log (`fs.watch.sync`) and re-lists when dirty.
+ * - After activity (event, nudge, wake) stay "hot" (~250ms pulls) so the
+ *   UI feels near-instant — the sync round itself is cheap when quiet.
+ * - After a quiet streak, exponentially back off toward a few seconds so
+ *   an idle desktop is not opendir-hammered.
+ * - Unwatchable levels (network / mobile proot / EPERM) cannot rely on
+ *   events, so the loop stays on a fixed short listing cadence.
+ * - A time-based full sweep (~30s) covers silently dropped OS events.
+ * - Hidden tabs relax further; becoming visible wakes every channel now.
  */
 import { api, type FsEntry, type FsStatInfo, type SessionScope } from './api.ts'
 
@@ -40,29 +41,44 @@ export interface TreeWatchHandlers {
   onStats?(stats: readonly FsStatInfo[]): void
 }
 
-/** Fresh cadence while the page is in front.
- *  Prefer watch events + {@link nudgeTreeWatch} after editor saves; this
- *  interval is only the idle heartbeat (was 1.2s and felt like silent churn). */
-const ACTIVE_INTERVAL_MS = 4_000
+/**
+ * Hot pull after activity — cheap `fs.watch.sync` only when nothing changed.
+ * ~250ms matches VS Code's "feel instant once the OS event lands" without
+ * turning the Host into a listing mill.
+ */
+export const TREE_WATCH_HOT_MS = 250
 
-/** Relaxed cadence while hidden (a background tab refreshes lazily). */
-const HIDDEN_INTERVAL_MS = 12_000
+/** Steady healthy pull while recently active. */
+export const TREE_WATCH_ACTIVE_MS = 750
 
-/** Cadence after a failed round (host restarting, fence refusal). */
-const ERROR_INTERVAL_MS = 6_000
-
-/** Full-subscription re-read cadence, in rounds — the lost-event backstop. */
-const FALLBACK_EVERY_ROUNDS = 40
+/** Backoff ceiling after a long quiet stretch. */
+export const TREE_WATCH_IDLE_MS = 3_000
 
 /**
- * The same backstop while the host reports unwatchable levels.
- *
- * Those levels get no events at all, so the sweep is their only refresh path;
- * it runs more often than the healthy cadence because it is the only signal
- * they have, and still slow enough that an unwatchable tree costs a handful of
- * `opendir` calls rather than one per tick.
+ * Fixed cadence while any subscribed level is unwatchable.
+ * Those levels have no events — listing IS the signal (chokidar `usePolling`
+ * on network drives is the same idea).
  */
-const DEGRADED_SWEEP_ROUNDS = 8
+export const TREE_WATCH_DEGRADED_MS = 1_500
+
+/** Relaxed cadence while the page is hidden. */
+export const TREE_WATCH_HIDDEN_MS = 15_000
+
+/** Cadence after a failed round (host restarting, fence refusal). */
+export const TREE_WATCH_ERROR_MS = 4_000
+
+/**
+ * Time-based full-subscription re-read — the lost-event backstop.
+ * Prefer wall-clock over round counts: adaptive delays would otherwise make
+ * a "every N rounds" sweep drift from a few seconds to minutes.
+ */
+export const TREE_WATCH_FALLBACK_MS = 30_000
+
+/** @deprecated Use {@link TREE_WATCH_HOT_MS}; kept for older test imports. */
+export const TREE_WATCH_FALLBACK_ROUNDS = 40
+
+/** @deprecated Degraded path is time-based now ({@link TREE_WATCH_DEGRADED_MS}). */
+export const TREE_WATCH_DEGRADED_ROUNDS = 2
 
 /** One subscriber inside a channel. */
 interface Subscription {
@@ -80,8 +96,17 @@ interface Channel {
   timer: ReturnType<typeof setTimeout> | undefined
   /** A round is in flight (skip the tick instead of stacking requests). */
   busy: boolean
-  rounds: number
-  /** The host reported unwatchable levels — fall back to slow full reads. */
+  /**
+   * A {@link nudgeTreeWatch} arrived while `busy`. The in-flight round's
+   * finally-path would otherwise park on the idle cadence and miss the
+   * "refresh now" intent (save, mutation, visibility wake).
+   */
+  pendingNudge: boolean
+  /** Consecutive quiet rounds — drives exponential backoff. */
+  quietStreak: number
+  /** Wall-clock of the last full-subscription sweep. */
+  lastSweepAt: number
+  /** The host reported unwatchable levels — fixed short listing cadence. */
   degraded: boolean
 }
 
@@ -162,12 +187,76 @@ function dispatch(
   }
 }
 
+/**
+ * Next delay after a round — VS Code-style hot → steady → backoff.
+ *
+ * Exported for unit tests so cadence tables stay honest without driving
+ * the whole broker clock.
+ */
+export function computeWatchDelay(input: {
+  pendingNudge: boolean
+  hidden: boolean
+  degraded: boolean
+  quietStreak: number
+}): number {
+  if (input.pendingNudge) return 0
+  if (input.hidden) return TREE_WATCH_HIDDEN_MS
+  if (input.degraded) return TREE_WATCH_DEGRADED_MS
+  const streak = input.quietStreak
+  if (streak <= 0) return TREE_WATCH_HOT_MS
+  if (streak <= 2) return TREE_WATCH_ACTIVE_MS
+  if (streak <= 6) return Math.min(TREE_WATCH_IDLE_MS, TREE_WATCH_ACTIVE_MS * 2)
+  return TREE_WATCH_IDLE_MS
+}
+
+/** Idle delay for the next round (honours a coalesced nudge). */
+function nextDelay(channel: Channel): number {
+  const delay = computeWatchDelay({
+    pendingNudge: channel.pendingNudge,
+    hidden: hidden(),
+    degraded: channel.degraded,
+    quietStreak: channel.quietStreak,
+  })
+  if (channel.pendingNudge) channel.pendingNudge = false
+  return delay
+}
+
+/** Mark the channel hot (activity just happened). */
+function markActive(channel: Channel): void {
+  channel.quietStreak = 0
+}
+
+/**
+ * Advance / reset the quiet streak after a round.
+ *
+ * Open-file stat probes cap the streak so external-edit detection stays near
+ * {@link TREE_WATCH_ACTIVE_MS} even when a quiet tree would otherwise back
+ * off to the idle ceiling (the open file's parent may not be in `dirs`).
+ * Only real watch activity resets to HOT — a periodic full sweep must not,
+ * or every {@link TREE_WATCH_FALLBACK_MS} would pin the loop at 250ms.
+ */
+function noteQuietRound(
+  channel: Channel,
+  hadActivity: boolean,
+  needsStats: boolean,
+): void {
+  if (hadActivity) {
+    markActive(channel)
+    return
+  }
+  channel.quietStreak += 1
+  if (needsStats) {
+    channel.quietStreak = Math.min(channel.quietStreak, 2)
+  }
+}
+
 /** One poll round: sync the watch set, then re-list what changed. */
 async function run(channel: Channel): Promise<void> {
   if (channel.busy || channel.subscriptions.size === 0) return
   const { dirs, statPaths } = collect(channel)
   if (dirs.length === 0 && statPaths.length === 0) {
-    schedule(channel, hidden() ? HIDDEN_INTERVAL_MS : ACTIVE_INTERVAL_MS)
+    channel.quietStreak += 1
+    schedule(channel, nextDelay(channel))
     return
   }
   channel.busy = true
@@ -176,25 +265,35 @@ async function run(channel: Channel): Promise<void> {
     // needs its stat probe; there is nothing to reconcile in that case, so the
     // watch round is skipped rather than sent as an empty request.
     const sync = dirs.length === 0
-      ? { changed: [], seq: channel.seq, missed: false, unwatched: [] }
+      ? { changed: [], seq: channel.seq, missed: false, unwatched: [] as string[] }
       : await api.fsWatchSync(channel.scope, dirs, channel.seq, channel.subscriber)
     channel.seq = sync.seq
-    channel.rounds += 1
     // Degraded is an internal cadence decision, not a UI signal: a level the
     // host cannot watch refreshes through the sweep below, so the only thing
     // it changes is how often that sweep runs.
     channel.degraded = sync.unwatched.length > 0
-    // Periodic full sweep: covers dropped/coalesced watch events and any
-    // directory whose watcher could not be opened at all. `unwatched` levels
-    // are re-read THIS round (they can never show up in `changed`), and the
-    // faster degraded sweep carries them after that.
-    const sweepEvery = channel.degraded ? DEGRADED_SWEEP_ROUNDS : FALLBACK_EVERY_ROUNDS
-    const dirty = channel.rounds % sweepEvery === 0
+    const now = Date.now()
+    const dueSweep = channel.lastSweepAt === 0
+      || (now - channel.lastSweepAt) >= TREE_WATCH_FALLBACK_MS
+    // Periodic full sweep: covers dropped/coalesced watch events. `missed`
+    // means the host cursor was stale — trust nothing, re-read everything.
+    // `unwatched` levels are re-read EVERY round (they can never show up in
+    // `changed`); the degraded delay keeps that path honest without
+    // re-listing healthy levels every tick.
+    const sweepAll = sync.missed || dueSweep
+    const dirty = sweepAll
       ? new Set(dirs)
       : new Set([...sync.changed, ...sync.unwatched])
+    if (sweepAll && dirs.length > 0) channel.lastSweepAt = now
+
+    // Real OS/watch signal only — a dueSweep that dirties every dir is not
+    // "activity" for backoff purposes (otherwise the 30s backstop keeps the
+    // loop hot forever).
+    const hadWatchActivity = sync.missed || sync.changed.length > 0 || sync.unwatched.length > 0
     const needsStats = statPaths.length > 0
     if (dirty.size === 0 && !needsStats) {
-      schedule(channel, hidden() ? HIDDEN_INTERVAL_MS : ACTIVE_INTERVAL_MS)
+      noteQuietRound(channel, hadWatchActivity, needsStats)
+      schedule(channel, nextDelay(channel))
       return
     }
     const batch = await api.fsTreeBatch(channel.scope, [...dirty], needsStats ? statPaths : [])
@@ -204,11 +303,14 @@ async function run(channel: Channel): Promise<void> {
       levels.push({ path: listing.path, entries: listing.entries, truncated: listing.truncated === true })
     }
     dispatch(channel, levels, batch.stats)
-    schedule(channel, hidden() ? HIDDEN_INTERVAL_MS : ACTIVE_INTERVAL_MS)
+    // Quiet stats probes must not pin HOT; open-file caps keep them at ACTIVE.
+    noteQuietRound(channel, hadWatchActivity, needsStats)
+    schedule(channel, nextDelay(channel))
   } catch {
     // The host may be restarting or the fence may refuse this scope: slow
     // down and retry rather than spinning or surfacing an error on every tick.
-    schedule(channel, ERROR_INTERVAL_MS)
+    // A nudge still wins — the user just saved / the tab just woke.
+    schedule(channel, channel.pendingNudge ? nextDelay(channel) : TREE_WATCH_ERROR_MS)
   } finally {
     channel.busy = false
   }
@@ -230,15 +332,23 @@ export function subscribeTreeWatch(scope: SessionScope, handlers: TreeWatchHandl
       seq: 0,
       timer: undefined,
       busy: false,
-      rounds: 0,
+      pendingNudge: false,
+      quietStreak: 0,
+      lastSweepAt: 0,
       degraded: false,
     }
     channels.set(key, channel)
   }
   const subscription: Subscription = { handlers }
   channel.subscriptions.add(subscription)
-  if (channel.timer === undefined && !channel.busy) {
-    schedule(channel, hidden() ? HIDDEN_INTERVAL_MS : ACTIVE_INTERVAL_MS)
+  // Poll immediately for the first pane AND for a later one joining an
+  // already-polling channel — otherwise the new editor's first stat (or a
+  // tree that mounts after the editor) waits a full idle beat.
+  markActive(channel)
+  if (!channel.busy) {
+    schedule(channel, hidden() ? TREE_WATCH_HIDDEN_MS : 0)
+  } else {
+    channel.pendingNudge = true
   }
   return () => {
     const current = channels.get(key)
@@ -251,15 +361,32 @@ export function subscribeTreeWatch(scope: SessionScope, handlers: TreeWatchHandl
 }
 
 /**
- * Pull the next watch round forward now (editor save, explicit refresh).
- * Coalesces with an in-flight round: if busy, the finally-path already
- * schedules the next tick; we only restart the idle timer.
+ * Pull the next watch round forward now (editor save, explicit refresh,
+ * visibility wake). Coalesces with an in-flight round via `pendingNudge`
+ * so the finally-path runs again immediately instead of parking on idle.
  */
 export function nudgeTreeWatch(scope: SessionScope): void {
   const channel = channels.get(channelKey(scope))
   if (channel === undefined || channel.subscriptions.size === 0) return
-  if (channel.busy) return
+  markActive(channel)
+  if (channel.busy) {
+    channel.pendingNudge = true
+    return
+  }
   schedule(channel, 0)
+}
+
+/** Wake every live channel (tab became visible again). */
+export function wakeTreeWatch(): void {
+  for (const channel of channels.values()) {
+    if (channel.subscriptions.size === 0) continue
+    markActive(channel)
+    if (channel.busy) {
+      channel.pendingNudge = true
+      continue
+    }
+    schedule(channel, 0)
+  }
 }
 
 /** Test seam: drop every channel and timer. */
@@ -280,7 +407,7 @@ export function resetTreeWatch(): void {
  *
  * Only render-visible fields are folded in. A directory's mtime changing
  * without its row set changing is exactly the case this whole path exists to
- * ignore.
+ * ignore (open-file content refresh is the editor's stat probe, not the tree).
  */
 export function levelSignature(entries: readonly FsEntry[]): string {
   return entries
@@ -322,4 +449,16 @@ export function reconcileLevel(
   if (current === undefined) return undefined
   if (current.entries === undefined) return [...fresh]
   return levelSignature(current.entries) === levelSignature(fresh) ? undefined : [...fresh]
+}
+
+// Visibility wake: one document listener for the whole broker. Absent
+// `document` (Node tests) is a no-op — tests drive timers directly.
+try {
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) wakeTreeWatch()
+    })
+  }
+} catch {
+  // Non-DOM hosts leave the broker timer-driven only.
 }

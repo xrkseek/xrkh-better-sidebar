@@ -223,13 +223,13 @@
   bottom: 0;
   /* Span the center column only — same seams as the toggle cluster.
      `--xrkh-center-left` / `--xrkh-center-right` are written from the
-     center column's live box (ResizeObserver). Until the first measure,
-     fall back to workbench + Overview inset on the right (never
-     `left:0; right:100vw`, which collapses width to 0 and looks like a
-     blank bottom strip until a width drag remeasures). The right panel
-     never hits this class of bug because it sizes with `width`, not
-     opposing left+right insets. */
-  left: var(--xrkh-center-left, 0px);
+     center column's live box (ResizeObserver + sync measure after layout
+     push). Until the first measure, fall back to Host LayoutInsets +
+     workbench width (never opposing insets that collapse width to 0 —
+     that painted a blank bottom strip until a width drag remeasured).
+     The right panel never hits this class of bug because it sizes with
+     `width`, not opposing left+right insets. */
+  left: var(--xrkh-center-left, var(--xrk-layout-inset-sidebar, 0px));
   right: var(
     --xrkh-center-right,
     calc(
@@ -244,14 +244,15 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
   /* Re-enable interaction inside the click-transparent panel host. */
   pointer-events: auto;
-  /* Bottom safe-area (notched phones); 0 on desktops. */
-  padding-bottom: env(safe-area-inset-bottom);
-  /* Expand/collapse slides the panel; height drags animate the height. */
+  /* Bottom safe-area (notched phones); 0 on desktops. Prefer Flutter
+     `--ds-safe-bottom` when env(safe-area) is 0 in Android WebView. */
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--ds-safe-bottom, 0px));
+  /* Expand/collapse slides the panel; height drags animate the height.
+     Do NOT ease left/right — edge vars must snap with the center column
+     or a mid-tween frame can collapse the strip to ~0px wide. */
   transition:
     transform var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
-    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
-    left var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1)),
-    right var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
+    height var(--ds-transition-duration-slow, 380ms) var(--ds-ease-in-out, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 /* Collapsed: slid off-screen, interactive nothing, hidden after the slide. */
@@ -2780,29 +2781,73 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
     max-width: 128px;
   }
 
-  /* Touch: 44px hit target around the 28px icon (WCAG / iOS HIG). */
+  /* Touch: 44px hit target around the 28px icon (WCAG / iOS HIG) — floating
+     expand only. The in-drawer collapse matches the 34px tab strip. */
   .toggleButton {
     width: 44px;
     height: 44px;
   }
 
-  /* Full-bleed drawer: clear notches; keep content above the home indicator. */
+  /* Full-bleed drawer: pad chrome like Settings / AppFrame phoneChrome —
+     floor 12px + env(safe-area) + Flutter --ds-safe-* (Android WebView often
+     reports env() as 0). Prefer padding over a lone `top` shift so the sheet
+     chrome (tab strip / close) clears the status bar the same way conversation
+     does. */
   .panel {
+    top: var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px));
     right: 0;
     left: 0;
     width: 100% !important;
     max-width: 100%;
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
+    padding-top: max(12px, env(safe-area-inset-top, 0px), var(--ds-safe-top, 0px));
+    padding-left: max(12px, env(safe-area-inset-left, 0px), var(--ds-safe-left, 0px));
+    padding-right: max(12px, env(safe-area-inset-right, 0px), var(--ds-safe-right, 0px));
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--ds-safe-bottom, 0px));
+    box-sizing: border-box;
   }
 
+  /* Leave room on the tab strip for the in-drawer close control. */
+  .tabBar {
+    padding-right: 34px;
+  }
+
+  /* Floating expand (drawer closed): match conversation chrome + safe top. */
   .toggleCluster {
-    /* Stay clear of the closed left session rail + notch when the drawer is shut. */
     top: calc(
-      10px + env(safe-area-inset-top) +
-      var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
+      max(12px, env(safe-area-inset-top, 0px), var(--ds-safe-top, 0px))
+      + var(--dsh-title-bar-strip, var(--xrk-desktop-chrome-height, 0px))
     );
-    right: calc(10px + env(safe-area-inset-right));
+    right: calc(
+      10px
+      + max(12px, env(safe-area-inset-right, 0px), var(--ds-safe-right, 0px))
+    );
+  }
+
+  /* In-drawer close (X): sit on the tab strip ("文件" row), not a float.
+     Absolute children are relative to the padding edge, so with panel
+     padding-top they already clear the status bar. */
+  .drawerCollapse {
+    position: absolute;
+    top: max(12px, env(safe-area-inset-top, 0px), var(--ds-safe-top, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px), var(--ds-safe-right, 0px));
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--dsw-alias-label-secondary);
+    cursor: pointer;
+  }
+
+  .drawerCollapse:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
   }
 
   .editorDownloadLink {

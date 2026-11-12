@@ -1634,6 +1634,26 @@ export class SidebarStore {
    * it directly.
    */
   private suspended = false
+  private readonly onPageHide = (): void => { this.flushPendingPersists() }
+  private readonly onVisibility = (): void => {
+    if (document.visibilityState === 'hidden') this.flushPendingPersists()
+  }
+
+  constructor() {
+    if (typeof window === 'undefined') return
+    // pagehide covers refresh / WebView tear-down; visibilitychange covers
+    // mobile backgrounding where the debounce may never fire.
+    window.addEventListener('pagehide', this.onPageHide)
+    document.addEventListener('visibilitychange', this.onVisibility)
+  }
+
+  /** Drop page-lifetime flush listeners (plugin deactivate / tests). */
+  dispose(): void {
+    if (typeof window === 'undefined') return
+    window.removeEventListener('pagehide', this.onPageHide)
+    document.removeEventListener('visibilitychange', this.onVisibility)
+    this.flushPendingPersists()
+  }
 
   /**
    * Set the external-disable flag (from the settings route) and remember it
@@ -1756,7 +1776,10 @@ export class SidebarStore {
     if (next === state) return
     this.bySession.set(sessionId, next)
     this.snapshot = { sessionId, state: next, prefs: this.prefs }
-    this.schedulePersist(sessionId, next)
+    // Expand/collapse must survive a hard refresh: debounce alone loses the
+    // write when the user toggles and reloads before 200ms elapses.
+    const openChanged = next.panelOpen !== state.panelOpen || next.bottomOpen !== state.bottomOpen
+    this.schedulePersist(sessionId, next, openChanged)
     this.notify()
   }
 
@@ -1793,7 +1816,28 @@ export class SidebarStore {
     this.schedulePersist(sessionId, next)
   }
 
-  private schedulePersist(sessionId: string, state: SidebarState): void {
+  private writePersisted(sessionId: string, state: SidebarState): void {
+    try {
+      localStorage.setItem(`${STORAGE_PREFIX}:${sessionId}`, JSON.stringify(state))
+    } catch {
+      // Storage full or unavailable: layout memory is best-effort.
+    }
+  }
+
+  /**
+   * Flush every pending debounce so a hard refresh / WebView tear-down keeps
+   * the last expand/collapse. Bound once from the constructor.
+   */
+  flushPendingPersists = (): void => {
+    for (const [sessionId, timer] of this.persistTimers) {
+      window.clearTimeout(timer)
+      this.persistTimers.delete(sessionId)
+      const state = this.bySession.get(sessionId)
+      if (state !== undefined) this.writePersisted(sessionId, state)
+    }
+  }
+
+  private schedulePersist(sessionId: string, state: SidebarState, immediate = false): void {
     // Keep the cross-session width in sync: any width change (drag, fullscreen
     // toggle) on the ACTIVE session becomes the shared width for every
     // conversation. A targeted open persists an INACTIVE session (reduceFor)
@@ -1809,13 +1853,14 @@ export class SidebarStore {
     // lose that session's layout).
     const existing = this.persistTimers.get(sessionId)
     if (existing !== undefined) window.clearTimeout(existing)
+    if (immediate) {
+      this.persistTimers.delete(sessionId)
+      this.writePersisted(sessionId, state)
+      return
+    }
     const timer = window.setTimeout(() => {
       this.persistTimers.delete(sessionId)
-      try {
-        localStorage.setItem(`${STORAGE_PREFIX}:${sessionId}`, JSON.stringify(state))
-      } catch {
-        // Storage full or unavailable: layout memory is best-effort.
-      }
+      this.writePersisted(sessionId, state)
     }, 200)
     this.persistTimers.set(sessionId, timer)
   }

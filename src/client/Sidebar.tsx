@@ -655,23 +655,48 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     [state, pinnedVirtualTabs, activePinnedTabId],
   )
 
+  // Panel node refs — declared before measureCenter so the sync edge write
+  // can clear legacy inline left/right without closing over a later binding.
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  const bottomRef = useRef<HTMLDivElement | null>(null)
+
   // Bottom panel horizontal edges ride CSS vars on <html> (see `.bottomPanel`).
   // ResizeObserver on the center column updates them every layout frame
   // without React re-renders (#315). Until the first measure, CSS falls back
-  // to workbench width + Overview inset — never the old inline
-  // `left:0; right:100vw` zero-width blank.
+  // to Host LayoutInsets + workbench width — never opposing insets that
+  // collapse width to 0 (blank bottom strip until a width drag remeasures).
   const centerColRef = useRef<HTMLElement | null>(null)
   const draggingRef = useRef(false)
+  /**
+   * AppFrame's center grid item. Prefer `[data-pane="conversation"]` (the
+   * real column that owns padding-bottom). Falling back to the parent of
+   * `[data-slot="conversation"]` covers older shells where only the slot
+   * anchor existed — the slot itself is `display:contents` and must not be
+   * measured (zero box → blank bottom panel).
+   */
+  const findCenterColumn = useCallback((): HTMLElement | null => {
+    const pane = document.querySelector('#root [data-pane="conversation"]')
+    if (pane instanceof HTMLElement && pane.isConnected) return pane
+    const slot = document.querySelector('#root [data-slot="conversation"]')
+    const parent = slot?.parentElement
+    if (parent instanceof HTMLElement && parent.isConnected) return parent
+    return null
+  }, [])
   const measureCenter = useCallback((): void => {
-    const col = centerColRef.current
+    const col = centerColRef.current ?? findCenterColumn()
     if (col === null) return
     if (!col.isConnected) {
       // Detached after HMR swap — locate re-runs on the next tick (#248).
       centerColRef.current = null
       return
     }
+    centerColRef.current = col
     const rect = col.getBoundingClientRect()
-    if (!(rect.right > rect.left)) return
+    // Refuse a degenerate box: writing left+right that sum to ≥ viewport
+    // collapses the bottom panel to 0px wide (blank strip; only a later
+    // workbench width drag remeasures and "fixes" it).
+    const width = rect.right - rect.left
+    if (!(width >= 40)) return
     const root = document.documentElement
     root.style.setProperty('--xrkh-center-left', `${Math.round(rect.left)}px`)
     root.style.setProperty('--xrkh-center-right', `${Math.round(window.innerWidth - rect.right)}px`)
@@ -683,18 +708,18 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       bottom.style.removeProperty('right')
       bottom.style.removeProperty('visibility')
     }
-  }, [])
+  }, [findCenterColumn])
   useEffect(() => {
     let disposed = false
     let observer: ResizeObserver | undefined
-    // Locate the AppFrame's center column via [data-slot="conversation"]
-    // parent (same anchor as layout.css). Boot may miss it once — watch
-    // #root and retry; never strand the edges on the CSS fallback alone.
+    // Locate once and keep the observer for the shell's life. Do NOT tear
+    // it down when bottomOpen flips — that cleared centerColRef between
+    // paint and the next measure and left the first open frame on a stale
+    // (sometimes zero-width) edge pair.
     const locate = (): void => {
       if (disposed) return
-      const col = document.querySelector('#root [data-slot="conversation"]')
-        ?.parentElement as HTMLElement | undefined
-      if (col === undefined || !col.isConnected) {
+      const col = findCenterColumn()
+      if (col === null) {
         if (centerColRef.current !== null) {
           centerColRef.current = null
           observer?.disconnect()
@@ -707,8 +732,8 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         observer?.disconnect()
         observer = new ResizeObserver(measureCenter)
         observer.observe(col)
-        measureCenter()
       }
+      measureCenter()
     }
     locate()
     let locateFrame: number | null = null
@@ -733,27 +758,12 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       if (document.visibilityState !== 'visible') return
       centerColRef.current = null
       locate()
-      measureCenter()
     }
     document.addEventListener('visibilitychange', onWake)
     window.addEventListener('pageshow', onWake)
-    // Bottom expand: remeasure after the slide starts (RO also tracks the
-    // center column while height/margin animate).
-    let expandFrame = 0
-    if (state?.bottomOpen === true) {
-      expandFrame = requestAnimationFrame(() => {
-        expandFrame = requestAnimationFrame(() => {
-          expandFrame = 0
-          if (disposed) return
-          locate()
-          measureCenter()
-        })
-      })
-    }
     return () => {
       disposed = true
       if (locateFrame !== null) cancelAnimationFrame(locateFrame)
-      if (expandFrame !== 0) cancelAnimationFrame(expandFrame)
       window.clearInterval(retry)
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('pageshow', onWake)
@@ -762,7 +772,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       htmlStyleWatcher.disconnect()
       centerColRef.current = null
     }
-  }, [measureCenter, state?.bottomOpen])
+  }, [findCenterColumn, measureCenter])
 
   /**
    * Free windows — drag-out detection. The tab strips already drive HTML5
@@ -891,8 +901,6 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // a store reduce re-renders both workbenches (terminals, editors…) per
   // move, which is the visible drag lag. The store is committed once on
   // pointer up (clamping + persistence).
-  const panelRef = useRef<HTMLDivElement | null>(null)
-  const bottomRef = useRef<HTMLDivElement | null>(null)
   const widthDrag = useRef({ startX: 0, startWidth: 0 })
   const [draggingWidth, setDraggingWidth] = useState(false)
   const bottomDrag = useRef({ startY: 0, startHeight: 0 })
@@ -1124,7 +1132,12 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       ? height + effectiveKeyboardInset
       : 0
     writeGeometry(width, bottomPush)
-  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight, viewport.width, layoutViewportHeight, effectiveKeyboardInset])
+    // Reading the center box after the push forces a sync reflow: the bottom
+    // panel's left/right must match BEFORE paint. Waiting for ResizeObserver
+    // (post-paint) left the first open frame on a stale/zero-width edge pair
+    // — blank bottom strip until a right-panel width drag remeasured.
+    measureCenter()
+  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight, viewport.width, layoutViewportHeight, effectiveKeyboardInset, measureCenter])
   // Unmount must release the push (issue #31): when the boundary swaps the
   // whole sidebar after a render crash (or the plugin fiber is disposed /
   // HMR), the CSS variables would otherwise stay on <html> and layout.css
@@ -1457,39 +1470,45 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     )
   }
 
+  const drawerOpen = narrow && state.panelOpen
+
   return (
-    <div data-dsh-panel-host {...osFileDragShield}>
+    <div
+      data-dsh-panel-host
+      data-drawer-open={drawerOpen || undefined}
+      {...osFileDragShield}
+    >
       {/*
-        Workbench toggles on the main-column seam (details inset + workbench width).
+        Floating expand affordance. On narrow, hide it while the drawer is
+        open — the in-drawer close (X) sits on the tab strip so it shares a
+        baseline with the "文件" row (not a second floating ball).
       */}
-      <div className={css.toggleCluster} data-dsh-toggle-cluster>
-        {/*
-          Narrow viewports merge the two workbenches into the one drawer —
-          there is no bottom panel, so its toggle button is not offered.
-        */}
-        {!narrow && (
-          <Tooltip label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')} side="bottom" delayMs={500}>
+      {!drawerOpen && (
+        <div className={css.toggleCluster} data-dsh-toggle-cluster>
+          {!narrow && (
+            <Tooltip label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')} side="bottom" delayMs={500}>
+              <button
+                type="button"
+                className={css.toggleButton}
+                aria-label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')}
+                onClick={() => { store.reduce(toggleBottomPanel) }}
+              >
+                <IconPanelBottomOutline16 />
+              </button>
+            </Tooltip>
+          )}
+          <Tooltip label={t('expand')} side="bottom" delayMs={500}>
             <button
               type="button"
               className={css.toggleButton}
-              aria-label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')}
-              onClick={() => { store.reduce(toggleBottomPanel) }}
+              aria-label={t('expand')}
+              onClick={() => { store.reduce(togglePanel) }}
             >
-              <IconPanelBottomOutline16 />
+              <IconPanelRightOutline16 />
             </button>
           </Tooltip>
-        )}
-        <Tooltip label={state.panelOpen ? t('collapse') : t('expand')} side="bottom" delayMs={500}>
-          <button
-            type="button"
-            className={css.toggleButton}
-            aria-label={state.panelOpen ? t('collapse') : t('expand')}
-            onClick={() => { store.reduce(togglePanel) }}
-          >
-            <IconPanelRightOutline16 />
-          </button>
-        </Tooltip>
-      </div>
+        </div>
+      )}
       {/*
         The right panel stays mounted while collapsed (hidden off-screen) so
         the slide in/out can animate; visibility hides it after the slide
@@ -1550,6 +1569,20 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
               onLostPointerCapture={() => { abortDrag(() => setDraggingWidth(false)) }}
             />
           )}
+        {drawerOpen ? (
+          <Tooltip label={t('close')} side="bottom" delayMs={500}>
+            <button
+              type="button"
+              className={css.drawerCollapse}
+              data-drawer-collapse
+              aria-label={t('close')}
+              title={t('close')}
+              onClick={() => { store.reduce(togglePanel) }}
+            >
+              <IconCloseFillRegular size={14} />
+            </button>
+          </Tooltip>
+        ) : null}
         <div className={css.panelBody}>
           <Workbench
             state={state}
