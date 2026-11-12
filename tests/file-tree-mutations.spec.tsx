@@ -1,7 +1,7 @@
 /**
  * FileTree mutation menu: new file / new folder / rename / delete.
  *
- * The tree owns the prompts (window.prompt / window.confirm) and hands the
+ * The tree owns the prompts (window.prompt / themed Modal) and hands the
  * decision to the caller; this spec pins that contract — including the two
  * cases that are easy to regress and expensive in the field:
  * - a CANCELLED prompt (null) or an empty name is a no-op, not a write to
@@ -181,16 +181,25 @@ describe('FileTree mutation menu', () => {
     expect(calls.rename).toHaveLength(1)
   })
 
+  /** Click the themed delete Modal's primary / outline button by label. */
+  function clickDeleteModal(label: string): void {
+    const button = [...document.querySelectorAll('button')]
+      .find(el => el.textContent?.trim() === label)
+    if (button === undefined) throw new Error(`delete modal button ${label} not found`)
+    act(() => { button.click() })
+  }
+
   it('deletes only after a confirmation naming the entry', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     choose('a.ts', 'Delete')
-    expect(confirmSpy).toHaveBeenCalledWith('Delete "a.ts"? This cannot be undone.')
+    expect(document.body.textContent).toContain('Delete "a.ts"? This cannot be undone.')
+    expect(calls.remove).toEqual([])
+    clickDeleteModal('Delete')
     expect(calls.remove).toEqual([{ path: '/tmp/a.ts', name: 'a.ts' }])
   })
 
   it('deletes nothing when the confirmation is refused', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
     choose('a.ts', 'Delete')
+    clickDeleteModal('Cancel')
     expect(calls.remove).toEqual([])
   })
 
@@ -201,13 +210,12 @@ describe('FileTree mutation menu', () => {
    *  confirmation never reaches the caller, while an accepted one does. (The
    *  row is only marked `danger` for styling; nothing branches on it.) */
   it('routes delete through a confirmation the caller can refuse', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
     choose('a.ts', 'Delete')
-    expect(confirmSpy).toHaveBeenCalledOnce()
+    clickDeleteModal('Cancel')
     expect(calls.remove).toEqual([])
 
-    confirmSpy.mockReturnValue(true)
     choose('a.ts', 'Delete')
+    clickDeleteModal('Delete')
     expect(calls.remove).toHaveLength(1)
   })
 })

@@ -307,7 +307,7 @@ export const api = {
   /** Create one directory (recursive by default; the file tree's "new folder"). */
   fsMkdir: (scope: SessionScope, path: string, recursive = true) =>
     call<{ created: true; path: string }>('fs.mkdir', scopePayload(scope, { path, recursive })),
-  /** Delete one file or (empty) directory. */
+  /** Delete one file or directory (Host removes directories recursively). */
   fsDelete: (scope: SessionScope, path: string) =>
     call<{ deleted: true }>('fs.delete', scopePayload(scope, { path })),
   /** Move/rename a path inside the workspace. */

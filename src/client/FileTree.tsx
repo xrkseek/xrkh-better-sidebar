@@ -24,8 +24,9 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type Dra
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import {
+  Button,
   IconChevronRightOutlineRegular, IconCodeOutlineRegular, IconCopyOutlineRegular, IconDownloadOutlineRegular,
-  IconLinkOutlineRegular, Menu, type MenuEntry, type MenuItem, writeClipboard,
+  IconLinkOutlineRegular, Menu, Modal, type MenuEntry, type MenuItem, writeClipboard,
 } from '@xrkseek/client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
 import { VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
@@ -156,6 +157,8 @@ export function FileTree(props: {
   const [copiedPath, setCopiedPath] = useState<string | null>(null)
   /** Open context menu: the row path (and whether it is a directory) plus the cursor position. */
   const [rowMenu, setRowMenu] = useState<{ path: string; isDir: boolean; x: number; y: number } | null>(null)
+  /** Pending delete — themed Modal instead of the WebView's ugly `window.confirm`. */
+  const [deleteConfirm, setDeleteConfirm] = useState<{ path: string; name: string } | null>(null)
   /** Whether a file drag hovers the tree (drives the portaled drop zone). */
   const [dropOver, setDropOver] = useState(false)
   /** The directory a drag is hovering right now (null = body, drop to root). */
@@ -805,11 +808,10 @@ export function FileTree(props: {
             return
           }
           if (id === 'delete') {
-            const name = baseName(target.path)
-            // Deleting is irreversible, and a mis-click here loses work: the
-            // name goes into the prompt so the target is never ambiguous.
-            if (!window.confirm(t('deleteConfirm', { name }))) return
-            onFsDelete(target.path, name)
+            // Deleting is irreversible — open the themed confirm Modal (never
+            // the WebView `window.confirm`, which paints a raw system chrome
+            // dialog on mobile).
+            setDeleteConfirm({ path: target.path, name: baseName(target.path) })
             return
           }
           copyPath(
@@ -822,6 +824,32 @@ export function FileTree(props: {
         getAnchorRect={() => (rowMenu === null ? null : new DOMRect(rowMenu.x, rowMenu.y, 0, 0))}
         anchor={<span />}
       />
+      <Modal
+        open={deleteConfirm !== null}
+        onClose={() => { setDeleteConfirm(null) }}
+        title={t('delete')}
+        closeLabel={t('cancel')}
+        footer={(
+          <>
+            <Button variant="outline" onClick={() => { setDeleteConfirm(null) }}>{t('cancel')}</Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                const pending = deleteConfirm
+                if (pending === null) return
+                setDeleteConfirm(null)
+                onFsDelete(pending.path, pending.name)
+              }}
+            >
+              {t('delete')}
+            </Button>
+          </>
+        )}
+      >
+        <p className={css.deleteConfirmDesc}>
+          {deleteConfirm !== null ? t('deleteConfirm', { name: deleteConfirm.name }) : ''}
+        </p>
+      </Modal>
     </div>
   )
 }

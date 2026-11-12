@@ -513,6 +513,22 @@ export interface SidebarContextShape {
   tools: SidebarToolsService
   /** The client locale service face. */
   locale: SidebarLocaleService
+  /**
+   * Shell LayoutInsets (ui-layout). Phone Overview stamps `detailsOpen` while
+   * `details` px stays 0 — workbench FABs read this to avoid the Status close.
+   */
+  layout: {
+    insets: {
+      getSnapshot(): {
+        readonly details: number
+        readonly detailsOpen: boolean
+        readonly sidebar: number
+        readonly bottom: number
+        readonly phone: boolean
+      }
+      subscribe(listener: () => void): () => void
+    }
+  }
   /** The client module system (rc.8+ chunk-loader externals). */
   modules: { import(specifier: string): Promise<unknown> }
   /** The host background-job registry (optional; routes degrade to 503). */

@@ -10,13 +10,19 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.7
+xrkh plugin add xrkh-better-sidebar@0.20.9
 xrkh restart
 ```
 
-装完硬刷新浏览器（Ctrl+Shift+R）。
+装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.9
+
+- **手机概况互斥**：Host 打开概况 / Status 时隐藏展开 FAB、收起抽屉，并隐藏整个 `data-dsh-panel-host`，避免与概况关闭键抢角或挡住点按（读 `ctx.layout.insets.detailsOpen` + `phone`）。
+- **文件树**：监视刷新与变异路径更稳；打开文件 /「打开方式」工具栏收口。
+- 建议搭配 **XRK-Harness ≥ 0.7.19**。
 
 ## 0.20.7
 

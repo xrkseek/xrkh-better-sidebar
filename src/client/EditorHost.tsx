@@ -307,7 +307,9 @@ export function EditorHost(props: {
   /** Re-list the levels a mutation touched, then surface the new entry. */
   const afterMutation = useCallback((path: string): void => {
     setExternalError(null)
-    nudgeTreeWatch(scope)
+    // Force a full visible-level re-list: mobile Host often has no native
+    // watch events, so a plain nudge would wait forever on an empty `changed`.
+    nudgeTreeWatch(scope, { sweep: true })
     if (path === '') return
     // EXPAND the parent (idempotent) instead of toggling it: the folder the
     // menu was opened on is usually ALREADY open — a toggle would fold it
@@ -336,7 +338,7 @@ export function EditorHost(props: {
     void api.fsDelete(scope, path)
       .then(() => {
         setExternalError(null)
-        nudgeTreeWatch(scope)
+        nudgeTreeWatch(scope, { sweep: true })
       })
       .catch(reportFs)
   }, [scope])

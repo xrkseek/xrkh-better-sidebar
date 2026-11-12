@@ -214,6 +214,23 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   const viewport = useViewportSize()
   const narrow = isNarrowWidth(viewport.width)
 
+  // Host Overview / Status open flag (phone sheet keeps details px at 0).
+  // Structural read: Host <0.7.19 LayoutInsets lacks `detailsOpen` in its
+  // published .d.ts; runtime still works once Host ≥0.7.19 ships the field.
+  const layoutInsets = useSyncExternalStore(
+    useMemo(() => (callback: () => void) => ctx.layout.insets.subscribe(callback), [ctx]),
+    useCallback(() => ctx.layout.insets.getSnapshot() as {
+      readonly details?: number
+      readonly detailsOpen?: boolean
+      readonly phone?: boolean
+    }, [ctx]),
+  )
+  const overviewOpen = layoutInsets.detailsOpen === true
+  // Host phone stamp is the Overview-sheet mode bit (AppFrame PHONE_MAX).
+  // Prefer it over local narrow width so a future breakpoint skew cannot hide
+  // the desktop FAB while Overview is only a side strip.
+  const hideExpandForOverview = layoutInsets.phone === true && overviewOpen
+
   // On-screen keyboard inset via visualViewport (narrow/touch only — see
   // effectiveKeyboardInset). Desktop must ignore vv deltas: after OS
   // sleep/wake Chromium/Electron often reports a collapsed vv.height while
@@ -279,6 +296,13 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     useCallback(() => store.getSnapshot(), [store]),
   )
   useEffect(() => { store.setSession(current) }, [current, store])
+
+  // Narrow + Overview open: collapse the floating drawer so it does not
+  // fight the Status sheet (Host already tucks the left rail the same way).
+  useEffect(() => {
+    if (!hideExpandForOverview) return
+    store.reduce(s => (s.panelOpen ? togglePanel(s) : s))
+  }, [hideExpandForOverview, store])
 
   const state = snapshot.state
   const sessionId = snapshot.sessionId
@@ -1347,22 +1371,25 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   if (state === undefined || sessionId === undefined) {
     // Keep the unavailable controls focusable: touch users have no hover, so
     // focus is the only way the existing Tooltip can explain what is missing.
+    // Hide while Overview owns the phone top-right close control.
     return (
       <div data-dsh-panel-host {...osFileDragShield}>
-        <div className={css.toggleCluster} data-dsh-toggle-cluster>
-          {!narrow && (
+        {!hideExpandForOverview && (
+          <div className={css.toggleCluster} data-dsh-toggle-cluster>
+            {!narrow && (
+              <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
+                <button type="button" className={css.toggleButton} aria-disabled="true" aria-label={t('noSession')}>
+                  <IconPanelBottomOutline16 />
+                </button>
+              </Tooltip>
+            )}
             <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
               <button type="button" className={css.toggleButton} aria-disabled="true" aria-label={t('noSession')}>
-                <IconPanelBottomOutline16 />
+                <IconPanelRightOutline16 />
               </button>
             </Tooltip>
-          )}
-          <Tooltip label={t('noSession')} side="bottom" delayMs={500}>
-            <button type="button" className={css.toggleButton} aria-disabled="true" aria-label={t('noSession')}>
-              <IconPanelRightOutline16 />
-            </button>
-          </Tooltip>
-        </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -1481,9 +1508,10 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       {/*
         Floating expand affordance. On narrow, hide it while the drawer is
         open — the in-drawer close (X) sits on the tab strip so it shares a
-        baseline with the "文件" row (not a second floating ball).
+        baseline with the "文件" row (not a second floating ball). Also hide
+        while Host Overview / Status owns the phone top-right close control.
       */}
-      {!drawerOpen && (
+      {!drawerOpen && !hideExpandForOverview && (
         <div className={css.toggleCluster} data-dsh-toggle-cluster>
           {!narrow && (
             <Tooltip label={state.bottomOpen ? t('collapseBottomPanel') : t('expandBottomPanel')} side="bottom" delayMs={500}>

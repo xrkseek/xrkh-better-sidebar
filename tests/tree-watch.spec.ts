@@ -288,18 +288,50 @@ describe('tree-watch broker', () => {
     expect([...(fsTreeBatch.mock.calls[0]?.[1] ?? [])].sort()).toEqual(['/w/a', '/w/b'])
   })
 
-  it('retries after a failure instead of throwing or stacking rounds', async () => {
+  it('falls back to listing when watch.sync is missing, and retries when listing also fails', async () => {
+    // Older Host without fs.watch.sync: treat every level as unwatched and
+    // still re-list via fs.tree.batch so mkdir/delete refresh works on mobile.
     subscribeTreeWatch(scope, { dirs: () => ['/w/a'], onLevels: () => {} })
-    fsWatchSync.mockRejectedValueOnce(new Error('host restarting'))
+    fsWatchSync.mockRejectedValueOnce(new Error('unsupported'))
+    fsTreeBatch.mockResolvedValueOnce({
+      listings: [{ path: '/w/a', entries: [], truncated: false }],
+      stats: [],
+    })
 
     await tick()
     expect(fsWatchSync).toHaveBeenCalledTimes(1)
-    expect(fsTreeBatch).not.toHaveBeenCalled()
+    expect(fsTreeBatch).toHaveBeenCalledTimes(1)
 
-    await after(TREE_WATCH_ACTIVE_MS)
-    expect(fsWatchSync).toHaveBeenCalledTimes(1)
-    await after(TREE_WATCH_ERROR_MS - TREE_WATCH_ACTIVE_MS)
+    // Both watch and batch fail: park on the error cadence, then retry.
+    fsWatchSync.mockRejectedValueOnce(new Error('host restarting'))
+    fsTreeBatch.mockRejectedValueOnce(new Error('host restarting'))
+    fsTreeBatch.mockClear()
+    await after(TREE_WATCH_DEGRADED_MS)
     expect(fsWatchSync).toHaveBeenCalledTimes(2)
+    // Batch attempted (and fs.tree fallback may also run — at least one list path).
+    expect(fsTreeBatch).toHaveBeenCalled()
+  })
+
+  it('forceSweep after a mutation nudge re-lists every subscribed directory', async () => {
+    const levels: string[] = []
+    subscribeTreeWatch(scope, {
+      dirs: () => ['/w/a', '/w/b'],
+      onLevels: (rows) => { for (const row of rows) levels.push(row.path) },
+    })
+    await tick() // initial
+    fsTreeBatch.mockClear()
+    fsWatchSync.mockResolvedValue({ changed: [], seq: 1, missed: false, unwatched: [] })
+    fsTreeBatch.mockResolvedValue({
+      listings: [
+        { path: '/w/a', entries: [], truncated: false },
+        { path: '/w/b', entries: [], truncated: false },
+      ],
+      stats: [],
+    })
+
+    nudgeTreeWatch(scope, { sweep: true })
+    await tick()
+    expect([...(fsTreeBatch.mock.calls[0]?.[1] ?? [])].sort()).toEqual(['/w/a', '/w/b'])
   })
 
   it('coalesces nudge while a round is in flight into an immediate follow-up', async () => {

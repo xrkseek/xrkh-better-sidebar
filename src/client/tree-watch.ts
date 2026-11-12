@@ -108,6 +108,11 @@ interface Channel {
   lastSweepAt: number
   /** The host reported unwatchable levels — fixed short listing cadence. */
   degraded: boolean
+  /**
+   * Next round must re-list every subscribed directory (mkdir / rename /
+   * delete). Cleared after the sweep runs.
+   */
+  forceSweep: boolean
 }
 
 /** Live channels keyed by `${sessionId}\0${cwd}`. */
@@ -250,6 +255,27 @@ function noteQuietRound(
   }
 }
 
+/** Re-list every subscribed directory via `fs.tree` (Host without batch). */
+async function listDirsViaTree(
+  channel: Channel,
+  dirs: readonly string[],
+): Promise<TreeWatchLevel[]> {
+  const levels: TreeWatchLevel[] = []
+  await Promise.all(dirs.map(async (dir) => {
+    try {
+      const listing = await api.fsTree(channel.scope, dir)
+      levels.push({
+        path: dir,
+        entries: listing.entries,
+        truncated: listing.truncated === true,
+      })
+    } catch {
+      /* vanished / fence — skip this level */
+    }
+  }))
+  return levels
+}
+
 /** One poll round: sync the watch set, then re-list what changed. */
 async function run(channel: Channel): Promise<void> {
   if (channel.busy || channel.subscriptions.size === 0) return
@@ -264,15 +290,34 @@ async function run(channel: Channel): Promise<void> {
     // An editor-only subscription (no tree panel, so no directories) still
     // needs its stat probe; there is nothing to reconcile in that case, so the
     // watch round is skipped rather than sent as an empty request.
-    const sync = dirs.length === 0
-      ? { changed: [], seq: channel.seq, missed: false, unwatched: [] as string[] }
-      : await api.fsWatchSync(channel.scope, dirs, channel.seq, channel.subscriber)
+    let sync: {
+      changed: string[]
+      seq: number
+      missed: boolean
+      unwatched: string[]
+    }
+    try {
+      sync = dirs.length === 0
+        ? { changed: [], seq: channel.seq, missed: false, unwatched: [] }
+        : await api.fsWatchSync(channel.scope, dirs, channel.seq, channel.subscriber)
+    } catch {
+      // Older Host without `fs.watch.sync`: treat every level as unwatched so
+      // the degraded listing path still refreshes after mkdir/delete.
+      sync = {
+        changed: [],
+        seq: channel.seq,
+        missed: false,
+        unwatched: [...dirs],
+      }
+    }
     channel.seq = sync.seq
     // Degraded is an internal cadence decision, not a UI signal: a level the
     // host cannot watch refreshes through the sweep below, so the only thing
     // it changes is how often that sweep runs.
     channel.degraded = sync.unwatched.length > 0
     const now = Date.now()
+    const mutationSweep = channel.forceSweep
+    channel.forceSweep = false
     const dueSweep = channel.lastSweepAt === 0
       || (now - channel.lastSweepAt) >= TREE_WATCH_FALLBACK_MS
     // Periodic full sweep: covers dropped/coalesced watch events. `missed`
@@ -280,7 +325,9 @@ async function run(channel: Channel): Promise<void> {
     // `unwatched` levels are re-read EVERY round (they can never show up in
     // `changed`); the degraded delay keeps that path honest without
     // re-listing healthy levels every tick.
-    const sweepAll = sync.missed || dueSweep
+    // A mutation nudge (`forceSweep`) also re-lists everything once — self
+    // mkdir must not wait for an OS watch event that never arrives on mobile.
+    const sweepAll = sync.missed || dueSweep || mutationSweep
     const dirty = sweepAll
       ? new Set(dirs)
       : new Set([...sync.changed, ...sync.unwatched])
@@ -288,21 +335,29 @@ async function run(channel: Channel): Promise<void> {
 
     // Real OS/watch signal only — a dueSweep that dirties every dir is not
     // "activity" for backoff purposes (otherwise the 30s backstop keeps the
-    // loop hot forever).
-    const hadWatchActivity = sync.missed || sync.changed.length > 0 || sync.unwatched.length > 0
+    // loop hot forever). Mutation sweeps DO count so the next beat stays hot
+    // long enough to catch a follow-up rename.
+    const hadWatchActivity = sync.missed || sync.changed.length > 0 || sync.unwatched.length > 0 || mutationSweep
     const needsStats = statPaths.length > 0
     if (dirty.size === 0 && !needsStats) {
       noteQuietRound(channel, hadWatchActivity, needsStats)
       schedule(channel, nextDelay(channel))
       return
     }
-    const batch = await api.fsTreeBatch(channel.scope, [...dirty], needsStats ? statPaths : [])
-    const levels: TreeWatchLevel[] = []
-    for (const listing of batch.listings) {
-      if (listing.entries === undefined) continue
-      levels.push({ path: listing.path, entries: listing.entries, truncated: listing.truncated === true })
+    let levels: TreeWatchLevel[] = []
+    let stats: FsStatInfo[] = []
+    try {
+      const batch = await api.fsTreeBatch(channel.scope, [...dirty], needsStats ? statPaths : [])
+      for (const listing of batch.listings) {
+        if (listing.entries === undefined) continue
+        levels.push({ path: listing.path, entries: listing.entries, truncated: listing.truncated === true })
+      }
+      stats = batch.stats
+    } catch {
+      // Host without `fs.tree.batch`: fall back to per-dir `fs.tree`.
+      levels = await listDirsViaTree(channel, [...dirty])
     }
-    dispatch(channel, levels, batch.stats)
+    dispatch(channel, levels, stats)
     // Quiet stats probes must not pin HOT; open-file caps keep them at ACTIVE.
     noteQuietRound(channel, hadWatchActivity, needsStats)
     schedule(channel, nextDelay(channel))
@@ -336,6 +391,7 @@ export function subscribeTreeWatch(scope: SessionScope, handlers: TreeWatchHandl
       quietStreak: 0,
       lastSweepAt: 0,
       degraded: false,
+      forceSweep: false,
     }
     channels.set(key, channel)
   }
@@ -364,10 +420,18 @@ export function subscribeTreeWatch(scope: SessionScope, handlers: TreeWatchHandl
  * Pull the next watch round forward now (editor save, explicit refresh,
  * visibility wake). Coalesces with an in-flight round via `pendingNudge`
  * so the finally-path runs again immediately instead of parking on idle.
+ *
+ * Pass `{ sweep: true }` after a self-initiated mutation (mkdir / rename /
+ * delete) so the next round re-lists every visible directory even when the
+ * OS watch never reports the change (mobile proot / unwatched hosts).
  */
-export function nudgeTreeWatch(scope: SessionScope): void {
+export function nudgeTreeWatch(
+  scope: SessionScope,
+  options?: { readonly sweep?: boolean },
+): void {
   const channel = channels.get(channelKey(scope))
   if (channel === undefined || channel.subscriptions.size === 0) return
+  if (options?.sweep === true) channel.forceSweep = true
   markActive(channel)
   if (channel.busy) {
     channel.pendingNudge = true

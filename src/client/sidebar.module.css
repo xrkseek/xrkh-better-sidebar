@@ -92,6 +92,20 @@
   transition: none;
 }
 
+/* Phone Overview sheet: Host stamps data-xrk-layout-details-open while the
+   Status close control owns the top-right corner (details px stays 0 on
+   phone, so inset-based offset cannot clear the collision). The panel host
+   is fixed on body at z-index 25 and would otherwise sit above in-flow
+   Overview chrome — hide the whole host while the sheet is open. */
+:global(html[data-xrk-layout-details-open][data-xrk-layout-phone]) .toggleCluster {
+  display: none;
+}
+
+:global(html[data-xrk-layout-details-open][data-xrk-layout-phone] [data-dsh-panel-host]) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* The closed-state affordance is the native rail icon control: a plain
    28px circle (the app's icon-button size — the cluster must stay inside
    the 34px tab-strip band so it never covers the pane headers below),
@@ -3099,4 +3113,11 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorVideo {
   max-width: 100%;
   max-height: 100%;
+}
+
+.deleteConfirmDesc {
+  margin: 0;
+  font: var(--dsw-font-s-14);
+  color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
 }

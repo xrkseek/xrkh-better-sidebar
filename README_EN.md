@@ -10,13 +10,19 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.7
+xrkh plugin add xrkh-better-sidebar@0.20.9
 xrkh restart
 ```
 
-Hard-refresh the browser after install (Ctrl+Shift+R).
+Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.9
+
+- **Phone Overview mutual exclusion**: while Host Overview / Status is open, hide the expand FAB, collapse the drawer, and hide the whole `data-dsh-panel-host` so it does not collide with or sit above the sheet close control (`ctx.layout.insets.detailsOpen` + `phone`).
+- **File tree**: stabler watch refresh and mutation paths; open-file / “Open with” toolbar cleanup.
+- Prefer **XRK-Harness ≥ 0.7.19**.
 
 ## 0.20.7
 
