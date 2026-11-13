@@ -614,6 +614,13 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
   // Serialize commits: a queued write must observe the previous write's
   // revision; a failed write must not poison the queue for later ones.
   const inFlightRef = useRef<Promise<unknown>>(Promise.resolve())
+  // In-flight write count: while > 0, ignore external store prefs so an
+  // optimistic edit is not wiped by our own `store.setPrefs` notify (or by a
+  // concurrent `settings/document-updated` mid-commit).
+  const pendingWritesRef = useRef(0)
+  // Last store snapshot prefs reference we adopted — panel layout notifies
+  // reuse the same prefs object, so we can skip noisy re-syncs.
+  const lastSnapPrefsRef = useRef(store.getSnapshot().prefs)
 
   // Sync the persisted document once on mount: the revision and the current
   // values (another tab may have changed them since the store hydrated).
@@ -624,15 +631,41 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
       revisionRef.current = view.revision
       if (dirtyRef.current) return
       const next = parsePrefs(view.value)
+      optimisticRef.current = next
       setPrefs(next)
       setWidthDraft(String(next.defaultWidthPercent))
     }).catch(() => { /* the store's defaults stay authoritative */ })
     return () => { cancelled = true }
   }, [])
 
+  // Hot-adopt prefs when the shared store changes from outside this page
+  // (document-updated sync, open-with pin writes, another settings surface).
+  useEffect(() => store.subscribe(() => {
+    if (pendingWritesRef.current > 0) return
+    const snapPrefs = store.getSnapshot().prefs
+    if (snapPrefs === lastSnapPrefsRef.current) return
+    lastSnapPrefsRef.current = snapPrefs
+    const next = store.getPrefs()
+    optimisticRef.current = next
+    setPrefs(next)
+    setWidthDraft(String(next.defaultWidthPercent))
+    // Refresh the revision so the next local write does not 409 against a
+    // document another surface already advanced.
+    void api.settingsGet().then((view) => {
+      if (pendingWritesRef.current > 0) return
+      revisionRef.current = view.revision
+      const parsed = parsePrefs(view.value)
+      lastSnapPrefsRef.current = store.getSnapshot().prefs
+      optimisticRef.current = parsed
+      setPrefs(parsed)
+      setWidthDraft(String(parsed.defaultWidthPercent))
+    }).catch(() => { /* keep the store copy */ })
+  }), [store])
+
   /** Persist one patch through the settings route (serialized, revision-guarded). */
   const commit = (patch: Record<string, unknown>): Promise<{ ok: boolean; prefs: SidebarPrefs }> => {
     dirtyRef.current = true
+    pendingWritesRef.current += 1
     const run = inFlightRef.current.then(async () => {
       const view = await api.settingsUpdate(
         { ...patch },
@@ -641,13 +674,18 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
       const next = parsePrefs(view.value)
       revisionRef.current = view.revision
       store.setPrefs(next)
+      lastSnapPrefsRef.current = store.getSnapshot().prefs
       return next
     })
     // A failed commit must not poison the queue: later writes still run.
     inFlightRef.current = run.then(() => undefined, () => undefined)
     return run.then(
-      (next) => ({ ok: true, prefs: next }),
+      (next) => {
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1)
+        return { ok: true, prefs: next }
+      },
       (caught) => {
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1)
         setError(messageOf(caught))
         return { ok: false, prefs }
       },

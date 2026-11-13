@@ -1,12 +1,14 @@
 # 文件树「打开方式」子菜单设计（2026-08-22）
 
 > 状态：已实现（分支 `feat/open-with-menu`）。本文档记录功能设计、关键取舍与实施偏差。
+>
+> **2026-11 修订（0.20.10）**：打开目标改为 Face `listOpenInApps` 探测，不再硬编码 IDE 列表。多端拆三轴——**APK 薄壳**（`XrkShell`）与 **手机浏览器 / 远程 Web**（`!loopback`）均不画「打开方式」；**窄屏 chrome**（`LayoutInsets.phone`）只扁平化菜单，不等于 APK。
 
 ## 目标
 
 文件树（`FileTree`）右键菜单新增「在应用中打开 >」子菜单：
 
-- 内置 **资源管理器（在文件管理器中显示）、VS Code、Cursor、Zed** 四个打开方式；每个子菜单行右侧有**图钉**，点击可把该方式固定为右键菜单的**顶层直达项**（再点取消固定）。
+- 内置 **资源管理器（在文件管理器中显示）** + Face 探测到的编辑器（如 VS Code / Cursor）；每个子菜单行右侧有**图钉**，点击可把该方式固定为右键菜单的**顶层直达项**（再点取消固定）。
 - **远端 SSH**：设置中配置可选 SSH host（`user@host` 或 `~/.ssh/config` 别名）。非空即整个工作区视为远端：VSCode 系条目（VS Code / Cursor / 自定义且勾选"VSCode 系"）改用 `<scheme>://vscode-remote/ssh-remote+<host>/<path>` 打开；本地专用条目（资源管理器 / Zed / 非 VSCode 系自定义）从菜单隐藏。
 - **自定义编辑器**：名称 + URL 模板（`{path}` 占位符，如 `cursor://file/{path}`）+ 「是否 VSCode 系」开关；配置入口在**侧边栏设置 Files 卡片齿轮**（与既有 `editorExplorer` 下拉同一弹窗）。
 - 打开动作经宿主新路由 `POST /sidebar/api/open.external` 执行（argv 数组 spawn，无 shell 注入），浏览器模式与 DSH Desktop 行为一致；**不经过** `ctx.workspaces.openPath`（该入口已被 `wrapOpenPath` 劫持到侧边栏编辑器，见 `src/client/openpath-intercept.ts`）。

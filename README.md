@@ -10,13 +10,26 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.9
+xrkh plugin add xrkh-better-sidebar@0.20.11
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.11
+
+- **设置页版本**：徽章读 `package.json`，不再硬编码 semver。
+- **配置热更**：Side card 订阅共享 store；外部写入 / `settings/document-updated` 会刷新 prefs 与 revision。
+- **打开方式 · 三轴**（承接 0.20.10）：APK 薄壳 / 远程 Web / 窄屏 chrome 分开判。
+- 推荐 office 预览插件 **`xrkh-better-sidebar-plugin-office@0.1.2`**（手机 blob 下载 · 窄屏触控）。
+- 建议搭配 **XRK-Harness ≥ 0.7.20**。
+
+## 0.20.10
+
+- **打开方式 · 三轴**：APK 薄壳（`XrkShell`）/ 远程 Web（`!loopback`）/ 窄屏 chrome（`phone`）分开判。APK 不画 Cursor/VS Code 列表（走系统分享与「下载」）；手机浏览器连服务器同样隐藏；本机窄窗仍可 Face 探测编辑器，只改成扁平菜单。
+- 建议搭配 **XRK-Harness ≥ 0.7.19**。
 
 ## 0.20.9
 
@@ -75,7 +88,7 @@ xrkh restart
 - Side card →「添加预览插件」推荐目录收录 office 安装命令。
 
 ```bash
-xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.1
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.2
 ```
 
 ## 0.20.0
@@ -88,7 +101,7 @@ xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.1
 注册，不进本包 client bundle。安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.2
 ```
 
 或源码：`xrkh plugin add ./extensions/xrkh-better-sidebar-plugin-office`。

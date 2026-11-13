@@ -1,13 +1,26 @@
 /**
- * The file tree's "open with" vocabulary: which external editors / file
- * managers the context menu can hand a row's path to, how the per-user
- * configuration (custom editors, SSH host, pinned ids) is parsed out of the
- * persisted blob, and how the external URL is built (local `file` URLs and
- * VSCode-family SSH-remote URLs).
+ * File-tree "open with" vocabulary — multi-end.
  *
- * Pure by design (no React / no `api`), so the whole surface is unit-testable
- * without a DOM or a host route. The menu and the settings panel only consume
- * the exported types and functions.
+ * Three axes (do not conflate them):
+ *
+ * 1. **Carrier** — Phone APK thin shell (`XrkShell`) vs ordinary browser /
+ *    Desktop. APK owns share/download in Flutter; never paint a Face IDE list.
+ * 2. **Privilege** — Face `isLoopback` + `canOpenPath`. Remote Web (phone or
+ *    desktop browser → a server) must not offer Host-machine OS open.
+ * 3. **Chrome width** — `LayoutInsets.phone` / narrow viewport (&lt;768). Only
+ *    flattens the menu (no sideways submenu). Narrow desktop still gets
+ *    Face-probed editors when loopback.
+ *
+ * | Surface                         | Reveal | Host editors | Custom URL | Menu shape |
+ * |---------------------------------|--------|--------------|------------|------------|
+ * | Phone APK (`thinShell`)         | never  | never        | never      | — (hidden) |
+ * | Remote Web (!loopback)          | never  | never        | never      | — (hidden) |
+ * | Local Web / Desktop             | if canOpenPath≠false | Face probe | yes | nested if room |
+ * | Same + phone/narrow chrome      | same   | same         | same       | flat       |
+ * | SSH workspace                   | never  | → vscode-remote URL | VSCode-fam | — |
+ *
+ * Editors are **auto-detected** via Face `listOpenInApps`. No hardcoded
+ * “always show VS Code / Cursor / Zed” list.
  */
 import type { CopyKey } from './locales.ts'
 
@@ -16,92 +29,120 @@ export interface CustomEditor {
   id: string
   /** Human label shown in the menu (e.g. "Windsurf"). */
   name: string
-  /** URL template with a `{path}` placeholder (e.g. `cursor://file/{path}`). */
+  /** URL template with a `{path}` placeholder (e.g. `windsurf://file/{path}`). */
   urlTemplate: string
-  /** Whether the editor speaks the VSCode URL dialect — the only editors
-   *  with an SSH-remote form (`<scheme>://vscode-remote/ssh-remote+<host>/…`). */
+  /** Whether the editor speaks the VSCode URL dialect — SSH-remote form. */
   isVscodeFamily: boolean
 }
 
-/** The per-user "open with" configuration (one key of the editor blob). */
+/** Per-user open-with configuration (one key of the editor blob). */
 export interface OpenWithConfig {
-  /** SSH host (user@host or an ~/.ssh/config alias); '' = local workspace. */
+  /** SSH host (user@host or ~/.ssh/config alias); '' = local workspace. */
   sshHost: string
-  /** User-defined editors, appended after the built-ins. */
+  /** User-defined editors, appended after Host-probed apps. */
   customEditors: CustomEditor[]
-  /** Ids of open-with targets pinned to the menu's top level
-   *  ('explorer' | 'vscode' | 'cursor' | 'zed' | 'custom:<id>'). */
+  /** Ids pinned to the menu's top level. */
   pinned: string[]
 }
 
-/** One menu-visible open target (built-in or custom, SSH-filtered). */
+/** One menu-visible open target. */
 export interface OpenWithTarget {
-  /** Stable id (`explorer` / `vscode` / `cursor` / `zed` / `custom:<id>`). */
+  /** Stable id (`explorer` / Face app id / `custom:<id>`). */
   id: string
-  /** Locale key of a built-in label (custom editors carry `name` instead). */
+  /** Locale key for Host-known labels (custom editors use `name`). */
   nameKey?: CopyKey
-  /** User-defined label (custom editors only; '' for built-ins). */
+  /** User-defined label (custom only). */
   name: string
-  /** 'reveal' = show in the OS file manager; 'url' = open a URL. */
-  kind: 'reveal' | 'url'
-  /** URL template with `{path}`; undefined for reveal targets. */
+  /**
+   * `reveal` — OS file manager via Face openPath.
+   * `host` — Face `host.openInApp` (local probed editor argv).
+   * `url` — custom scheme or SSH vscode-remote URL.
+   */
+  kind: 'reveal' | 'host' | 'url'
+  /** URL template with `{path}`; only for `url`. */
   urlTemplate?: string
-  /** Whether the editor talks the VSCode URL dialect. */
+  /** VSCode URL dialect (SSH remote form). */
   isVscodeFamily: boolean
-  /** Hidden in SSH mode (a host-local opener cannot reach a remote path). */
+  /** Hidden in SSH mode (cannot reach a remote path). */
   localOnly: boolean
+  /** Face catalog id when launching via `host.openInApp`. */
+  hostAppId?: string
 }
 
-/** The default open-with configuration (fresh documents). */
+/**
+ * Runtime surface for multi-end gating.
+ *
+ * Built by {@link ./open-with-surface.ts} from LayoutInsets + viewport + Face
+ * + Flutter `XrkShell` (APK thin shell).
+ */
+export interface OpenWithSurface {
+  /**
+   * AppFrame phone chrome (`data-xrk-layout-phone` / viewport &lt;768).
+   * Width-only — true on APK, phone Safari, and a resized desktop window.
+   * Affects menu shape, not “hide all Host editors”.
+   */
+  phone?: boolean
+  /** Viewport width &lt; 768 — same flat-menu hint as `phone`. */
+  narrow?: boolean
+  /**
+   * Flutter phone thin shell injected `XrkShell.postMessage`. Ordinary
+   * browsers never have this — use it to tell APK apart from phone Web.
+   */
+  thinShell?: boolean
+  /**
+   * Privileged local plane (same machine as Host). Remote browsers must not
+   * offer OS open — mirrors Overview `ui-open-in-app` `isLoopback` gate.
+   * `undefined` = unknown (treat as local for optimistic desktop).
+   */
+  loopback?: boolean
+  /** Face `host.describe.canOpenPath`. */
+  canOpenPath?: boolean
+  /** Face `host.listOpenInApps` ids. `undefined` = not probed yet. */
+  installedApps?: readonly string[]
+}
+
 export const OPEN_WITH_DEFAULTS: OpenWithConfig = {
   sshHost: '',
   customEditors: [],
   pinned: [],
 }
 
-/** The built-in open targets, in menu order. */
-export const OPEN_WITH_BUILTINS: readonly OpenWithTarget[] = [
-  {
-    id: 'explorer',
-    nameKey: 'openWithExplorer',
-    name: '',
-    kind: 'reveal',
-    isVscodeFamily: false,
-    localOnly: true,
-  },
-  {
-    id: 'vscode',
-    nameKey: 'openWithVscode',
-    name: '',
-    kind: 'url',
-    urlTemplate: 'vscode://file/{path}',
-    isVscodeFamily: true,
-    localOnly: false,
-  },
-  {
-    id: 'cursor',
-    nameKey: 'openWithCursor',
-    name: '',
-    kind: 'url',
-    urlTemplate: 'cursor://file/{path}',
-    isVscodeFamily: true,
-    localOnly: false,
-  },
-  {
-    id: 'zed',
-    nameKey: 'openWithZed',
-    name: '',
-    kind: 'url',
-    urlTemplate: 'zed://file/{path}',
-    isVscodeFamily: false,
-    localOnly: true,
-  },
-]
+/** Single reveal row — Host openPath, not a duplicate file-manager app entry. */
+export const OPEN_WITH_REVEAL: OpenWithTarget = {
+  id: 'explorer',
+  nameKey: 'openWithExplorer',
+  name: '',
+  kind: 'reveal',
+  isVscodeFamily: false,
+  localOnly: true,
+}
 
-/** Whether a persisted value makes a structurally valid custom-editor row.
- *  Name/template may be empty — the settings panel edits rows in place and
- *  an in-progress row must survive the round-trip; the MENU hides rows that
- *  fail the stricter {@link isValidCustomEditor} check. */
+/**
+ * Face catalog ids that belong on a *file* row. Terminals / file-managers are
+ * skipped (reveal covers the manager; terminals do not open a file usefully).
+ * Labels only — membership comes from Face probe, not this map alone.
+ */
+const HOST_FILE_EDITORS: Readonly<Record<string, {
+  nameKey: CopyKey
+  isVscodeFamily: boolean
+  /** Scheme template used only to synthesize SSH vscode-remote URLs. */
+  urlTemplate: string
+}>> = {
+  vscode: {
+    nameKey: 'openWithVscode',
+    isVscodeFamily: true,
+    urlTemplate: 'vscode://file/{path}',
+  },
+  cursor: {
+    nameKey: 'openWithCursor',
+    isVscodeFamily: true,
+    urlTemplate: 'cursor://file/{path}',
+  },
+}
+
+/** @deprecated Use {@link OPEN_WITH_REVEAL}; kept for transitional imports. */
+export const OPEN_WITH_BUILTINS: readonly OpenWithTarget[] = [OPEN_WITH_REVEAL]
+
 function isCustomEditor(value: unknown): value is CustomEditor {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
   const record = value as Record<string, unknown>
@@ -111,12 +152,6 @@ function isCustomEditor(value: unknown): value is CustomEditor {
     && typeof record.isVscodeFamily === 'boolean'
 }
 
-/**
- * Parse the persisted `openWith` blob (tolerant): malformed fields fall back
- * to the defaults, malformed custom-editor rows are dropped, and pinned ids
- * are kept verbatim (unknown ids are pruned when the targets are resolved —
- * the menu is the only consumer of the resolved list).
- */
 export function parseOpenWithConfig(raw: unknown): OpenWithConfig {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return { ...OPEN_WITH_DEFAULTS }
   const record = raw as Record<string, unknown>
@@ -130,47 +165,135 @@ export function parseOpenWithConfig(raw: unknown): OpenWithConfig {
   return { sshHost, customEditors, pinned }
 }
 
-/** Whether a custom editor id belongs to this config (id prefix match). */
 function customIdOf(id: string): string {
   return `custom:${id}`
 }
 
-/**
- * The menu-visible open targets, in order (built-ins then custom editors).
- * In SSH mode the local-only targets (the OS file manager, Zed, custom
- * editors without the VSCode dialect) are dropped — they cannot reach a
- * remote path. Unknown pinned ids are pruned here too.
- */
-export function resolveOpenWithTargets(config: OpenWithConfig): OpenWithTarget[] {
-  const ssh = config.sshHost.trim() !== ''
-  const targets: OpenWithTarget[] = [
-    ...OPEN_WITH_BUILTINS,
-    ...config.customEditors
-      .filter(isValidCustomEditor)
-      .map((editor): OpenWithTarget => ({
-        id: customIdOf(editor.id),
-        name: editor.name,
+/** Build Host-probed editor targets from Face `listOpenInApps`. */
+export function hostProbedEditorTargets(
+  installedApps: readonly string[] | undefined,
+  ssh: boolean,
+): OpenWithTarget[] {
+  if (installedApps === undefined) return []
+  const out: OpenWithTarget[] = []
+  for (const appId of installedApps) {
+    const meta = HOST_FILE_EDITORS[appId]
+    if (meta === undefined) continue
+    if (ssh) {
+      out.push({
+        id: appId,
+        nameKey: meta.nameKey,
+        name: '',
         kind: 'url',
-        urlTemplate: editor.urlTemplate,
-        isVscodeFamily: editor.isVscodeFamily,
-        localOnly: !editor.isVscodeFamily,
-      })),
-  ]
-  return targets.filter(target => !(ssh && target.localOnly))
+        urlTemplate: meta.urlTemplate,
+        isVscodeFamily: meta.isVscodeFamily,
+        localOnly: false,
+        hostAppId: appId,
+      })
+    } else {
+      out.push({
+        id: appId,
+        nameKey: meta.nameKey,
+        name: '',
+        kind: 'host',
+        isVscodeFamily: meta.isVscodeFamily,
+        localOnly: false,
+        hostAppId: appId,
+      })
+    }
+  }
+  return out
 }
 
-/** The SSH hint appended to a target's label in remote mode. */
+/**
+ * Whether this surface may offer any OS / Host open actions at all.
+ * - Remote Web (`!loopback`): Host apps are on the server — never.
+ * - Phone APK thin shell: Flutter share / Download — never Face IDE list.
+ * - `phone` chrome alone does **not** deny (narrow desktop / phone Web local).
+ */
+export function openWithSurfaceAllowsOs(surface: OpenWithSurface): boolean {
+  if (surface.thinShell === true) return false
+  if (surface.loopback === false) return false
+  return true
+}
+
+/**
+ * Menu-visible targets for the current end + OS capability.
+ * Never invents vscode/cursor/zed without a Face probe.
+ */
+export function resolveOpenWithTargets(
+  config: OpenWithConfig,
+  surface: OpenWithSurface = {},
+): OpenWithTarget[] {
+  if (!openWithSurfaceAllowsOs(surface)) return []
+
+  const ssh = config.sshHost.trim() !== ''
+  const canOpen = surface.canOpenPath
+  const targets: OpenWithTarget[] = []
+
+  // Local Web / Desktop: reveal when canOpenPath is true or still unknown
+  // (describe may lag); deny when Face said false.
+  if (canOpen !== false && !(ssh && OPEN_WITH_REVEAL.localOnly)) {
+    targets.push(OPEN_WITH_REVEAL)
+  }
+
+  targets.push(...hostProbedEditorTargets(surface.installedApps, ssh))
+
+  for (const editor of config.customEditors.filter(isValidCustomEditor)) {
+    const target: OpenWithTarget = {
+      id: customIdOf(editor.id),
+      name: editor.name,
+      kind: 'url',
+      urlTemplate: editor.urlTemplate,
+      isVscodeFamily: editor.isVscodeFamily,
+      localOnly: !editor.isVscodeFamily,
+    }
+    if (ssh && target.localOnly) continue
+    targets.push(target)
+  }
+
+  return targets
+}
+
+/**
+ * Apply surface gates to an already-built list (tests / composition).
+ * Prefer {@link resolveOpenWithTargets} for the full pipeline.
+ */
+export function filterOpenWithBySurface(
+  targets: readonly OpenWithTarget[],
+  surface: OpenWithSurface = {},
+): OpenWithTarget[] {
+  if (!openWithSurfaceAllowsOs(surface)) return []
+  const canOpen = surface.canOpenPath
+  const installed = surface.installedApps
+  return targets.filter((target) => {
+    if (target.kind === 'reveal') return canOpen !== false
+    if (target.kind === 'host' && installed !== undefined && target.hostAppId !== undefined) {
+      return installed.includes(target.hostAppId)
+    }
+    return true
+  })
+}
+
+/**
+ * Flatten menus on phone, narrow viewports, or short lists — nested submenu
+ * cards open sideways and spill past APK / split-pane edges.
+ */
+export function preferFlatOpenWithMenu(
+  targets: readonly OpenWithTarget[],
+  surface: OpenWithSurface = {},
+): boolean {
+  if (surface.phone === true) return true
+  if (surface.narrow === true) return true
+  if (targets.length <= 2) return true
+  return targets.every(target => target.kind === 'reveal')
+}
+
 export function openWithSshActive(config: OpenWithConfig): boolean {
   return config.sshHost.trim() !== ''
 }
 
-/**
- * The URL to open for one resolved target, or undefined when the target has
- * no URL form (reveal) or the template is malformed. The path is inserted
- * RAW into the template (browsers percent-encode as needed; VSCode-family
- * URL parsers consume the absolute path with its leading slash, e.g.
- * `vscode://file//home/u/f.ts` or `vscode://file/C:/Users/u/f.ts`).
- */
+/** URL for a `url` target; Host/`reveal` go through Face instead. */
 export function openWithUrl(target: OpenWithTarget, path: string, config: OpenWithConfig): string | undefined {
   if (target.kind !== 'url' || target.urlTemplate === undefined) return undefined
   const normalized = normalizeUrlPath(path)
@@ -178,21 +301,16 @@ export function openWithUrl(target: OpenWithTarget, path: string, config: OpenWi
   if (ssh && target.isVscodeFamily) {
     const scheme = schemeOf(target.urlTemplate)
     if (scheme === undefined) return undefined
-    // `ssh-remote+<host>` owns NO slash of its own: the path keeps its
-    // leading slash, so `/home/u/f.ts` lands as `…+host/home/u/f.ts`.
     return `${scheme}://vscode-remote/ssh-remote+${config.sshHost.trim()}${normalized}`
   }
   if (!target.urlTemplate.includes('{path}') || !hasUrlScheme(target.urlTemplate)) return undefined
   return target.urlTemplate.replace('{path}', normalized)
 }
 
-/** Whether a template starts with a `scheme://` prefix (the only shape the
- *  host's external opener accepts and the settings panel suggests). */
 function hasUrlScheme(template: string): boolean {
   return /^[a-z][a-z0-9+.-]*:\/\//i.test(template)
 }
 
-/** The scheme of a URL template (the part before the first ':'), or undefined. */
 function schemeOf(template: string): string | undefined {
   const at = template.indexOf(':')
   if (at <= 0) return undefined
@@ -200,12 +318,10 @@ function schemeOf(template: string): string | undefined {
   return /^[a-z][a-z0-9+.-]*$/i.test(scheme) ? scheme : undefined
 }
 
-/** Normalize a filesystem path for embedding in a URL (backslashes → '/'). */
 export function normalizeUrlPath(path: string): string {
   return path.replace(/\\/g, '/')
 }
 
-/** A fresh custom-editor id (uuid when available, time-based fallback). */
 export function newCustomEditorId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -213,7 +329,6 @@ export function newCustomEditorId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2)}`
 }
 
-/** Validate one custom-editor row before the settings panel accepts it. */
 export function isValidCustomEditor(row: { name: string; urlTemplate: string }): boolean {
   return row.name.trim() !== ''
     && row.urlTemplate.includes('{path}')

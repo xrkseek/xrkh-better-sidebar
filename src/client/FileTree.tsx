@@ -129,6 +129,11 @@ export function FileTree(props: {
   openWithPinned?: string[]
   /** Whether the workspace is remote (appends the SSH hint to target labels). */
   openWithSsh?: boolean
+  /**
+   * Flatten open-with to top-level rows (no nested "Open with >" submenu).
+   * Phone / single-target surfaces must not open a sideways card off-screen.
+   */
+  openWithFlat?: boolean
   /** Open one target externally (reveal or URL — the caller decides). */
   onOpenWith?: (targetId: string, path: string) => void
   /** Toggle one target's pinned state (the submenu row's pushpin). */
@@ -150,7 +155,7 @@ export function FileTree(props: {
   /** True while an upload is in flight (drops are ignored). */
   busy: boolean
 }) {
-  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, refreshTick, onUploadRequest, onFsCreate, onFsRename, onFsDelete, busy } = props
+  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, openWithFlat, onOpenWith, onToggleOpenWithPin, onReferenceFile, refreshTick, onUploadRequest, onFsCreate, onFsRename, onFsDelete, busy } = props
   const [data, setData] = useState<Record<string, LevelData>>({})
   const dataRef = useRef(data)
   /** The row whose path was just copied ("copied" label replaces its button). */
@@ -502,6 +507,19 @@ export function FileTree(props: {
         icon: itemIcon(target),
       }
     })
+    // Phone / single-target: keep every opener as a top-level row. A nested
+    // submenu card opens sideways and spills past a narrow APK viewport.
+    if (openWithFlat === true) {
+      const flat = openWithTargets.map<MenuItem>(target => ({
+        id: `open-with:${target.id}`,
+        label: target.kind === 'reveal' ? t('showInFolder') : openWithLabelOf(target),
+        icon: itemIcon(target),
+      }))
+      // Dedupe reveal if already promoted into topLevel under the same id.
+      const seen = new Set(topLevel.map(item => item.id))
+      const extras = flat.filter(item => !seen.has(item.id))
+      return [...topLevel, ...extras]
+    }
     return [
       ...topLevel,
       ...(topLevel.length > 0 ? [{ id: 'open-with-sep', type: 'separator' } as MenuEntry] : []),

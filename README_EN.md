@@ -10,13 +10,26 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.9
+xrkh plugin add xrkh-better-sidebar@0.20.11
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.11
+
+- **Settings badge version**: reads `package.json` — no hardcoded semver.
+- **Prefs hot sync**: Side card subscribes to the shared store; external writes / `settings/document-updated` refresh prefs + revision.
+- **Open with · three axes** (from 0.20.10): APK thin shell / remote Web / narrow chrome stay separate.
+- Prefer office preview plugin **`xrkh-better-sidebar-plugin-office@0.1.2`** (mobile blob download · narrow touch targets).
+- Prefer **XRK-Harness ≥ 0.7.20**.
+
+## 0.20.10
+
+- **Open with · three axes**: APK thin shell (`XrkShell`) / remote Web (`!loopback`) / narrow chrome (`phone`) are separate. APK never paints a Cursor/VS Code list (system share + Download); phone browsers hitting a server also hide it; a local narrow window still gets Face-probed editors, flattened only.
+- Prefer **XRK-Harness ≥ 0.7.19**.
 
 ## 0.20.9
 
@@ -67,7 +80,7 @@ Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-
 - Side card → “Add preview plugin” catalogs the office install command.
 
 ```bash
-xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.1
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.2
 ```
 
 ## 0.20.0
@@ -80,7 +93,7 @@ registered via `ctx.betterSidebar.registerFileViewer` — not part of this packa
 client bundle. Install:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0
+xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.2
 ```
 
 Or from source: `xrkh plugin add ./extensions/xrkh-better-sidebar-plugin-office`.

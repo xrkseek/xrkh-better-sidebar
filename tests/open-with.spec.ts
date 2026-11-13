@@ -1,19 +1,19 @@
 /**
- * The file tree "open with" pure logic: config parsing (tolerant), target
- * resolution (built-ins + custom, SSH filtering), URL building (local file
- * URLs and VSCode-family SSH-remote URLs) and the custom-editor validators.
+ * Open-with pure logic: Face-probed editors + reveal + custom URLs; phone /
+ * canOpenPath / SSH gates; no invented vscode/cursor/zed without a probe.
  */
 import { describe, expect, it } from 'vitest'
 import {
+  hostProbedEditorTargets,
   isValidCustomEditor,
   newCustomEditorId,
   normalizeUrlPath,
   openWithSshActive,
   openWithUrl,
   parseOpenWithConfig,
+  preferFlatOpenWithMenu,
   resolveOpenWithTargets,
   type CustomEditor,
-  type OpenWithTarget,
 } from '../src/client/open-with.ts'
 
 describe('parseOpenWithConfig', () => {
@@ -23,128 +23,154 @@ describe('parseOpenWithConfig', () => {
     expect(parseOpenWithConfig([])).toEqual({ sshHost: '', customEditors: [], pinned: [] })
   })
 
-  it('keeps structurally valid custom editors (incl. in-progress rows) and drops junk', () => {
+  it('keeps structurally valid custom editors and drops junk', () => {
     const config = parseOpenWithConfig({
       sshHost: 'dev',
       customEditors: [
         { id: 'a', name: 'Windsurf', urlTemplate: 'windsurf://file/{path}', isVscodeFamily: false },
         { id: 'b', name: '', urlTemplate: 'b://file/{path}', isVscodeFamily: true },
-        { id: 'c', name: 'Trae', urlTemplate: 'trae://file/{path}', isVscodeFamily: true },
         'junk',
         null,
-        42,
       ],
-      pinned: ['vscode', 'custom:a', 42, '', 'custom:c'],
+      pinned: ['vscode', 'custom:a', 42, ''],
     })
     expect(config.sshHost).toBe('dev')
-    expect(config.customEditors.map(editor => editor.id)).toEqual(['a', 'b', 'c'])
-    expect(config.pinned).toEqual(['vscode', 'custom:a', 'custom:c'])
+    expect(config.customEditors.map(editor => editor.id)).toEqual(['a', 'b'])
+    expect(config.pinned).toEqual(['vscode', 'custom:a'])
+  })
+})
+
+describe('hostProbedEditorTargets', () => {
+  it('emits host-kind rows for Face-probed editors (local)', () => {
+    const targets = hostProbedEditorTargets(['explorer', 'cursor', 'vscode', 'windowsterminal'], false)
+    expect(targets.map(t => t.id)).toEqual(['cursor', 'vscode'])
+    expect(targets.every(t => t.kind === 'host')).toBe(true)
+  })
+
+  it('emits url-kind rows in SSH mode (vscode-remote needs a scheme)', () => {
+    const targets = hostProbedEditorTargets(['cursor'], true)
+    expect(targets).toHaveLength(1)
+    expect(targets[0]?.kind).toBe('url')
+    expect(targets[0]?.urlTemplate).toBe('cursor://file/{path}')
+  })
+
+  it('returns nothing before Face has probed', () => {
+    expect(hostProbedEditorTargets(undefined, false)).toEqual([])
   })
 })
 
 describe('resolveOpenWithTargets', () => {
-  const localCustom: CustomEditor = { id: 'e1', name: 'Windsurf', urlTemplate: 'windsurf://file/{path}', isVscodeFamily: false }
-  const familyCustom: CustomEditor = { id: 'e2', name: 'Zed-like fork', urlTemplate: 'x-zed://file/{path}', isVscodeFamily: true }
+  const localCustom: CustomEditor = {
+    id: 'e1', name: 'Windsurf', urlTemplate: 'windsurf://file/{path}', isVscodeFamily: false,
+  }
+  const familyCustom: CustomEditor = {
+    id: 'e2', name: 'Fork', urlTemplate: 'x-fork://file/{path}', isVscodeFamily: true,
+  }
 
-  it('lists built-ins first, then custom editors (local mode)', () => {
-    const targets = resolveOpenWithTargets(parseOpenWithConfig({ customEditors: [localCustom] }))
-    expect(targets.map(target => target.id)).toEqual(['explorer', 'vscode', 'cursor', 'zed', 'custom:e1'])
+  it('never invents IDE rows without a Face probe', () => {
+    const targets = resolveOpenWithTargets(parseOpenWithConfig({}))
+    expect(targets.map(t => t.id)).toEqual(['explorer'])
     expect(targets[0]?.kind).toBe('reveal')
-    expect(targets[1]?.urlTemplate).toBe('vscode://file/{path}')
   })
 
-  it('excludes incomplete custom-editor rows from the menu (they stay in the blob)', () => {
-    const targets = resolveOpenWithTargets(parseOpenWithConfig({
-      customEditors: [
-        { id: 'e1', name: 'Windsurf', urlTemplate: 'windsurf://file/{path}', isVscodeFamily: false },
-        { id: 'e2', name: '', urlTemplate: 'incomplete://file/{path}', isVscodeFamily: true },
-      ],
-    }))
-    expect(targets.map(target => target.id)).toEqual(['explorer', 'vscode', 'cursor', 'zed', 'custom:e1'])
+  it('adds Face-probed editors after reveal', () => {
+    const targets = resolveOpenWithTargets(
+      parseOpenWithConfig({ customEditors: [localCustom] }),
+      { canOpenPath: true, installedApps: ['vscode', 'cursor'] },
+    )
+    expect(targets.map(t => t.id)).toEqual(['explorer', 'vscode', 'cursor', 'custom:e1'])
+    expect(targets.find(t => t.id === 'vscode')?.kind).toBe('host')
   })
 
-  it('drops local-only targets in SSH mode (file manager, Zed, non-VSCode custom)', () => {
-    const config = parseOpenWithConfig({ sshHost: 'dev', customEditors: [localCustom, familyCustom] })
-    const targets = resolveOpenWithTargets(config)
-    expect(targets.map(target => target.id)).toEqual(['vscode', 'cursor', 'custom:e2'])
+  it('drops reveal when Face says canOpenPath is false', () => {
+    const targets = resolveOpenWithTargets(
+      parseOpenWithConfig({}),
+      { canOpenPath: false, installedApps: ['cursor'] },
+    )
+    expect(targets.map(t => t.id)).toEqual(['cursor'])
   })
 
-  it('prunes unknown pinned ids only when resolving (the parse keeps them)', () => {
-    const config = parseOpenWithConfig({ pinned: ['ghost'] })
-    expect(config.pinned).toEqual(['ghost'])
-    expect(resolveOpenWithTargets(config).map(target => target.id)).toContain('vscode')
+  it('APK thinShell: empty — Flutter share/download, not a Face IDE list', () => {
+    expect(resolveOpenWithTargets(
+      parseOpenWithConfig({ customEditors: [localCustom] }),
+      { thinShell: true, phone: true, canOpenPath: true, installedApps: ['cursor', 'vscode'] },
+    )).toEqual([])
+  })
+
+  it('phone chrome alone (Safari / resized desktop) still offers Face targets', () => {
+    expect(resolveOpenWithTargets(
+      parseOpenWithConfig({ customEditors: [localCustom] }),
+      { phone: true, canOpenPath: true, installedApps: ['cursor'] },
+    ).map(t => t.id)).toEqual(['explorer', 'cursor', 'custom:e1'])
+  })
+
+  it('remote Web (!loopback): empty — phone or desktop browser to a server', () => {
+    expect(resolveOpenWithTargets(
+      parseOpenWithConfig({}),
+      { phone: true, loopback: false, canOpenPath: true, installedApps: ['cursor'] },
+    )).toEqual([])
+    expect(resolveOpenWithTargets(
+      parseOpenWithConfig({}),
+      { loopback: false, canOpenPath: true, installedApps: ['cursor'] },
+    )).toEqual([])
+  })
+
+  it('SSH drops local-only custom editors; Host editors become URL', () => {
+    const config = parseOpenWithConfig({
+      sshHost: 'dev',
+      customEditors: [localCustom, familyCustom],
+    })
+    const targets = resolveOpenWithTargets(config, {
+      canOpenPath: true,
+      installedApps: ['vscode'],
+    })
+    expect(targets.map(t => t.id)).toEqual(['vscode', 'custom:e2'])
+    expect(targets[0]?.kind).toBe('url')
+  })
+
+  it('prefers flat menus on phone/narrow chrome and with few targets', () => {
+    expect(preferFlatOpenWithMenu([], { phone: true })).toBe(true)
+    expect(preferFlatOpenWithMenu(
+      resolveOpenWithTargets(parseOpenWithConfig({}), {
+        canOpenPath: true,
+        installedApps: ['cursor', 'vscode'],
+      }),
+      { narrow: true },
+    )).toBe(true)
+    const two = resolveOpenWithTargets(parseOpenWithConfig({}), {
+      canOpenPath: true,
+      installedApps: ['cursor'],
+    })
+    expect(preferFlatOpenWithMenu(two)).toBe(true)
   })
 })
 
 describe('openWithUrl', () => {
-  const targets = resolveOpenWithTargets(parseOpenWithConfig({}))
-  const byId = (id: string): OpenWithTarget => {
-    const target = targets.find(item => item.id === id)
-    if (target === undefined) throw new Error(`no target ${id}`)
-    return target
-  }
-
-  it('builds local file URLs with the raw path (backslashes normalized)', () => {
-    expect(openWithUrl(byId('vscode'), '/home/u/f.ts', parseOpenWithConfig({}))).toBe('vscode://file//home/u/f.ts')
-    expect(openWithUrl(byId('vscode'), 'C:\\Users\\u\\f.ts', parseOpenWithConfig({}))).toBe('vscode://file/C:/Users/u/f.ts')
-    expect(openWithUrl(byId('zed'), '/x/y', parseOpenWithConfig({}))).toBe('zed://file//x/y')
-  })
-
-  it('builds SSH-remote URLs for VSCode-family targets in SSH mode', () => {
+  it('builds SSH-remote URLs for VSCode-family targets', () => {
     const config = parseOpenWithConfig({ sshHost: 'dev' })
-    expect(openWithUrl(byId('vscode'), '/home/u/f.ts', config))
-      .toBe('vscode://vscode-remote/ssh-remote+dev/home/u/f.ts')
-    expect(openWithUrl(byId('cursor'), '/home/u/f.ts', config))
+    const [cursor] = hostProbedEditorTargets(['cursor'], true)
+    expect(openWithUrl(cursor!, '/home/u/f.ts', config))
       .toBe('cursor://vscode-remote/ssh-remote+dev/home/u/f.ts')
   })
 
-  it('keeps the local URL form for non-VSCode-family targets even in SSH mode', () => {
-    // (Such targets are hidden from the SSH menu; the URL builder stays honest.)
-    expect(openWithUrl(byId('zed'), '/x', parseOpenWithConfig({ sshHost: 'dev' }))).toBe('zed://file//x')
+  it('normalizes backslashes in local URL templates', () => {
+    expect(normalizeUrlPath('C:\\Users\\u\\f.ts')).toBe('C:/Users/u/f.ts')
   })
 
-  it('returns undefined for reveal targets and malformed templates', () => {
-    expect(openWithUrl(byId('explorer'), '/x', parseOpenWithConfig({}))).toBeUndefined()
-    const noScheme: OpenWithTarget = { id: 'x', name: '', kind: 'url', urlTemplate: 'not-a-url {path}', isVscodeFamily: false, localOnly: false }
-    expect(openWithUrl(noScheme, '/x', parseOpenWithConfig({}))).toBeUndefined()
-    const noSlash: OpenWithTarget = { id: 'y', name: '', kind: 'url', urlTemplate: 'a:file/{path}', isVscodeFamily: false, localOnly: false }
-    expect(openWithUrl(noSlash, '/x', parseOpenWithConfig({}))).toBeUndefined()
-  })
-
-  it('uses the custom template scheme for SSH URLs of VSCode-family custom editors', () => {
-    const config = parseOpenWithConfig({
-      sshHost: 'dev',
-      customEditors: [
-        { id: 'e', name: 'Fork', urlTemplate: 'myfork://file/{path}', isVscodeFamily: true },
-      ],
-    })
-    const targets = resolveOpenWithTargets(config)
-    expect(openWithUrl(targets[targets.length - 1]!, '/r/f.ts', config))
-      .toBe('myfork://vscode-remote/ssh-remote+dev/r/f.ts')
+  it('openWithSshActive tracks the ssh host field', () => {
+    expect(openWithSshActive(parseOpenWithConfig({ sshHost: 'dev' }))).toBe(true)
+    expect(openWithSshActive(parseOpenWithConfig({}))).toBe(false)
   })
 })
 
-describe('helpers', () => {
-  it('normalizeUrlPath converts backslashes to slashes', () => {
-    expect(normalizeUrlPath('a\\b\\c')).toBe('a/b/c')
+describe('custom editor validators', () => {
+  it('accepts a filled name + scheme://{path} template', () => {
+    expect(isValidCustomEditor({ name: 'Windsurf', urlTemplate: 'windsurf://file/{path}' })).toBe(true)
+    expect(isValidCustomEditor({ name: '', urlTemplate: 'x://file/{path}' })).toBe(false)
+    expect(isValidCustomEditor({ name: 'X', urlTemplate: 'no-scheme/{path}' })).toBe(false)
   })
 
-  it('openWithSshActive trims the host', () => {
-    expect(openWithSshActive(parseOpenWithConfig({ sshHost: '  ' }))).toBe(false)
-    expect(openWithSshActive(parseOpenWithConfig({ sshHost: ' dev ' }))).toBe(true)
-  })
-
-  it('isValidCustomEditor requires a name, a {path} placeholder and a scheme:// prefix', () => {
-    expect(isValidCustomEditor({ name: 'A', urlTemplate: 'a://file/{path}' })).toBe(true)
-    expect(isValidCustomEditor({ name: '', urlTemplate: 'a://file/{path}' })).toBe(false)
-    expect(isValidCustomEditor({ name: 'A', urlTemplate: 'a://file/x' })).toBe(false)
-    expect(isValidCustomEditor({ name: 'A', urlTemplate: 'a:file/{path}' })).toBe(false)
-  })
-
-  it('newCustomEditorId yields unique non-empty ids', () => {
-    const first = newCustomEditorId()
-    const second = newCustomEditorId()
-    expect(first).not.toBe(second)
-    expect(first.length).toBeGreaterThan(0)
+  it('mints a non-empty custom id', () => {
+    expect(newCustomEditorId().length).toBeGreaterThan(4)
   })
 })

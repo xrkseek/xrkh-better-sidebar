@@ -1,7 +1,7 @@
 /**
- * Editor-header "Open with" control: the same targets as the file-tree
- * context menu (reveal / VS Code / Cursor / Zed / custom), reachable from
- * any file detail view without hunting a tree row.
+ * Editor-header "Open with" control: same targets as the file-tree context
+ * menu (Face-probed apps + reveal + custom), reachable from any file detail
+ * view without hunting a tree row.
  */
 import { useRef, useState, type ReactNode } from 'react'
 import {
@@ -20,15 +20,17 @@ export interface OpenWithToolbarButtonProps {
   targets: readonly OpenWithTarget[]
   pinned: readonly string[]
   ssh: boolean
+  /** Flatten to top-level rows (phone / few targets — no sideways submenu). */
+  flat?: boolean
   onOpenWith: (targetId: string, path: string) => void
   onTogglePin?: (targetId: string) => void
 }
 
 function itemIcon(target: OpenWithTarget): ReactNode {
   if (target.kind === 'reveal') return <VscFolderOpened size={16} />
-  if (target.id === 'vscode') return <IconVscode16 size={16} />
-  if (target.id === 'cursor') return <SiCursor size={16} />
-  if (target.id === 'zed') return <SiZedindustries size={16} />
+  if (target.id === 'vscode' || target.hostAppId === 'vscode') return <IconVscode16 size={16} />
+  if (target.id === 'cursor' || target.hostAppId === 'cursor') return <SiCursor size={16} />
+  if (target.id === 'zed' || /zed/i.test(target.name)) return <SiZedindustries size={16} />
   return <IconCodeOutlineRegular size={16} />
 }
 
@@ -39,7 +41,7 @@ function labelOf(target: OpenWithTarget, ssh: boolean): string {
 
 /** Toolbar button that opens the shared "Open with" menu for one absolute path. */
 export function OpenWithToolbarButton(props: OpenWithToolbarButtonProps): ReactNode {
-  const { path, targets, pinned, ssh, onOpenWith, onTogglePin } = props
+  const { path, targets, pinned, ssh, flat, onOpenWith, onTogglePin } = props
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
   if (path === '' || targets.length === 0) return null
@@ -62,49 +64,61 @@ export function OpenWithToolbarButton(props: OpenWithToolbarButtonProps): ReactN
           icon: itemIcon(reveal),
         } satisfies MenuItem,
       ]
-  const submenu = targets.map<MenuItem>(target => {
-    const pinnedNow = pinned.includes(target.id)
-    return {
+
+  let items: MenuEntry[]
+  if (flat === true) {
+    const flatRows = targets.map<MenuItem>(target => ({
       id: `open-with:${target.id}`,
-      label: (
-        <span className={css.openWithLabel}>
-          <span className={css.openWithName}>{labelOf(target, ssh)}</span>
-          {onTogglePin !== undefined && (
-            <span
-              role="button"
-              tabIndex={-1}
-              className={clsx(css.openWithPin, pinnedNow && css.openWithPinActive)}
-              aria-label={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
-              title={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
-              onClick={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                onTogglePin(target.id)
-              }}
-            >
-              {pinnedNow ? <VscPinned size={14} /> : <VscPin size={14} />}
-            </span>
-          )}
-        </span>
-      ),
+      label: target.kind === 'reveal' ? t('showInFolder') : labelOf(target, ssh),
       icon: itemIcon(target),
-    }
-  })
-  const items: MenuEntry[] = [
-    ...topLevel,
-    ...(topLevel.length > 0 ? [{ id: 'open-with-sep', type: 'separator' as const }] : []),
-    {
-      id: 'open-with-menu',
-      label: (
-        <span className={css.openWithLabel}>
-          <span className={css.openWithName}>{t('openWithMenu')}</span>
-          <IconChevronRightOutlineRegular size={14} className={css.openWithChevron} aria-hidden />
-        </span>
-      ),
-      icon: <VscLinkExternal size={16} />,
-      submenu,
-    },
-  ]
+    }))
+    const seen = new Set(topLevel.map(item => item.id))
+    items = [...topLevel, ...flatRows.filter(item => !seen.has(item.id))]
+  } else {
+    const submenu = targets.map<MenuItem>(target => {
+      const pinnedNow = pinned.includes(target.id)
+      return {
+        id: `open-with:${target.id}`,
+        label: (
+          <span className={css.openWithLabel}>
+            <span className={css.openWithName}>{labelOf(target, ssh)}</span>
+            {onTogglePin !== undefined && (
+              <span
+                role="button"
+                tabIndex={-1}
+                className={clsx(css.openWithPin, pinnedNow && css.openWithPinActive)}
+                aria-label={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
+                title={pinnedNow ? t('unpinOpenWith') : t('pinOpenWith')}
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onTogglePin(target.id)
+                }}
+              >
+                {pinnedNow ? <VscPinned size={14} /> : <VscPin size={14} />}
+              </span>
+            )}
+          </span>
+        ),
+        icon: itemIcon(target),
+      }
+    })
+    items = [
+      ...topLevel,
+      ...(topLevel.length > 0 ? [{ id: 'open-with-sep', type: 'separator' as const }] : []),
+      {
+        id: 'open-with-menu',
+        label: (
+          <span className={css.openWithLabel}>
+            <span className={css.openWithName}>{t('openWithMenu')}</span>
+            <IconChevronRightOutlineRegular size={14} className={css.openWithChevron} aria-hidden />
+          </span>
+        ),
+        icon: <VscLinkExternal size={16} />,
+        submenu,
+      },
+    ]
+  }
 
   return (
     <Menu

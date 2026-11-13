@@ -36,7 +36,11 @@ import { createFrameBatcher } from './frame-batcher.ts'
 import { baseName } from './paths.ts'
 import { openSidebarFile } from './intercept.tsx'
 import { OpenWithToolbarButton } from './OpenWithToolbarButton.tsx'
-import { openWithSshActive, openWithUrl, parseOpenWithConfig, resolveOpenWithTargets } from './open-with.ts'
+import {
+  openWithSshActive, openWithUrl, parseOpenWithConfig, preferFlatOpenWithMenu,
+  resolveOpenWithTargets,
+} from './open-with.ts'
+import { useOpenWithSurface } from './open-with-surface.ts'
 import { updatePluginSettings } from './plugin-settings.ts'
 import { TreePanel } from './TreePanel.tsx'
 import { nudgeTreeWatch, subscribeTreeWatch } from './tree-watch.ts'
@@ -144,7 +148,14 @@ export function EditorHost(props: {
     useCallback(() => store.getSnapshot().prefs.pluginSettings['editor'] ?? EMPTY_PLUGIN_BLOB, [store]),
   )
   const openWithConfig = useMemo(() => parseOpenWithConfig(editorBlob.openWith), [editorBlob])
-  const openWithTargets = useMemo(() => resolveOpenWithTargets(openWithConfig), [openWithConfig])
+  // Phone + Face canOpenPath / listOpenInApps — strip dead desktop IDE rows in
+  // the APK WebView and prefer Host-probed builtins on desktop.
+  const openWithSurface = useOpenWithSurface(ctx)
+  const openWithTargets = useMemo(
+    () => resolveOpenWithTargets(openWithConfig, openWithSurface),
+    [openWithConfig, openWithSurface],
+  )
+  const openWithFlat = preferFlatOpenWithMenu(openWithTargets, openWithSurface)
   // A path-less tab shows the empty-state hint in merged mode — and in split
   // mode it is the standalone explorer (tree-only, see the render below). A
   // folder tab is a folder window in BOTH modes: the tree rooted at the
@@ -248,13 +259,9 @@ export function EditorHost(props: {
     })
   }, [store, tab.id])
 
-  /** The context menu's "open with" action: reveal the path in the OS file
-   *  manager, or hand the target's URL (a local `file` URL, or the SSH-remote
-   *  form for VSCode-family editors in remote mode) to the host's external
-   *  opener. Failures surface as a notice on the tree panel: the action is
-   *  fire-and-forget, so a swallowed rejection is indistinguishable from a
-   *  dead menu row — a policy refusal or a missing handler used to read as
-   *  "nothing happened". */
+  /** Open-with launch: Face openPath (reveal) / openInApp (Host-probed) /
+   *  or open.external URL (custom / SSH vscode-remote). Failures land on the
+   *  tree notice — a swallowed rejection used to read as a dead menu row. */
   const openWith = useCallback((targetId: string, absolute: string): void => {
     const target = openWithTargets.find(item => item.id === targetId)
     if (target === undefined) return
@@ -268,11 +275,38 @@ export function EditorHost(props: {
       void api.openExternal({ action: 'reveal', path: absolute }).catch(report)
       return
     }
+    if (target.kind === 'host') {
+      const appId = target.hostAppId ?? target.id
+      setExternalError(null)
+      void (async () => {
+        try {
+          const withGet = ctx as Context & { get?: (name: string) => unknown }
+          const connection = typeof withGet.get === 'function'
+            ? withGet.get('connection') as {
+              api?: { host?: { openInApp: (body: { app: string; path: string }) => Promise<{
+                result: { ok: true } | { ok: false; error: { message: string } }
+              }> } }
+            } | undefined
+            : undefined
+          const openInApp = connection?.api?.host?.openInApp
+          if (typeof openInApp !== 'function') {
+            throw new Error('host.openInApp unavailable')
+          }
+          const response = await openInApp({ app: appId, path: absolute })
+          if (!response.result.ok) {
+            throw new Error(response.result.error.message)
+          }
+        } catch (error) {
+          report(error)
+        }
+      })()
+      return
+    }
     const url = openWithUrl(target, absolute, openWithConfig)
     if (url === undefined) return
     setExternalError(null)
     void api.openExternal({ action: 'url', url }).catch(report)
-  }, [openWithConfig, openWithTargets])
+  }, [ctx, openWithConfig, openWithTargets])
 
   /** Toggle one target's pinned state. The write is serialized (see
    *  plugin-settings.ts) and the menu re-renders when the store prefs land. */
@@ -586,6 +620,7 @@ export function EditorHost(props: {
       openWithTargets={openWithTargets}
       openWithPinned={openWithConfig.pinned}
       openWithSsh={openWithSshActive(openWithConfig)}
+      openWithFlat={openWithFlat}
       onOpenWith={openWith}
       onToggleOpenWithPin={toggleOpenWithPin}
       onReferenceFile={onReferenceFile}
@@ -690,6 +725,7 @@ export function EditorHost(props: {
             targets={openWithTargets}
             pinned={openWithConfig.pinned}
             ssh={openWithSshActive(openWithConfig)}
+            flat={openWithFlat}
             onOpenWith={openWith}
             onTogglePin={toggleOpenWithPin}
           />

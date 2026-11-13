@@ -63,6 +63,8 @@ export interface TreePanelProps {
   openWithTargets?: OpenWithTarget[]
   openWithPinned?: string[]
   openWithSsh?: boolean
+  /** Flatten open-with to top-level rows (phone / single target — no submenu). */
+  openWithFlat?: boolean
   onOpenWith?: (targetId: string, path: string) => void
   onToggleOpenWithPin?: (targetId: string) => void
   onReferenceFile: (path: string, kind?: 'file' | 'directory') => void
@@ -84,7 +86,7 @@ export interface TreePanelProps {
  * alone instead of the whole explorer subtree.
  */
 export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
-  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, onOpenWith, onToggleOpenWithPin, onReferenceFile, onFsCreate, onFsRename, onFsDelete, full } = props
+  const { sessionId, cwd, store, expanded, revealed, onToggle, onOpenFile, onOpenFileNewTab, onOpenFileSide, openWithTargets, openWithPinned, openWithSsh, openWithFlat, onOpenWith, onToggleOpenWithPin, onReferenceFile, onFsCreate, onFsRename, onFsDelete, full } = props
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<{ matches: string[]; truncated: boolean } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -251,6 +253,7 @@ export const TreePanel = memo(function TreePanel(props: TreePanelProps) {
           openWithTargets={openWithTargets}
           openWithPinned={openWithPinned}
           openWithSsh={openWithSsh}
+          openWithFlat={openWithFlat}
           onOpenWith={onOpenWith}
           onToggleOpenWithPin={onToggleOpenWithPin}
           onReferenceFile={onReferenceFile}

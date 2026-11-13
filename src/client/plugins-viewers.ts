@@ -10,6 +10,6 @@ export const builtinViewerPlugins: readonly PluginEntry[] = [
     name: 'Office preview',
     url: 'https://github.com/HuanLinOTO/dsh-plugin-better-sidebar-plugin-office',
     description: () => t('pluginOfficeDesc'),
-    install: 'xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.0',
+    install: 'xrkh plugin add xrkh-better-sidebar-plugin-office@0.1.2',
   },
 ]

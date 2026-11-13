@@ -20,7 +20,7 @@
  *   then `exts`; `exts: []` is a catch-all that matches any path.
  */
 import type { ReactNode } from 'react'
-import { PACKAGE_ID } from '../identity.ts'
+import { PACKAGE_ID, PACKAGE_VERSION } from '../identity.ts'
 import type { Context } from '../context-types.ts'
 import {
   activateTab as activateTabReducer, allLeaves, closeTab as closeTabReducer, closeFloatByTab, floatWithTab,
@@ -479,10 +479,11 @@ export function matchUrlTarget(tabs: readonly TabDescriptor[], url: URL): TabDes
 }
 
 /**
- * The plugin version this service instance reports. Keep in lockstep with
- * `package.json`'s version — `tests/service.spec.ts` asserts the pair.
+ * The plugin version this service instance reports — same string as
+ * `package.json` `version` (via {@link PACKAGE_VERSION}). Bump the package
+ * only; do not hardcode a semver here.
  */
-export const SIDEBAR_SERVICE_VERSION = '0.20.8'
+export const SIDEBAR_SERVICE_VERSION = PACKAGE_VERSION
 
 /**
  * Monotonic capability list consumers use to gate new API usage (features
