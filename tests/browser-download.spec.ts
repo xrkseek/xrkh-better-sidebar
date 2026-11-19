@@ -174,4 +174,28 @@ describe('triggerBrowserDownload', () => {
     expect(anchors[0]!.download).toBe('offline.bin')
     expect(anchors[0]!.click).toHaveBeenCalledTimes(1)
   })
+
+  it('posts download to XrkShell on the phone thin shell instead of <a download>', async () => {
+    const posts: string[] = []
+    ;(globalThis as { XrkShell?: { postMessage: (raw: string) => void } }).XrkShell = {
+      postMessage: (raw) => { posts.push(raw) },
+    }
+    const fetchImpl = vi.fn()
+    vi.stubGlobal('fetch', fetchImpl)
+    const { anchors } = installAnchorCapture()
+
+    try {
+      await triggerBrowserDownload('/sidebar/file?download=1&path=deck.pptx', 'deck.pptx')
+      expect(posts).toHaveLength(1)
+      expect(JSON.parse(posts[0]!)).toEqual({
+        op: 'download',
+        url: '/sidebar/file?download=1&path=deck.pptx',
+        filename: 'deck.pptx',
+      })
+      expect(fetchImpl).not.toHaveBeenCalled()
+      expect(anchors).toHaveLength(0)
+    } finally {
+      delete (globalThis as { XrkShell?: unknown }).XrkShell
+    }
+  })
 })

@@ -10,13 +10,20 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.11
+xrkh plugin add xrkh-better-sidebar@0.20.12
 xrkh restart
 ```
 
-Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion).
+Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion). Phone thin-shell download / share needs **≥ 0.8.0**.
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.12
+
+- **Phone APK thin-shell download**: binary / image / PDF / tree “Download” use `XrkShell` `{op:'download'}` → Flutter Downloads → system share / open-with (not guest `openPath` alone).
+- **Binary preview auto-download**: on thin shell, opening a no-preview file triggers one download so the pane wake also lands a file.
+- **Visible save failures**: editor checkmark failures show the Host reason (including session workspace fence text).
+- Prefer **XRK-Harness ≥ 0.8.0** (thin-shell skip of native open + session `fs.write` fence).
 
 ## 0.20.11
 

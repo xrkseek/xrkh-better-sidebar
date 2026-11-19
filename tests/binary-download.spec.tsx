@@ -10,8 +10,9 @@ import { act } from 'react-dom/test-utils'
 
 ;(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true
 
-const { triggerBrowserDownload } = vi.hoisted(() => ({
+const { triggerBrowserDownload, readPhoneThinShell } = vi.hoisted(() => ({
   triggerBrowserDownload: vi.fn(async () => {}),
+  readPhoneThinShell: vi.fn(() => false),
 }))
 
 vi.mock('../src/client/api.ts', () => ({
@@ -25,6 +26,10 @@ vi.mock('../src/client/api.ts', () => ({
   triggerBrowserDownload: (...args: unknown[]) => triggerBrowserDownload(...args),
 }))
 
+vi.mock('../src/client/open-with-surface.ts', () => ({
+  readPhoneThinShell: () => readPhoneThinShell(),
+}))
+
 import { BinaryDownload } from '../src/client/binary-download.tsx'
 
 beforeAll(() => {
@@ -36,6 +41,8 @@ let root: Root
 
 beforeEach(() => {
   triggerBrowserDownload.mockClear()
+  readPhoneThinShell.mockReset()
+  readPhoneThinShell.mockReturnValue(false)
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
@@ -88,5 +95,19 @@ describe('BinaryDownload', () => {
       }))
     })
     expect(container.textContent).toContain('Editor not found')
+  })
+
+  it('auto-hands the file to XrkShell on phone thin shell (chat wake skips download)', async () => {
+    readPhoneThinShell.mockReturnValue(true)
+    await act(async () => {
+      root.render(createElement(BinaryDownload, {
+        scope: { sessionId: 's1', cwd: '/ws' },
+        path: '/ws/deck.pptx',
+      }))
+    })
+    expect(triggerBrowserDownload).toHaveBeenCalledTimes(1)
+    const [url, name] = triggerBrowserDownload.mock.calls[0]!
+    expect(String(url)).toContain('download=1')
+    expect(name).toBe('deck.pptx')
   })
 })

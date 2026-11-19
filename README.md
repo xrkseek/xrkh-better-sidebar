@@ -10,13 +10,20 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.11
+xrkh plugin add xrkh-better-sidebar@0.20.12
 xrkh restart
 ```
 
-装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。
+装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。手机薄壳下载 / 分享需 **≥ 0.8.0**。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.12
+
+- **手机 APK 薄壳下载**：二进制 / 图片 / PDF / 树「下载」走 `XrkShell` `{op:'download'}` → Flutter Downloads → 系统分享 / 用其它 APP 打开（不再只靠 guest `openPath`）。
+- **二进制预览自动下载**：薄壳上点开无预览文件时自动触发一次下载，避免只醒编辑器却不落盘。
+- **保存失败可见**：编辑器对勾失败时展示 Host 返回原因（含会话工作区围栏文案）。
+- 建议搭配 **XRK-Harness ≥ 0.8.0**（薄壳跳过 native open + 会话 `fs.write` 围栏）。
 
 ## 0.20.11
 

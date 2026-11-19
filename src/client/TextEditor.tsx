@@ -65,6 +65,7 @@ export function TextEditor(props: FileViewerProps) {
   const [draft, setDraft] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+  const [saveError, setSaveError] = useState<string | null>(null)
   const hostRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<CodeMirrorView | null>(null)
   const savingRef = useRef(false)
@@ -111,6 +112,7 @@ export function TextEditor(props: FileViewerProps) {
     setDraft(null)
     setDirty(false)
     setSaveState('idle')
+    setSaveError(null)
     hidePopup()
   }, [content])
 
@@ -232,14 +234,20 @@ export function TextEditor(props: FileViewerProps) {
     if (view === null || savingRef.current) return
     savingRef.current = true
     setSaveState('saving')
+    setSaveError(null)
     api.fsWrite(scope, path, view.state.doc.toString()).then(() => {
       savingRef.current = false
       setDraft(null)
       setDirty(false)
       setSaveState('saved')
-    }).catch(() => {
+      setSaveError(null)
+    }).catch((error: unknown) => {
       savingRef.current = false
       setSaveState('failed')
+      // Surface Host fence / IO reason — bare「保存失败」hid outside-workspace
+      // writes that fs.read still allowed for chat-woken absolute tabs.
+      const message = error instanceof Error ? error.message.trim() : String(error).trim()
+      setSaveError(message === '' ? null : message)
     })
   }
 
@@ -318,7 +326,13 @@ export function TextEditor(props: FileViewerProps) {
     )
   }
   const editable = content !== undefined
-  const saveLabel = saveState === 'saving' ? t('loading') : saveState === 'saved' ? t('saved') : saveState === 'failed' ? t('saveFailed') : ''
+  const saveLabel = saveState === 'saving'
+    ? t('loading')
+    : saveState === 'saved'
+      ? t('saved')
+      : saveState === 'failed'
+        ? (saveError !== null && saveError !== '' ? `${t('saveFailed')}: ${saveError}` : t('saveFailed'))
+        : ''
   // Per-feature sandbox escape hatch: the global side card setting (warned)
   // plus a per-surface temporary unlock. The unlock state starts at the
   // "default unsafe" pref so a preview can open straight into the red

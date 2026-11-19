@@ -34,7 +34,8 @@ export function isOutsideWorkspaceError(error: unknown): boolean {
 
 /** Message-level variant for surfaces that stored the raw text (file-tree level errors). */
 export function isOutsideWorkspaceMessage(message: string): boolean {
-  return message.includes('outside workspace')
+  // Host wording varies: readable-path fence vs mutation fence.
+  return message.includes('outside workspace') || message.includes('escapes workspace')
 }
 
 /** Explorer row (host fs-tree shape). */
@@ -447,16 +448,37 @@ export function downloadBasename(path: string): string {
   return name === '' ? 'download' : name
 }
 
+type XrkShellPort = { readonly postMessage?: (raw: string) => void }
+
 /**
- * Trigger a file download that works on mobile Safari / Chrome as well as
- * desktop. A bare `<a href download>` against a query-string route often
- * navigates (or no-ops) on iOS; fetch→blob→objectURL is the reliable path.
- * Falls back to a classic anchor click when fetch is unavailable.
+ * Flutter phone APK injects `XrkShell` (`local_host_shell.dart`). Relative
+ * `/sidebar/file?…` is fine — the shell resolves against the WebView page URL
+ * (`shell_host_download.dart` + `pageUrl`). Same contract as Host
+ * `triggerBrowserOrShellDownload` (do not re-fetch into downloadBytes here).
+ */
+function phoneThinShell(): XrkShellPort | undefined {
+  try {
+    const shell = (globalThis as { XrkShell?: XrkShellPort }).XrkShell
+    return typeof shell?.postMessage === 'function' ? shell : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Trigger a file download: phone APK → `XrkShell` `{op:'download'}` → Flutter
+ * Downloads + share / open-with; Desktop / ordinary browsers → fetch→blob→
+ * `<a download>`, with a classic anchor fallback when fetch fails.
  */
 export async function triggerBrowserDownload(
   url: string,
   filename: string = 'download',
 ): Promise<void> {
+  const shell = phoneThinShell()
+  if (shell !== undefined) {
+    shell.postMessage?.(JSON.stringify({ op: 'download', url, filename }))
+    return
+  }
   try {
     const response = await fetch(url, { credentials: 'same-origin' })
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
