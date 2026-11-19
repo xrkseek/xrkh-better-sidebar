@@ -10,13 +10,18 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.12
+xrkh plugin add xrkh-better-sidebar@0.20.13
 xrkh restart
 ```
 
 装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。手机薄壳下载 / 分享需 **≥ 0.8.0**。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.13
+
+- **聊天连开不同文件**：对话点第二个路径（如图后点 pptx）会新开/切到该文件，不再卡在第一个 tab（根因：省略 `id` 时共用 `"editor"`，id 安全网只激活旧图）。
+- 建议搭配 **XRK-Harness ≥ 0.8.0**。
 
 ## 0.20.12
 

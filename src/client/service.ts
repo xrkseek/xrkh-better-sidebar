@@ -652,8 +652,12 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
         next = applyDedupe(state, result.tab, descriptor)
         if (result.patch !== undefined) next = { ...next, ...result.patch }
       } else {
+        // Chat / Overview wake `openTab({ type:'editor', path })` with no id.
+        // Mint `editor:${path}` (same as openFile / openSidebarFile) so a
+        // second path does not hit the id safety net and reactivate the
+        // first file tab (phone: stay on last png while pptx is ignored).
         tab = {
-          id: seed.id ?? seed.type,
+          id: defaultEditorAwareTabId(seed),
           type: seed.type,
           title: tabTitleFromSeed(seed, descriptor),
           ...(seed.path !== undefined ? { path: seed.path } : {}),
@@ -857,6 +861,20 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
     activateTab,
     openFile,
   }
+}
+
+/**
+ * Default tab id for `openTab` when the seed omits `id`.
+ * Pathful editors must be path-stable (`editor:${path}`) — matching
+ * `openFile` / `openSidebarFile` — so chat wakes of distinct files do not
+ * collide on the bare type id `"editor"` and reactivate the first tab.
+ */
+function defaultEditorAwareTabId(seed: OpenTabSeed): string {
+  if (seed.id !== undefined && seed.id !== '') return seed.id
+  if (seed.type === 'editor' && seed.path !== undefined && seed.path !== '') {
+    return `editor:${seed.path}`
+  }
+  return seed.type
 }
 
 /**

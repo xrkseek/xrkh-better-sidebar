@@ -4,13 +4,23 @@
  */
 import { describe, it, expect, vi } from 'vitest'
 
-// Mock browser globals (SidebarStore.reduce → schedulePersist uses window.setTimeout)
+// Mock browser globals (SidebarStore.reduce → schedulePersist uses window.setTimeout;
+// constructor also binds pagehide / visibilitychange for layout flush).
 const g = globalThis as Record<string, unknown>
 if (g.window === undefined) {
   g.window = {
     clearTimeout: () => {},
     setTimeout: (_fn: () => void) => 0,
     innerWidth: 1024,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }
+}
+if (g.document === undefined) {
+  g.document = {
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    visibilityState: 'visible',
   }
 }
 if (g.localStorage === undefined) {
@@ -359,6 +369,40 @@ describe('service.openTab dedupe', () => {
       .find(t => t.id === staleId)?.title).toBe('ai-frontend-candidates.tsv')
     expect(allLeaves(store.getSnapshot().state!.splits).flatMap(l => l.tabs)
       .filter(t => t.path === '/w/ai-frontend-candidates.tsv')).toHaveLength(1)
+  })
+
+  it('chat wake of a second path opens a new editor tab (does not stick on the first file)', () => {
+    const store = createSidebarStore()
+    const service = createBetterSidebarService(store)
+    service.registerTab({
+      id: 'editor',
+      title: 'Files',
+      dedupeKey: (tab) => tab.path ?? '',
+      component: () => null,
+    })
+    store.setSession('s1')
+    // Phone repro: deck-preview.png open, then click a .pptx chat link —
+    // both wakes omit id; bare type id "editor" used to reactivate the png.
+    service.openTab({ type: 'editor', path: '/tmp/deck-preview.png' })
+    service.openTab({ type: 'editor', path: '/tmp/from-idea-to-delivery.pptx' })
+    const state = store.getSnapshot().state!
+    const editors = allLeaves(state.splits).flatMap(l => l.tabs)
+      .filter(t => t.type === 'editor' && t.path !== undefined)
+    expect(editors.map(t => t.path).sort()).toEqual([
+      '/tmp/deck-preview.png',
+      '/tmp/from-idea-to-delivery.pptx',
+    ])
+    expect(editors.find(t => t.path === '/tmp/deck-preview.png')?.id).toBe(
+      'editor:/tmp/deck-preview.png',
+    )
+    expect(editors.find(t => t.path === '/tmp/from-idea-to-delivery.pptx')?.id).toBe(
+      'editor:/tmp/from-idea-to-delivery.pptx',
+    )
+    const activeLeaf = allLeaves(state.splits).find(l => l.id === state.activePane)
+      ?? allLeaves(state.splits)[0]
+    expect(activeLeaf?.tabs.find(t => t.id === activeLeaf.active)?.path).toBe(
+      '/tmp/from-idea-to-delivery.pptx',
+    )
   })
 
   it('dedupeKey that returns undefined still focuses the pathless cohort', () => {

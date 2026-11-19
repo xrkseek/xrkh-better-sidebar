@@ -10,13 +10,18 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.12
+xrkh plugin add xrkh-better-sidebar@0.20.13
 xrkh restart
 ```
 
 Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion). Phone thin-shell download / share needs **≥ 0.8.0**.
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.13
+
+- **Chat opens of distinct files**: a second path from chat (e.g. image then pptx) opens/switches to that file instead of sticking on the first tab (omitted `id` used to share `"editor"`; the id safety net only reactivated the old tab).
+- Prefer **XRK-Harness ≥ 0.8.0**.
 
 ## 0.20.12
 
