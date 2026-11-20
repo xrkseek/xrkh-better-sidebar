@@ -1,6 +1,6 @@
 /**
  * PdfView toolbar download: same mobile-safe helper as BinaryDownload /
- * ImagePreview — click must not navigate away from the preview iframe.
+ * ImagePreview — click must not navigate away from the preview.
  */
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -21,10 +21,20 @@ vi.mock('../src/client/api.ts', () => ({
   triggerBrowserDownload: (...args: unknown[]) => triggerBrowserDownload(...args),
 }))
 
+vi.mock('../src/client/lazy-chunk.tsx', () => ({
+  lazyChunkComponent: () => () => null,
+}))
+
 import { PdfView } from '../src/client/PdfView.tsx'
 
 beforeAll(() => {
   Object.defineProperty(window.navigator, 'language', { value: 'en-US', configurable: true })
+  class ResizeObserverStub {
+    observe(): void {}
+    disconnect(): void {}
+    unobserve(): void {}
+  }
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 })
 
 let container: HTMLDivElement
@@ -39,21 +49,22 @@ beforeEach(() => {
     status: 200,
     headers: { 'Content-Type': 'application/pdf' },
   })))
-  vi.stubGlobal('URL', {
-    ...URL,
-    createObjectURL: () => 'blob:pdf-preview',
-    revokeObjectURL: () => {},
-  })
 })
 
 afterEach(() => {
   act(() => { root.unmount() })
   document.body.innerHTML = ''
   vi.unstubAllGlobals()
+  class ResizeObserverStub {
+    observe(): void {}
+    disconnect(): void {}
+    unobserve(): void {}
+  }
+  vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 })
 
 describe('PdfView download', () => {
-  it('wires the toolbar link through triggerBrowserDownload', async () => {
+  it('wires the toolbar download control through triggerBrowserDownload', async () => {
     await act(async () => {
       root.render(createElement(PdfView, {
         scope: { sessionId: 's1', cwd: '/ws' },
@@ -61,16 +72,14 @@ describe('PdfView download', () => {
         title: 'spec.pdf',
       }))
     })
-    // Allow the preview fetch to settle.
+    await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
 
-    const link = [...container.querySelectorAll('a')]
-      .find(a => (a.getAttribute('download') ?? '') !== '' || (a.getAttribute('href') ?? '').includes('download=1'))
-    expect(link).toBeDefined()
-    const event = new MouseEvent('click', { bubbles: true, cancelable: true })
-    await act(async () => { link!.dispatchEvent(event) })
+    const button = [...container.querySelectorAll('button')]
+      .find((el) => /download/i.test(el.textContent ?? ''))
+    expect(button).toBeDefined()
+    await act(async () => { button!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
 
-    expect(event.defaultPrevented).toBe(true)
     expect(triggerBrowserDownload).toHaveBeenCalledWith(
       expect.stringContaining('download=1'),
       'spec.pdf',

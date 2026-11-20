@@ -2419,9 +2419,55 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
 .editorPdfToolbar {
   flex: none;
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   padding: 6px 8px;
   border-bottom: 1px solid var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-base);
+  z-index: 2;
+}
+
+.editorPdfToolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.editorPdfButton {
+  flex: none;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-elevated, var(--dsw-alias-bg-base));
+  color: var(--dsw-alias-text-primary);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.editorPdfButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.editorPdfDownloadBtn {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.editorPdfPosition,
+.editorPdfZoom {
+  flex: none;
+  font-size: 12px;
+  color: var(--dsw-alias-text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .editorPdfStage {
@@ -2429,41 +2475,86 @@ body[data-dsh-sidebar-dragging] .bottomPanel {
   flex: 1;
   min-height: 0;
   display: flex;
+  flex-direction: column;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--dsw-alias-bg-subtle, var(--dsw-alias-bg-base));
 }
 
-.editorPdfFrame {
-  flex: 1;
-  min-height: 0;
+.editorPdfPages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 8px 24px;
   width: 100%;
-  border: none;
-  background: var(--dsw-alias-bg-base);
+  box-sizing: border-box;
 }
 
-.editorPdfFrameBlocked {
-  pointer-events: none;
+.editorPdfPage {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
 }
 
-.editorPdfDragShield {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
-  background: transparent;
+.editorPdfPage canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 3px color-mix(in srgb, #000 18%, transparent);
 }
 
-.editorPdfDragShieldActive {
-  pointer-events: auto;
+.editorPdfErrorPane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 16px;
+  text-align: center;
 }
 
-/* Tab drag must switch iframe hit-testing before the pointer can enter the
-   Chromium PDF browsing context. The body flag is set synchronously by the
-   drag source, avoiding React render timing entirely. */
-:global(body[data-dsh-tab-dragging]) .editorPdfFrame {
-  pointer-events: none !important;
-}
+/* Phone / narrow: larger hit targets, sticky chrome, safe-area bottom pad. */
+@media (max-width: 767px) {
+  .editorPdfToolbar {
+    position: sticky;
+    top: 0;
+    gap: 10px;
+    padding: 8px 10px;
+    padding-left: max(10px, env(safe-area-inset-left, 0px), var(--ds-safe-left, 0px));
+    padding-right: max(10px, env(safe-area-inset-right, 0px), var(--ds-safe-right, 0px));
+  }
 
-:global(body[data-dsh-tab-dragging]) .editorPdfDragShield {
-  pointer-events: auto !important;
+  .editorPdfButton {
+    min-width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    font-size: 18px;
+  }
+
+  .editorPdfDownloadBtn {
+    min-width: auto;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+  .editorPdfPosition,
+  .editorPdfZoom {
+    font-size: 13px;
+  }
+
+  .editorPdfPages {
+    gap: 10px;
+    padding: 8px 6px max(28px, env(safe-area-inset-bottom, 0px), var(--ds-safe-bottom, 0px));
+  }
+
+  .editorPdfPage canvas {
+    box-shadow: none;
+    border: 1px solid var(--dsw-alias-border-l1);
+  }
 }
 
 /* ── Terminal ──────────────────────────────────────────────────────────── */

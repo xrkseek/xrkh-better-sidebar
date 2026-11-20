@@ -145,6 +145,21 @@ describe('/sidebar/bundle route', () => {
   })
 
   it('exports the chunk allowlist (mirror of src/client/chunk-loader.ts)', () => {
-    expect([...CHUNK_NAMES]).toEqual(['terminal', 'editor', 'mermaid'])
+    expect([...CHUNK_NAMES]).toEqual(['terminal', 'editor', 'mermaid', 'pdf'])
+  })
+
+  it('serves the PDF.js worker asset next to the pdf chunk', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bundle-route-pdf-'))
+    try {
+      writeFileSync(join(dir, 'client-pdf.worker.mjs'), '/* pdf worker */')
+      const handler = createBundleRouteHandler(() => true, dir)
+      const res = fakeRes()
+      await handler(req('GET', '/sidebar/bundle/pdf.worker.mjs'), res as unknown as ServerResponse)
+      expect(res.status).toBe(200)
+      expect(res.headers['content-type']).toBe('text/javascript; charset=utf-8')
+      expect(res.body).toContain('pdf worker')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

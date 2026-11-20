@@ -1,6 +1,6 @@
 {
   "name": "xrkh-better-sidebar",
-  "version": "0.20.14",
+  "version": "0.20.15",
   "description": "XRK-Harness (xrkh) standard sidebar plugin: explorer, editor, terminal, git, browser.",
   "type": "module",
   "repository": {
@@ -47,6 +47,8 @@
     "lib/client-terminal.js",
     "lib/client-editor.js",
     "lib/client-mermaid.js",
+    "lib/client-pdf.js",
+    "lib/client-pdf.worker.mjs",
     "lib/types/**/*.d.ts",
     "src",
     "cordis.patch.yml",
@@ -57,9 +59,9 @@
     "scripts/install-xrkh.sh"
   ],
   "scripts": {
-    "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && tsdown",
+    "build": "node -e \"require('node:fs').rmSync('lib',{recursive:true,force:true})\" && tsc -p tsconfig.build.json && tsdown && node scripts/copy-pdf-worker.mjs",
     "typecheck": "tsc --noEmit",
-    "bundle": "tsdown",
+    "bundle": "tsdown && node scripts/copy-pdf-worker.mjs",
     "watch": "tsdown --watch",
     "test": "vitest run",
     "test:mount": "bash scripts/e2e-mount.sh",
@@ -67,18 +69,18 @@
   },
   "license": "MIT",
   "peerDependencies": {
-    "@xrkseek/cordis": "*",
     "@xrkseek/client-locale": "*",
     "@xrkseek/client-ui-conversation": "*",
     "@xrkseek/client-ui-layout": "*",
     "@xrkseek/client-ui-primitives": "*",
     "@xrkseek/client-ui-settings": "*",
     "@xrkseek/client-ui-slots": "*",
+    "@xrkseek/cordis": "*",
+    "@xrkseek/xrk-agent": "*",
     "@xrkseek/xrk-invariants": "*",
+    "@xrkseek/xrk-llm": "*",
     "@xrkseek/xrk-settings": "*",
     "@xrkseek/xrk-tools": "*",
-    "@xrkseek/xrk-llm": "*",
-    "@xrkseek/xrk-agent": "*",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
@@ -147,6 +149,7 @@
     "dompurify": "^3.4.14",
     "mermaid": "^11.16.1",
     "node-pty": "^1.1.0",
+    "pdfjs-dist": "4.10.38",
     "react-icons": "5.7.0",
     "rxjs": "^7.8.2",
     "schemastery": "^3.18.0",

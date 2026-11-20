@@ -1,7 +1,7 @@
 /**
  * tsdown build for xrkh-better-sidebar: the host-half lib (lib/index.js and
  * the lib/invariant.js companion, ESM node) plus the two browser client
- * bundles (lib/client.js and lib/client-registry.js, CJS closure factory) �?
+ * bundles (lib/client.js and lib/client-registry.js, CJS closure factory) â€?
  * one per install channel:
  *
  * - `lib/client.js` serves the official profile channel, registering with
@@ -14,7 +14,7 @@
  *
  * Both bundles replicate the official DSH client-bundle preset
  * (packages/client/tsdown.client.ts) and are compiled from the same
- * src/client/index.tsx source �?only the registered id and the output file
+ * src/client/index.tsx source â€?only the registered id and the output file
  * name differ, so they cannot drift:
  * - externals resolve through the loader module table at runtime (the
  *   PLATFORM_MODULES seed list from apps/web's platform.ts, plus the
@@ -32,7 +32,7 @@
  * (src/client/chunks/<name>.tsx), shared by both channels. Each script
  * assigns its factory to the plugin-owned global registry
  * (globalThis.__xrkhChunks__) and is fetched by
- * the client on first use from the plugin's own /sidebar/bundle route �?
+ * the client on first use from the plugin's own /sidebar/bundle route â€?
  * chunks deliberately do NOT go through the module loader (see
  * src/client/chunk-loader.ts). `codeSplitting: false` keeps every chunk a
  * single script; the core client.js must never statically import a chunks/
@@ -166,7 +166,7 @@ function clientBundle(pluginId: string, entryFile: string): UserConfig {
       // The CJS wrapper factory's `require` only resolves module-table entries
       // (react, cordis, ...); it cannot load relative chunk URLs in the browser.
       // Disable code splitting so every artifact is one script (the lazy chunk
-      // files themselves are separate bundles �?see chunkBundle below).
+      // files themselves are separate bundles â€?see chunkBundle below).
       codeSplitting: false,
     },
   }
@@ -180,7 +180,7 @@ function clientBundle(pluginId: string, entryFile: string): UserConfig {
  *
  * Chunks do NOT register with window.__ModuleLoader__: the module loader's
  * import() resolves seed words / shell-own modules / registered factories /
- * boot graph rows, and a chunk id is none of those �?resolution would be
+ * boot graph rows, and a chunk id is none of those â€?resolution would be
  * version-dependent. Instead each script assigns its CJS factory to the
  * plugin-owned global registry `globalThis.__xrkhChunks__[<name>]`, and the
  * loader (src/client/chunk-loader.ts) materializes it with a require built
@@ -188,7 +188,7 @@ function clientBundle(pluginId: string, entryFile: string): UserConfig {
  *
  * Chunk css tags use the constant plugin id `xrkh-better-sidebar` (matching
  * the official channel; the registry channel re-injects an identical copy
- * of the shared module css �?same content, no functional impact).
+ * of the shared module css â€?same content, no functional impact).
  * @param name - chunk name; entry src/client/chunks/<name>.tsx, output
  *   lib/client-<name>.js. Keep in sync with CHUNK_NAMES in src/bundle-route.ts.
  */
@@ -236,7 +236,7 @@ type BuildPlugin = NonNullable<UserConfig['plugins']>
 /**
  * Mermaid-chunk-only alias: pin uuid's BROWSER entry. The mermaid core
  * (mindmap definition) imports the bare `uuid` specifier, which rolldown
- * resolves to uuid's node entry �?its dist-node modules import
+ * resolves to uuid's node entry â€?its dist-node modules import
  * `node:crypto` and trip the client purity gate. The browser entry
  * (uuid/dist/index.js, Web Crypto based) carries no Node builtins, so alias
  * the specifier there instead of special-casing the gate. Resolved relative
@@ -263,7 +263,7 @@ function purityGatePlugin(): BuildPlugin {
     resolveId(source: string) {
       if (NODE_BUILTINS.has(source)) {
         throw new Error(
-          `client bundle purity: Node builtin "${source}" cannot run in the browser module table �?`
+          `client bundle purity: Node builtin "${source}" cannot run in the browser module table â€?`
           + 'select the dependency browser export or add an explicit browser implementation',
         )
       }
@@ -271,7 +271,7 @@ function purityGatePlugin(): BuildPlugin {
       if (CLIENT_EXTERNALS.includes(source)) return null // platform module: external wins
       if (INLINE_SAFE.test(source)) return null // wire/type layer: inline is the point
       throw new Error(
-        `client bundle purity: "${source}" is not a platform module (CLIENT_EXTERNALS) and not an inline-safe wire layer �?`
+        `client bundle purity: "${source}" is not a platform module (CLIENT_EXTERNALS) and not an inline-safe wire layer â€?`
         + 'cross-plugin value imports are forbidden; collaborate through cordis services (type-only imports are erased and never reach this gate)',
       )
     },
@@ -324,7 +324,7 @@ function makeCssPlugin(pluginId: string): BuildPlugin {
 }
 
 /** The lazy chunk names (keep in sync with src/bundle-route.ts CHUNK_NAMES). */
-const CHUNKS = ['terminal', 'editor', 'mermaid']
+const CHUNKS = ['terminal', 'editor', 'mermaid', 'pdf']
 
 export default [
   {

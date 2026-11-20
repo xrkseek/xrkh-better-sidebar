@@ -158,7 +158,7 @@ describe('editor language mapping', () => {
 })
 
 describe('pdf preview kind', () => {
-  it('routes only .pdf to the browser-native preview', () => {
+  it('routes only .pdf to the PDF.js canvas preview', () => {
     expect(isPdfExt('.pdf')).toBe(true)
     expect(isPdfExt('.PDF')).toBe(false)
     expect(isPdfExt('.docx')).toBe(false)
