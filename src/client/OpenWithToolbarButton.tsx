@@ -8,7 +8,9 @@ import {
   IconChevronRightOutlineRegular, IconCodeOutlineRegular, Menu, type MenuEntry, type MenuItem,
 } from '@xrkseek/client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
-import { VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
+import {
+  VscDesktopDownload, VscFolderOpened, VscLinkExternal, VscPin, VscPinned, VscWindow,
+} from 'react-icons/vsc'
 import { IconVscode16 } from './icons.tsx'
 import type { OpenWithTarget } from './open-with.ts'
 import { t } from './locales.ts'
@@ -27,11 +29,18 @@ export interface OpenWithToolbarButtonProps {
 }
 
 function itemIcon(target: OpenWithTarget): ReactNode {
+  if (target.kind === 'system') return <VscWindow size={16} />
+  if (target.kind === 'download') return <VscDesktopDownload size={16} />
   if (target.kind === 'reveal') return <VscFolderOpened size={16} />
   if (target.id === 'vscode' || target.hostAppId === 'vscode') return <IconVscode16 size={16} />
   if (target.id === 'cursor' || target.hostAppId === 'cursor') return <SiCursor size={16} />
   if (target.id === 'zed' || /zed/i.test(target.name)) return <SiZedindustries size={16} />
   return <IconCodeOutlineRegular size={16} />
+}
+
+function rowLabel(target: OpenWithTarget, ssh: boolean): string {
+  if (target.kind === 'reveal') return t('showInFolder')
+  return labelOf(target, ssh)
 }
 
 function labelOf(target: OpenWithTarget, ssh: boolean): string {
@@ -50,26 +59,29 @@ export function OpenWithToolbarButton(props: OpenWithToolbarButtonProps): ReactN
     .filter(target => pinned.includes(target.id))
     .map<MenuItem>(target => ({
       id: `open-with:${target.id}`,
-      label: labelOf(target, ssh),
+      label: rowLabel(target, ssh),
       icon: itemIcon(target),
     }))
-  const reveal = targets.find(target => target.kind === 'reveal')
-  const topLevel = reveal === undefined
-    ? pinnedItems
-    : [
-        ...pinnedItems.filter(item => item.id !== `open-with:${reveal.id}`),
-        {
-          id: `open-with:${reveal.id}`,
-          label: t('showInFolder'),
-          icon: itemIcon(reveal),
-        } satisfies MenuItem,
-      ]
+  // Promote system open + show-in-folder (and phone download) to the top
+  // level — burying them in the submenu made OS open read as missing.
+  const promoted = targets.filter(
+    target => target.kind === 'system' || target.kind === 'reveal' || target.kind === 'download',
+  )
+  const promotedIds = new Set(promoted.map(target => `open-with:${target.id}`))
+  const topLevel: MenuItem[] = [
+    ...promoted.map(target => ({
+      id: `open-with:${target.id}`,
+      label: rowLabel(target, ssh),
+      icon: itemIcon(target),
+    } satisfies MenuItem)),
+    ...pinnedItems.filter(item => !promotedIds.has(item.id)),
+  ]
 
   let items: MenuEntry[]
   if (flat === true) {
     const flatRows = targets.map<MenuItem>(target => ({
       id: `open-with:${target.id}`,
-      label: target.kind === 'reveal' ? t('showInFolder') : labelOf(target, ssh),
+      label: rowLabel(target, ssh),
       icon: itemIcon(target),
     }))
     const seen = new Set(topLevel.map(item => item.id))
@@ -81,7 +93,7 @@ export function OpenWithToolbarButton(props: OpenWithToolbarButtonProps): ReactN
         id: `open-with:${target.id}`,
         label: (
           <span className={css.openWithLabel}>
-            <span className={css.openWithName}>{labelOf(target, ssh)}</span>
+            <span className={css.openWithName}>{rowLabel(target, ssh)}</span>
             {onTogglePin !== undefined && (
               <span
                 role="button"

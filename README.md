@@ -10,13 +10,19 @@ Host 侧 `/sidebar/*` 由产品 Host 原生挂载（`createSidebarPublicHandler`
 前置：`xrkh web` 或 `npx @xrkseek/harness-cli web`，Node ≥ 26。建议 Host **≥ 0.3.4**。推荐从 **npmjs** 安装：
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.13
+xrkh plugin add xrkh-better-sidebar@0.20.14
 xrkh restart
 ```
 
-装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。手机薄壳下载 / 分享需 **≥ 0.8.0**。
+装完硬刷新浏览器（Ctrl+Shift+R）。建议 Host **≥ 0.7.19**（`LayoutInsets.detailsOpen` / 手机概况互斥）。手机薄壳下载 / 分享与「用系统打开」需 **≥ 0.8.0**（含 Face `open.external` `open` + `openInApp` 可开文件）。
 
 源码路径仍可用（非推荐）：`git clone git@github.com:xrkseek/xrkh-better-sidebar.git` 后 `xrkh plugin add ./xrkh-better-sidebar`。
+
+## 0.20.14
+
+- **用系统打开**：侧栏「用其它方式」首行走 OS 默认打开（Win 可弹出「选择应用」），与未装侧栏时点对话链接同路。
+- **在文件夹中显示** / Face 探测编辑器仍保留；**手机 APK** 改为「下载并分享」（`XrkShell`），不再空菜单。
+- 建议搭配 **XRK-Harness ≥ 0.8.0**（Host 允许编辑器打开文件路径）。
 
 ## 0.20.13
 

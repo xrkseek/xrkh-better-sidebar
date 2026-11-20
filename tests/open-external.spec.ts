@@ -5,8 +5,28 @@
  * OS outcome is not testable here.
  */
 import { describe, expect, it } from 'vitest'
-import { launchExternal, revealCommand, urlCommand, validateExternalUrl } from '../src/open-external.ts'
+import {
+  launchExternal, openCommand, revealCommand, urlCommand, validateExternalUrl,
+} from '../src/open-external.ts'
 import { SidebarError } from '../src/wire.ts'
+
+describe('openCommand', () => {
+  it('darwin: `open <path>` uses the OS default handler', () => {
+    expect(openCommand('/a/b.md', 'darwin')).toEqual({ command: 'open', args: ['/a/b.md'] })
+  })
+
+  it('win32: ShellExecute start (may show choose-an-app)', () => {
+    expect(openCommand('C:/work/a.md', 'win32')).toEqual({
+      command: 'cmd.exe',
+      args: ['/c', 'start', '', 'C:\\work\\a.md'],
+      windowsHide: false,
+    })
+  })
+
+  it('linux: `xdg-open <path>`', () => {
+    expect(openCommand('/a/b.md', 'linux')).toEqual({ command: 'xdg-open', args: ['/a/b.md'] })
+  })
+})
 
 describe('revealCommand', () => {
   it('darwin: `open -R <path>` selects the file in Finder', () => {
@@ -71,7 +91,8 @@ describe('validateExternalUrl', () => {
 })
 
 describe('launchExternal validation (pre-spawn)', () => {
-  it('rejects relative reveal paths before anything is spawned', () => {
+  it('rejects relative open / reveal paths before anything is spawned', () => {
+    expect(() => launchExternal('open', 'relative/path')).toThrow(SidebarError)
     expect(() => launchExternal('reveal', 'relative/path')).toThrow(SidebarError)
   })
 

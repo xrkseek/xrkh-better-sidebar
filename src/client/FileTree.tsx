@@ -29,7 +29,9 @@ import {
   IconLinkOutlineRegular, Menu, Modal, type MenuEntry, type MenuItem, writeClipboard,
 } from '@xrkseek/client-ui-primitives'
 import { SiCursor, SiZedindustries } from 'react-icons/si'
-import { VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned } from 'react-icons/vsc'
+import {
+  VscDesktopDownload, VscFile, VscFolder, VscFolderOpened, VscLinkExternal, VscPin, VscPinned, VscWindow,
+} from 'react-icons/vsc'
 import {
   api, downloadBasename, downloadUrl, isOutsideWorkspaceMessage, triggerBrowserDownload, type FsEntry,
 } from './api.ts'
@@ -448,41 +450,45 @@ export function FileTree(props: {
     /** Brand marks for the built-ins (monochrome silhouettes, currentColor);
      *  reveal gets the folder glyph, custom editors a generic code mark. */
     const itemIcon = (target: OpenWithTarget): ReactNode => {
+      if (target.kind === 'system') return <VscWindow size={16} />
+      if (target.kind === 'download') return <VscDesktopDownload size={16} />
       if (target.kind === 'reveal') return <VscFolderOpened size={16} />
       if (target.id === 'vscode') return <IconVscode16 size={16} />
       if (target.id === 'cursor') return <SiCursor size={16} />
       if (target.id === 'zed') return <SiZedindustries size={16} />
       return <IconCodeOutlineRegular size={16} />
     }
+    const openWithRowLabel = (target: OpenWithTarget): string => (
+      target.kind === 'reveal' ? t('showInFolder') : openWithLabelOf(target)
+    )
     const pinned = openWithTargets
       .filter(target => pinnedIds.includes(target.id))
       .map<MenuItem>(target => ({
         id: `open-with:${target.id}`,
-        label: openWithLabelOf(target),
+        label: openWithRowLabel(target),
         icon: itemIcon(target),
       }))
-    // "Show in folder" is the one open-with target users reach for on every
-    // file; burying it two levels deep (submenu only) made it read as missing.
-    // Always promote the reveal target to the top level, labeled by what it
-    // does (`showInFolder`) rather than "File Manager" (the app name).
-    const reveal = openWithTargets.find(target => target.kind === 'reveal')
-    const topLevel = reveal === undefined
-      ? pinned
-      : [
-          ...pinned.filter(item => item.id !== `open-with:${reveal.id}`),
-          {
-            id: `open-with:${reveal.id}`,
-            label: t('showInFolder'),
-            icon: itemIcon(reveal),
-          } as MenuItem,
-        ]
+    // Promote system open + show-in-folder (+ phone download) to the top
+    // level — OS open used to look missing when buried in the submenu.
+    const promoted = openWithTargets.filter(
+      target => target.kind === 'system' || target.kind === 'reveal' || target.kind === 'download',
+    )
+    const promotedIds = new Set(promoted.map(target => `open-with:${target.id}`))
+    const topLevel: MenuItem[] = [
+      ...promoted.map(target => ({
+        id: `open-with:${target.id}`,
+        label: openWithRowLabel(target),
+        icon: itemIcon(target),
+      } as MenuItem)),
+      ...pinned.filter(item => !promotedIds.has(item.id)),
+    ]
     const submenu = openWithTargets.map<MenuItem>(target => {
       const pinnedNow = pinnedIds.includes(target.id)
       return {
         id: `open-with:${target.id}`,
         label: (
           <span className={css.openWithLabel}>
-            <span className={css.openWithName}>{openWithLabelOf(target)}</span>
+            <span className={css.openWithName}>{openWithRowLabel(target)}</span>
             {/* The pushpin: a span (never a button — the Menu row itself is
                 a button, so a nested interactive element would be invalid).
                 Clicking it pins/unpins the target at the menu's top level
@@ -512,7 +518,7 @@ export function FileTree(props: {
     if (openWithFlat === true) {
       const flat = openWithTargets.map<MenuItem>(target => ({
         id: `open-with:${target.id}`,
-        label: target.kind === 'reveal' ? t('showInFolder') : openWithLabelOf(target),
+        label: openWithRowLabel(target),
         icon: itemIcon(target),
       }))
       // Dedupe reveal if already promoted into topLevel under the same id.

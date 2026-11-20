@@ -28,7 +28,10 @@ import { createElement } from 'react'
 import clsx from 'clsx'
 import { IconCheckOutlineRegular, IconFolderOpenRegular, IconRefreshOutlineRegular } from '@xrkseek/client-ui-primitives'
 import type { Context } from '../context-types.ts'
-import { api, isOutsideWorkspaceMessage, mediaUrl, type SessionScope } from './api.ts'
+import {
+  api, downloadBasename, downloadUrl, isOutsideWorkspaceMessage, mediaUrl,
+  triggerBrowserDownload, type SessionScope,
+} from './api.ts'
 import { BinaryDownload } from './binary-download.tsx'
 import { FenceErrorNotice } from './FenceErrorNotice.tsx'
 import { decideExternalChange, planFirstMatch, planFsReadOutcome, type EditorLoadAction } from './editor-load.ts'
@@ -259,9 +262,8 @@ export function EditorHost(props: {
     })
   }, [store, tab.id])
 
-  /** Open-with launch: Face openPath (reveal) / openInApp (Host-probed) /
-   *  or open.external URL (custom / SSH vscode-remote). Failures land on the
-   *  tree notice — a swallowed rejection used to read as a dead menu row. */
+  /** Open-with launch: system openPath / reveal / openInApp / download /
+   *  or open.external URL. Failures land on the tree notice. */
   const openWith = useCallback((targetId: string, absolute: string): void => {
     const target = openWithTargets.find(item => item.id === targetId)
     if (target === undefined) return
@@ -270,9 +272,22 @@ export function EditorHost(props: {
       console.error('open external failed', error)
       setExternalError(t('openExternalFailed', { message }))
     }
+    if (target.kind === 'system') {
+      setExternalError(null)
+      // Same OS default / “choose an app” sheet chat used without the sidebar.
+      void api.openExternal({ action: 'open', path: absolute }).catch(report)
+      return
+    }
     if (target.kind === 'reveal') {
       setExternalError(null)
       void api.openExternal({ action: 'reveal', path: absolute }).catch(report)
+      return
+    }
+    if (target.kind === 'download') {
+      setExternalError(null)
+      // Phone APK: XrkShell → Downloads → share / open-with.
+      void triggerBrowserDownload(downloadUrl(scope, absolute), downloadBasename(absolute))
+        .catch(report)
       return
     }
     if (target.kind === 'host') {
@@ -306,7 +321,7 @@ export function EditorHost(props: {
     if (url === undefined) return
     setExternalError(null)
     void api.openExternal({ action: 'url', url }).catch(report)
-  }, [ctx, openWithConfig, openWithTargets])
+  }, [ctx, openWithConfig, openWithTargets, scope])
 
   /** Toggle one target's pinned state. The write is serialized (see
    *  plugin-settings.ts) and the menu re-renders when the store prefs land. */

@@ -10,13 +10,19 @@ Host mounts `/sidebar/*` natively (`createSidebarPublicHandler`); this package s
 Requires `xrkh web` or `npx @xrkseek/harness-cli web`, Node ≥ 26. Prefer Host **≥ 0.3.4**. Install from **npmjs**:
 
 ```bash
-xrkh plugin add xrkh-better-sidebar@0.20.13
+xrkh plugin add xrkh-better-sidebar@0.20.14
 xrkh restart
 ```
 
-Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion). Phone thin-shell download / share needs **≥ 0.8.0**.
+Hard-refresh the browser after install (Ctrl+Shift+R). Prefer Host **≥ 0.7.19** (`LayoutInsets.detailsOpen` / phone Overview mutual exclusion). Phone thin-shell download / share and “Open with system” need **≥ 0.8.0** (Face `open.external` `open` + `openInApp` on files).
 
 Source path still works (not preferred): `git clone git@github.com:xrkseek/xrkh-better-sidebar.git` then `xrkh plugin add ./xrkh-better-sidebar`.
+
+## 0.20.14
+
+- **Open with system**: sidebar “Open with” leads with OS default open (Windows may show “choose an app”) — same path as chat links without the sidebar.
+- **Show in folder** / Face-probed editors remain; **phone APK** offers “Download & share” (`XrkShell`) instead of an empty menu.
+- Prefer **XRK-Harness ≥ 0.8.0** (Host allows editors to open file paths).
 
 ## 0.20.13
 

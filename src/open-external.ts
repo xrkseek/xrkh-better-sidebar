@@ -1,23 +1,24 @@
 /**
- * External open actions for the file tree's "open with" menu: hand a path to
- * the OS file manager (reveal/select) or launch a URL scheme's registered
- * handler (vscode://, cursor://, zed://, custom schemes).
+ * External open actions for the file tree's "open with" menu: OS default
+ * open, file-manager reveal/select, or a URL scheme handler (vscode://,
+ * cursor://, …).
  *
- * The client runs in a browser / DSH Desktop renderer where a raw `vscode://`
- * navigation is unreliable, so both actions fan out through this host route
- * and spawn the platform opener with an argv array (no shell interpolation).
+ * The client runs in a browser / Desktop renderer where a raw `vscode://`
+ * navigation is unreliable, so actions fan out through this host route and
+ * spawn the platform opener with an argv array (no shell interpolation).
  * The command builders are pure — the platform is injectable — so every
  * per-platform branch is unit-testable without spawning anything.
  *
  * On XRK-Harness product Host, `/sidebar` `open.external` is owned by Face
- * (`revealNativePath`); this module remains for Cordis profile mounts.
+ * (`openNativePath` / `revealNativePath`); this module remains for Cordis
+ * profile mounts.
  */
 import { spawn } from 'node:child_process'
 import { parentOf, requireAbsolute } from './fs-tree.ts'
 import { SidebarError } from './wire.ts'
 
-/** The two external open actions the route accepts. */
-export type OpenExternalAction = 'reveal' | 'url'
+/** External open actions the route accepts. */
+export type OpenExternalAction = 'open' | 'reveal' | 'url'
 
 /** One platform opener invocation (argv array — never a shell string). */
 export interface ExternalCommand {
@@ -33,6 +34,24 @@ export interface ExternalCommand {
  */
 export function windowsExplorerPath(target: string): string {
   return target.trim().replace(/\//g, '\\')
+}
+
+/** Open a path with the OS default handler (Win may show “choose an app”). */
+export function openCommand(path: string, platform: NodeJS.Platform = process.platform): ExternalCommand {
+  switch (platform) {
+    case 'darwin':
+      return { command: 'open', args: [path] }
+    case 'win32': {
+      const winPath = windowsExplorerPath(path)
+      return {
+        command: 'cmd.exe',
+        args: ['/c', 'start', '', winPath],
+        windowsHide: false,
+      }
+    }
+    default:
+      return { command: 'xdg-open', args: [path] }
+  }
 }
 
 /** Reveal/select a path in the OS file manager. On Linux there is no common
@@ -102,9 +121,11 @@ export function validateExternalUrl(raw: string): string {
  */
 export function launchExternal(action: OpenExternalAction, value: string): { started: true } {
   const platform = process.platform
-  const spec = action === 'reveal'
-    ? revealCommand(requireAbsolute(value), platform)
-    : urlCommand(validateExternalUrl(value), platform)
+  const spec = action === 'open'
+    ? openCommand(requireAbsolute(value), platform)
+    : action === 'reveal'
+      ? revealCommand(requireAbsolute(value), platform)
+      : urlCommand(validateExternalUrl(value), platform)
   const child = spawn(spec.command, spec.args, {
     detached: true,
     stdio: 'ignore',

@@ -11,16 +11,17 @@
  *    flattens the menu (no sideways submenu). Narrow desktop still gets
  *    Face-probed editors when loopback.
  *
- * | Surface                         | Reveal | Host editors | Custom URL | Menu shape |
- * |---------------------------------|--------|--------------|------------|------------|
- * | Phone APK (`thinShell`)         | never  | never        | never      | — (hidden) |
- * | Remote Web (!loopback)          | never  | never        | never      | — (hidden) |
- * | Local Web / Desktop             | if canOpenPath≠false | Face probe | yes | nested if room |
- * | Same + phone/narrow chrome      | same   | same         | same       | flat       |
- * | SSH workspace                   | never  | → vscode-remote URL | VSCode-fam | — |
+ * | Surface                         | System open | Reveal | Host editors | Custom / DL |
+ * |---------------------------------|-------------|--------|--------------|-------------|
+ * | Phone APK (`thinShell`)         | never       | never  | never        | Download→share |
+ * | Remote Web (!loopback)          | never       | never  | never        | — (hidden) |
+ * | Local Web / Desktop             | if canOpen  | if canOpen | Face probe | custom URL |
+ * | Same + phone/narrow chrome      | same        | same   | same         | flat menu |
+ * | SSH workspace                   | never       | never  | vscode-remote URL | VSCode-fam |
  *
- * Editors are **auto-detected** via Face `listOpenInApps`. No hardcoded
- * “always show VS Code / Cursor / Zed” list.
+ * **System open** = Face `host.openPath` (no reveal) — same OS default /
+ * “choose an app” sheet chat used before the sidebar woke. Reveal is folder
+ * select only. Editors are **auto-detected** via Face `listOpenInApps`.
  */
 import type { CopyKey } from './locales.ts'
 
@@ -54,11 +55,14 @@ export interface OpenWithTarget {
   /** User-defined label (custom only). */
   name: string
   /**
-   * `reveal` — OS file manager via Face openPath.
-   * `host` — Face `host.openInApp` (local probed editor argv).
+   * `system` — OS default handler via Face openPath (no reveal); Win may show
+   *   “choose an app”.
+   * `reveal` — OS file manager select via Face openPath reveal.
+   * `host` — Face `host.openInApp` (local probed editor argv; files OK).
    * `url` — custom scheme or SSH vscode-remote URL.
+   * `download` — phone thin-shell download → Flutter share / open-with.
    */
-  kind: 'reveal' | 'host' | 'url'
+  kind: 'system' | 'reveal' | 'host' | 'url' | 'download'
   /** URL template with `{path}`; only for `url`. */
   urlTemplate?: string
   /** VSCode URL dialect (SSH remote form). */
@@ -107,12 +111,38 @@ export const OPEN_WITH_DEFAULTS: OpenWithConfig = {
   pinned: [],
 }
 
-/** Single reveal row — Host openPath, not a duplicate file-manager app entry. */
+/**
+ * System default open — same cascade chat used without the sidebar
+ * (`host.openPath`, not reveal). Local Desktop / LAN Web only.
+ */
+export const OPEN_WITH_SYSTEM: OpenWithTarget = {
+  id: 'system',
+  nameKey: 'openWithSystem',
+  name: '',
+  kind: 'system',
+  isVscodeFamily: false,
+  localOnly: true,
+}
+
+/** Reveal/select in the OS file manager — Host openPath reveal. */
 export const OPEN_WITH_REVEAL: OpenWithTarget = {
   id: 'explorer',
   nameKey: 'openWithExplorer',
   name: '',
   kind: 'reveal',
+  isVscodeFamily: false,
+  localOnly: true,
+}
+
+/**
+ * Phone APK thin shell: download via `XrkShell` → Downloads → share /
+ * open-with. Never a Face IDE list (Host apps live on the phone Guest).
+ */
+export const OPEN_WITH_DOWNLOAD: OpenWithTarget = {
+  id: 'download',
+  nameKey: 'openWithDownload',
+  name: '',
+  kind: 'download',
   isVscodeFamily: false,
   localOnly: true,
 }
@@ -225,14 +255,19 @@ export function resolveOpenWithTargets(
   config: OpenWithConfig,
   surface: OpenWithSurface = {},
 ): OpenWithTarget[] {
+  // Phone APK: one Download/share row — not Face IDE / Host OS open.
+  if (surface.thinShell === true) return [OPEN_WITH_DOWNLOAD]
   if (!openWithSurfaceAllowsOs(surface)) return []
 
   const ssh = config.sshHost.trim() !== ''
   const canOpen = surface.canOpenPath
   const targets: OpenWithTarget[] = []
 
-  // Local Web / Desktop: reveal when canOpenPath is true or still unknown
-  // (describe may lag); deny when Face said false.
+  // Local Web / Desktop: system open + reveal when canOpenPath is true or
+  // still unknown (describe may lag); deny when Face said false.
+  if (canOpen !== false && !(ssh && OPEN_WITH_SYSTEM.localOnly)) {
+    targets.push(OPEN_WITH_SYSTEM)
+  }
   if (canOpen !== false && !(ssh && OPEN_WITH_REVEAL.localOnly)) {
     targets.push(OPEN_WITH_REVEAL)
   }
@@ -267,7 +302,8 @@ export function filterOpenWithBySurface(
   const canOpen = surface.canOpenPath
   const installed = surface.installedApps
   return targets.filter((target) => {
-    if (target.kind === 'reveal') return canOpen !== false
+    if (target.kind === 'system' || target.kind === 'reveal') return canOpen !== false
+    if (target.kind === 'download') return surface.thinShell === true
     if (target.kind === 'host' && installed !== undefined && target.hostAppId !== undefined) {
       return installed.includes(target.hostAppId)
     }

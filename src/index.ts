@@ -784,9 +784,10 @@ function buildApi(
     'open.external': (payload) => {
       const record = payload as { action?: unknown } | null
       const action = record?.action
+      if (action === 'open') return launchExternal('open', requireString(payload, 'path'))
       if (action === 'reveal') return launchExternal('reveal', requireString(payload, 'path'))
       if (action === 'url') return launchExternal('url', requireString(payload, 'url'))
-      throw new SidebarError('bad-request', 'action must be "reveal" or "url"')
+      throw new SidebarError('bad-request', 'action must be "open", "reveal", or "url"')
     },
   }
 }

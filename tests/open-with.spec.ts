@@ -67,22 +67,23 @@ describe('resolveOpenWithTargets', () => {
     id: 'e2', name: 'Fork', urlTemplate: 'x-fork://file/{path}', isVscodeFamily: true,
   }
 
-  it('never invents IDE rows without a Face probe', () => {
+  it('never invents IDE rows without a Face probe (system + reveal only)', () => {
     const targets = resolveOpenWithTargets(parseOpenWithConfig({}))
-    expect(targets.map(t => t.id)).toEqual(['explorer'])
-    expect(targets[0]?.kind).toBe('reveal')
+    expect(targets.map(t => t.id)).toEqual(['system', 'explorer'])
+    expect(targets[0]?.kind).toBe('system')
+    expect(targets[1]?.kind).toBe('reveal')
   })
 
-  it('adds Face-probed editors after reveal', () => {
+  it('adds Face-probed editors after system open + reveal', () => {
     const targets = resolveOpenWithTargets(
       parseOpenWithConfig({ customEditors: [localCustom] }),
       { canOpenPath: true, installedApps: ['vscode', 'cursor'] },
     )
-    expect(targets.map(t => t.id)).toEqual(['explorer', 'vscode', 'cursor', 'custom:e1'])
+    expect(targets.map(t => t.id)).toEqual(['system', 'explorer', 'vscode', 'cursor', 'custom:e1'])
     expect(targets.find(t => t.id === 'vscode')?.kind).toBe('host')
   })
 
-  it('drops reveal when Face says canOpenPath is false', () => {
+  it('drops system + reveal when Face says canOpenPath is false', () => {
     const targets = resolveOpenWithTargets(
       parseOpenWithConfig({}),
       { canOpenPath: false, installedApps: ['cursor'] },
@@ -90,18 +91,18 @@ describe('resolveOpenWithTargets', () => {
     expect(targets.map(t => t.id)).toEqual(['cursor'])
   })
 
-  it('APK thinShell: empty — Flutter share/download, not a Face IDE list', () => {
+  it('APK thinShell: download/share only — not a Face IDE list', () => {
     expect(resolveOpenWithTargets(
       parseOpenWithConfig({ customEditors: [localCustom] }),
       { thinShell: true, phone: true, canOpenPath: true, installedApps: ['cursor', 'vscode'] },
-    )).toEqual([])
+    ).map(t => t.id)).toEqual(['download'])
   })
 
   it('phone chrome alone (Safari / resized desktop) still offers Face targets', () => {
     expect(resolveOpenWithTargets(
       parseOpenWithConfig({ customEditors: [localCustom] }),
       { phone: true, canOpenPath: true, installedApps: ['cursor'] },
-    ).map(t => t.id)).toEqual(['explorer', 'cursor', 'custom:e1'])
+    ).map(t => t.id)).toEqual(['system', 'explorer', 'cursor', 'custom:e1'])
   })
 
   it('remote Web (!loopback): empty — phone or desktop browser to a server', () => {
@@ -137,11 +138,18 @@ describe('resolveOpenWithTargets', () => {
       }),
       { narrow: true },
     )).toBe(true)
-    const two = resolveOpenWithTargets(parseOpenWithConfig({}), {
+    // system + reveal only → flat; adding probed editors nests on wide desktop.
+    const systemAndReveal = resolveOpenWithTargets(parseOpenWithConfig({}), {
+      canOpenPath: true,
+      installedApps: [],
+    })
+    expect(systemAndReveal.map(t => t.id)).toEqual(['system', 'explorer'])
+    expect(preferFlatOpenWithMenu(systemAndReveal)).toBe(true)
+    const withEditor = resolveOpenWithTargets(parseOpenWithConfig({}), {
       canOpenPath: true,
       installedApps: ['cursor'],
     })
-    expect(preferFlatOpenWithMenu(two)).toBe(true)
+    expect(preferFlatOpenWithMenu(withEditor)).toBe(false)
   })
 })
 
