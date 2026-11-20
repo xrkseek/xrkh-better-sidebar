@@ -6,12 +6,26 @@
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from 'pdfjs-dist'
+import { PDF_WORKER_SOURCE } from 'virtual:pdf-worker'
 import { fitScale } from './pdf-scale.ts'
 import { t } from './locales.ts'
 import css from './sidebar.module.css'
 
-/** Same-origin worker served by /sidebar/bundle (see bundle-route.ts). */
+/** Optional HTTP fallback (kept for Hosts that already serve the asset). */
 export const PDF_WORKER_URL = '/sidebar/bundle/pdf.worker.mjs'
+
+/** Blob URL of the inlined worker — no second /sidebar/bundle hop (phone WebView). */
+let workerBlobUrl: string | undefined
+
+function pdfWorkerSrc(): string {
+  if (workerBlobUrl === undefined) {
+    // ESM worker: pdf.js 4 always constructs `new Worker(src, { type: 'module' })`.
+    workerBlobUrl = URL.createObjectURL(
+      new Blob([PDF_WORKER_SOURCE], { type: 'text/javascript' }),
+    )
+  }
+  return workerBlobUrl
+}
 
 type DocState =
   | { status: 'loading' }
@@ -112,14 +126,27 @@ export function PdfCanvasView(props: {
 
 async function openPdfDocument(data: ArrayBuffer): Promise<PDFDocumentProxy> {
   const pdfjs = await import('pdfjs-dist')
-  // Phone APK / offline Host: same-origin bundle asset (never a CDN).
-  pdfjs.GlobalWorkerOptions.workerSrc = PDF_WORKER_URL
-  return pdfjs.getDocument({
-    data: data.slice(0),
-    useSystemFonts: true,
-    isEvalSupported: false,
-    verbosity: 0,
-  }).promise
+  const open = async (workerSrc: string): Promise<PDFDocumentProxy> => {
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc
+    return pdfjs.getDocument({
+      data: data.slice(0),
+      useSystemFonts: true,
+      isEvalSupported: false,
+      verbosity: 0,
+    }).promise
+  }
+  // Prefer inlined blob (phone 8787 / WebView often 404s the separate worker
+  // asset and then FakeWorker fails with "Failed to fetch dynamically…").
+  // HTTP URL remains a desktop/browser fallback when blob workers are blocked.
+  try {
+    return await open(pdfWorkerSrc())
+  } catch (blobError) {
+    try {
+      return await open(PDF_WORKER_URL)
+    } catch {
+      throw blobError instanceof Error ? blobError : new Error(String(blobError))
+    }
+  }
 }
 
 function PdfPage(props: {

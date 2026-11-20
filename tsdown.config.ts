@@ -40,6 +40,7 @@
  *
  * Types ship from lib/types (tsc -p tsconfig.build.json), not from tsdown.
  */
+import { readFileSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, resolve as resolvePath, sep } from 'node:path'
 import { builtinModules, createRequire } from 'node:module'
@@ -218,6 +219,7 @@ function chunkBundle(name: string): UserConfig {
       purityGatePlugin(),
       makeCssPlugin('xrkh-better-sidebar'),
       ...(name === 'mermaid' ? [mermaidChunkAliases()] : []),
+      ...(name === 'pdf' ? [pdfWorkerInlinePlugin()] : []),
     ],
     outputOptions: {
       entryFileNames: `client-${name}.js`,
@@ -252,6 +254,30 @@ function mermaidChunkAliases(): BuildPlugin {
     resolveId(source: string) {
       if (source === 'uuid') return uuidBrowserEntry
       return null
+    },
+  }
+}
+
+/**
+ * Inline pdf.js's worker into the pdf chunk as a string. Phone WebView often
+ * fails to fetch `/sidebar/bundle/pdf.worker.mjs` (404 / module load), which
+ * surfaces as "Setting up fake worker failed". A blob: URL needs no second hop.
+ */
+function pdfWorkerInlinePlugin(): BuildPlugin {
+  const workerPath = resolvePath(
+    dirname(require.resolve('pdfjs-dist/package.json')),
+    'build/pdf.worker.min.mjs',
+  )
+  return {
+    name: 'xrkh-pdf-worker-inline',
+    resolveId(source: string) {
+      if (source === 'virtual:pdf-worker') return '\0virtual:pdf-worker'
+      return null
+    },
+    load(id: string) {
+      if (id !== '\0virtual:pdf-worker') return null
+      const source = readFileSync(workerPath, 'utf8')
+      return `export const PDF_WORKER_SOURCE = ${JSON.stringify(source)};\n`
     },
   }
 }

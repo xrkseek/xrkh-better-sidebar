@@ -13,9 +13,10 @@
 - Client 按扩展名识别 `.pdf`，`fetchStrategy: mediaUrl`。
 - `PdfView` 拉取字节；缩放以**适应舞台宽度**为 1.0，工具栏 ± 调整相对倍率。
 - 实际绘制在懒加载 chunk `pdf`（`lib/client-pdf.js`）里，用 PDF.js 把页面画到 canvas；可见页 IntersectionObserver 懒渲染。
-- Worker 同源：`/sidebar/bundle/pdf.worker.mjs` ← `lib/client-pdf.worker.mjs`（构建时从 `pdfjs-dist` 拷贝）。禁止 CDN。
+- Worker **内联进 pdf chunk**（blob URL），避免手机 Host `127.0.0.1:8787` / WebView 二次请求 `/sidebar/bundle/pdf.worker.mjs` 失败；HTTP 同源 worker 仅作回退。禁止 CDN。
 - 工具条始终提供下载（手机短文案「下载」）；加载失败时舞台内也可下载。
 - 窄屏（≤767）：更大触控、粘性工具条、safe-area 底边距。
+- 目标面：手机 APK WebView、手机 Host 开的浏览器、桌面 Electron/Web、macOS Safari/Chrome。
 
 ## 与 office 插件的关系
 
